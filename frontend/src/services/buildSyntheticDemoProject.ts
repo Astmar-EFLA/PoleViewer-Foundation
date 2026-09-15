@@ -9,23 +9,14 @@
 import poleLattice4LegJson from "../../../fixtures/synthetic/pole-lattice-4leg.json";
 import terrainSlopeJson from "../../../fixtures/synthetic/terrain-slope.json";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
-import type { RectangularPadPedestalParameters } from "../domain/foundation";
+import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
 import type { TerrainPoint } from "../domain/terrain";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
-import { buildDefaultFoundationInstances } from "./buildFoundationInstances";
+import { buildFoundationInstanceForLeg } from "./buildFoundationInstances";
 import { parsePoleModel } from "../validation/poleModelSchema";
-
-const DEFAULT_FOUNDATION_PARAMETERS: RectangularPadPedestalParameters = {
-  padWidth: 1.8,
-  padLength: 1.8,
-  padThickness: 0.5,
-  pedestalWidth: 0.5,
-  pedestalLength: 0.5,
-  pedestalHeight: 0.8,
-};
 
 export function buildSyntheticDemoProject(): Project {
   const nowIso = new Date().toISOString();
@@ -45,10 +36,20 @@ export function buildSyntheticDemoProject(): Project {
     generatedAtIso: nowIso,
   });
 
-  const foundationInstances = buildDefaultFoundationInstances(
-    poleModel,
-    DEFAULT_FOUNDATION_PARAMETERS,
-    nowIso
+  // Deliberately mixed foundation types across legs (spec: each leg is
+  // independently assignable) -- NE/SE get the pad-and-pedestal type,
+  // SW/NW get the stepped-rectangular type, so the demo itself proves
+  // per-leg independence rather than asserting it only in tests.
+  const padPedestalType = requireFoundationTypeById("rectangular-pad-pedestal-v1");
+  const steppedType = requireFoundationTypeById("stepped-rectangular-v1");
+  const legFoundationType: Record<string, typeof padPedestalType> = {
+    "leg-ne": padPedestalType,
+    "leg-se": padPedestalType,
+    "leg-sw": steppedType,
+    "leg-nw": steppedType,
+  };
+  const foundationInstances = poleModel.structuralLegs.map((leg) =>
+    buildFoundationInstanceForLeg(poleModel, leg.id, legFoundationType[leg.id] ?? padPedestalType, nowIso)
   );
 
   return {

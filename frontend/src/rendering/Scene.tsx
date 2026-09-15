@@ -17,6 +17,9 @@ interface SceneProps {
 
 export function Scene({ project }: SceneProps) {
   const setHover = useProjectStore((s) => s.setHover);
+  const selectedLegId = useProjectStore((s) => s.selectedLegId);
+  const selectedInstanceId =
+    project.foundationInstances.find((f) => f.legId === selectedLegId)?.instanceId ?? null;
 
   const viewerFrame: ViewerFrameDefinition = { renderOriginLocal: project.renderOriginLocal };
   const localFrame: LocalFrameDefinition = {
@@ -80,6 +83,7 @@ export function Scene({ project }: SceneProps) {
         viewerFrame={viewerFrame}
         visible={project.layerStyles.foundations.visible}
         opacity={project.layerStyles.foundations.opacity}
+        selectedInstanceId={selectedInstanceId}
       />
 
       <OrbitControls makeDefault />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import type { Project } from "../domain/project";
-import type { RectangularPadPedestalParameters } from "../domain/foundation";
+import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
@@ -12,14 +12,6 @@ import { buildDefaultFoundationInstances } from "./buildFoundationInstances";
 import { deserializeProject, serializeProject } from "./projectSerialization";
 
 const NOW = "2026-09-15T00:00:00.000Z";
-const PARAMS: RectangularPadPedestalParameters = {
-  padWidth: 1.8,
-  padLength: 1.8,
-  padThickness: 0.5,
-  pedestalWidth: 0.5,
-  pedestalLength: 0.5,
-  pedestalHeight: 0.8,
-};
 
 function buildSyntheticProject(): Project {
   const poleModelParsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
@@ -35,7 +27,11 @@ function buildSyntheticProject(): Project {
     generatedAtIso: NOW,
   });
 
-  const foundationInstances = buildDefaultFoundationInstances(poleModel, PARAMS, NOW);
+  const foundationInstances = buildDefaultFoundationInstances(
+    poleModel,
+    requireFoundationTypeById("rectangular-pad-pedestal-v1"),
+    NOW
+  );
 
   return {
     schemaVersion: "0.1.0",

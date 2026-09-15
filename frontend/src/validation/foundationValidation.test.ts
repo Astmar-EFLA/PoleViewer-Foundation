@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { FoundationInstance, RectangularPadPedestalParameters } from "../domain/foundation";
+import type {
+  FoundationInstance,
+  RectangularPadPedestalParameters,
+  SteppedRectangularParameters,
+} from "../domain/foundation";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
 import { placedAnchorPosition } from "../geometry/polePlacement";
 import { parsePoleModel } from "./poleModelSchema";
@@ -12,6 +16,7 @@ const BASE_PROVENANCE = {
 };
 
 const PARAMS: RectangularPadPedestalParameters = {
+  geometryType: "rectangular-pad-pedestal",
   padWidth: 1.8,
   padLength: 1.8,
   padThickness: 0.5,
@@ -100,5 +105,61 @@ describe("validateFoundationInstance: connection mismatch", () => {
     const instance = baseInstance({ position: { x: anchorPos.x + 0.5, y: anchorPos.y } });
     const results = validateFoundationInstance(instance, anchorPos, NOW);
     expect(results.some((r) => r.ruleId === "foundation.connection-mismatch")).toBe(true);
+  });
+});
+
+describe("validateFoundationInstance: stepped-rectangular", () => {
+  const STEPPED_PARAMS: SteppedRectangularParameters = {
+    geometryType: "stepped-rectangular",
+    steps: [
+      { width: 1.8, length: 1.8, height: 0.4 },
+      { width: 0.6, length: 0.6, height: 0.8 },
+    ],
+  };
+
+  it("passes for a correctly-connected stepped foundation with valid steps", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const anchorPos = placedAnchorPosition("anchor-leg-ne", parsed.data);
+
+    const instance = baseInstance({
+      parameters: STEPPED_PARAMS,
+      baseElevation: anchorPos.z - 0.4 - 0.8,
+    });
+    const results = validateFoundationInstance(instance, anchorPos, NOW);
+    expect(results).toHaveLength(0);
+  });
+
+  it("flags zero steps as blocking", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const anchorPos = placedAnchorPosition("anchor-leg-ne", parsed.data);
+
+    const instance = baseInstance({ parameters: { geometryType: "stepped-rectangular", steps: [] } });
+    const results = validateFoundationInstance(instance, anchorPos, NOW);
+    expect(results.some((r) => r.ruleId === "foundation.no-steps" && r.severity === "blocking")).toBe(true);
+  });
+
+  it("flags a non-positive dimension within any step as blocking, naming the offending step", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const anchorPos = placedAnchorPosition("anchor-leg-ne", parsed.data);
+
+    const instance = baseInstance({
+      parameters: {
+        geometryType: "stepped-rectangular",
+        steps: [
+          { width: 1.8, length: 1.8, height: 0.4 },
+          { width: 0, length: 0.6, height: 0.8 },
+        ],
+      },
+    });
+    const results = validateFoundationInstance(instance, anchorPos, NOW);
+    const nonPositive = results.find((r) => r.ruleId === "foundation.non-positive-dimension");
+    expect(nonPositive?.severity).toBe("blocking");
+    expect(nonPositive?.detail).toContain("steps[1].width");
   });
 });

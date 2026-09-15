@@ -2,13 +2,10 @@ import type { Provenance, VerificationState } from "./provenance";
 
 /**
  * Foundation type #1 from the parametric library (spec: "rectangular pad
- * with pedestal") -- the only foundation type implemented in Phase 1. Other
- * library types (stepped rectangular, rock placeholder, ...) are added in
- * Phase 4 once the library-loading mechanism itself exists; this Phase-1
- * type is deliberately hardcoded rather than loaded, per "prefer a simple
- * correct implementation over a visually impressive but unverified one."
+ * with pedestal").
  */
 export interface RectangularPadPedestalParameters {
+  readonly geometryType: "rectangular-pad-pedestal";
   /** Pad width along local X (transverse), m. */
   readonly padWidth: number;
   /** Pad length along local Y (longitudinal), m. */
@@ -23,13 +20,36 @@ export interface RectangularPadPedestalParameters {
   readonly pedestalHeight: number;
 }
 
+/** One rectangular tier of a stepped foundation, ordered bottom to top and centred on the same (x, y). */
+export interface RectangularStep {
+  readonly width: number;
+  readonly length: number;
+  readonly height: number;
+}
+
+/** Foundation type #2 from the parametric library (spec: "stepped rectangular foundation"). */
+export interface SteppedRectangularParameters {
+  readonly geometryType: "stepped-rectangular";
+  /** Bottom to top; at least one step is required. */
+  readonly steps: readonly RectangularStep[];
+}
+
+/**
+ * Discriminated on `geometryType`, which lives on the parameters value
+ * itself (not just on the FoundationType library entry) so geometry
+ * generation stays a pure function of a FoundationInstance alone -- no
+ * library lookup required at render time (ADR-006).
+ */
+export type FoundationParameters = RectangularPadPedestalParameters | SteppedRectangularParameters;
+export type FoundationGeometryType = FoundationParameters["geometryType"];
+
 export interface FoundationType {
   readonly foundationTypeId: string;
   readonly name: string;
   readonly description?: string;
-  readonly geometryType: "rectangular-pad-pedestal";
+  readonly geometryType: FoundationGeometryType;
   readonly units: "m";
-  readonly defaultParameters: RectangularPadPedestalParameters;
+  readonly defaultParameters: FoundationParameters;
   readonly defaultColour: string;
   readonly defaultOpacity: number;
   readonly verificationState: VerificationState;
@@ -49,11 +69,11 @@ export interface FoundationInstance {
   readonly anchorId: string;
   readonly foundationTypeId: string;
   /** Defaults merged with any user overrides; kept as one resolved value so geometry generation stays a pure function of the instance alone. */
-  readonly parameters: RectangularPadPedestalParameters;
+  readonly parameters: FoundationParameters;
   /** Local horizontal placement (X, Y), independent of any other instance. */
   readonly position: { readonly x: number; readonly y: number };
   readonly orientationRadians: number;
-  /** Local Z of the pad's bottom face. */
+  /** Local Z of the foundation's bottom face. */
   readonly baseElevation: number;
   readonly visible: boolean;
   readonly colour: string;

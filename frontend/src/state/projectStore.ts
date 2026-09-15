@@ -1,9 +1,12 @@
 import { create } from "zustand";
 import type { LocalCoordinate, ProjectCoordinate } from "../domain/coordinates";
+import type { FoundationParameters } from "../domain/foundation";
+import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { ClassificationCount, ProcessingWarning } from "../domain/pointCloud";
 import type { Project, ProjectLayerStyles } from "../domain/project";
 import type { ElevationQuerySource } from "../domain/terrain";
 import { BackendClipBlockedError, BackendRequestError } from "../services/backendClient";
+import { withFoundationType } from "../services/buildFoundationInstances";
 import { generateTerrainFromPointCloud } from "../services/terrainGeneration";
 
 export type LayerKey = keyof ProjectLayerStyles;
@@ -34,6 +37,7 @@ interface ProjectStoreState {
   readonly project: Project | null;
   readonly hover: HoverReadout | null;
   readonly terrainRegeneration: TerrainRegenerationState;
+  readonly selectedLegId: string | null;
   setProject(project: Project): void;
   setLayerVisible(layer: LayerKey, visible: boolean): void;
   setLayerOpacity(layer: LayerKey, opacity: number): void;
@@ -41,6 +45,10 @@ interface ProjectStoreState {
   setTerrainWireframe(wireframe: boolean): void;
   setHover(hover: HoverReadout | null): void;
   regenerateTerrainFromPointCloud(): Promise<void>;
+  setSelectedLeg(legId: string | null): void;
+  setFoundationType(legId: string, foundationTypeId: string): void;
+  setFoundationParameters(legId: string, parameters: FoundationParameters): void;
+  copyFoundationToOtherLegs(sourceLegId: string): void;
 }
 
 /**
@@ -55,6 +63,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   project: null,
   hover: null,
   terrainRegeneration: IDLE_TERRAIN_REGENERATION,
+  selectedLegId: null,
   setProject: (project) => set({ project }),
   setLayerVisible: (layer, visible) =>
     set((state) => {
@@ -161,4 +170,73 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       });
     }
   },
+  setSelectedLeg: (legId) => set({ selectedLegId: legId }),
+  setFoundationType: (legId, foundationTypeId) =>
+    set((state) => {
+      if (!state.project) return {};
+      const instance = state.project.foundationInstances.find((f) => f.legId === legId);
+      if (!instance) return {};
+
+      const foundationType = requireFoundationTypeById(foundationTypeId);
+      const updated = withFoundationType(instance, state.project.poleModel, foundationType, new Date().toISOString());
+
+      return {
+        project: {
+          ...state.project,
+          foundationInstances: state.project.foundationInstances.map((f) =>
+            f.legId === legId ? updated : f
+          ),
+        },
+      };
+    }),
+  setFoundationParameters: (legId, parameters) =>
+    set((state) => {
+      if (!state.project) return {};
+      const instance = state.project.foundationInstances.find((f) => f.legId === legId);
+      if (!instance) return {};
+
+      const foundationType = requireFoundationTypeById(instance.foundationTypeId);
+      const updated = withFoundationType(
+        instance,
+        state.project.poleModel,
+        foundationType,
+        new Date().toISOString(),
+        parameters
+      );
+
+      return {
+        project: {
+          ...state.project,
+          foundationInstances: state.project.foundationInstances.map((f) =>
+            f.legId === legId ? updated : f
+          ),
+        },
+      };
+    }),
+  copyFoundationToOtherLegs: (sourceLegId) =>
+    set((state) => {
+      const project = state.project;
+      if (!project) return {};
+      const source = project.foundationInstances.find((f) => f.legId === sourceLegId);
+      if (!source) return {};
+
+      const foundationType = requireFoundationTypeById(source.foundationTypeId);
+      const nowIso = new Date().toISOString();
+
+      return {
+        project: {
+          ...project,
+          // Each target leg keeps its own anchor and independently solves
+          // its own base elevation for that anchor's level (withFoundationType
+          // re-derives baseElevation per instance) -- copying a foundation
+          // type/parameters is never allowed to also copy an elevation
+          // across legs on sloping terrain.
+          foundationInstances: project.foundationInstances.map((f) =>
+            f.legId === sourceLegId
+              ? f
+              : withFoundationType(f, project.poleModel, foundationType, nowIso, source.parameters)
+          ),
+        },
+      };
+    }),
 }));
