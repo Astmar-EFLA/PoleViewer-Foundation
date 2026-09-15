@@ -16,6 +16,20 @@ and quantities are not an approved design or a certified construction quantity.
 - Phase 3 (terrain surface from the real point cloud) — done: the frontend's TIN
   generator now runs on real backend-clipped LAS points, not just synthetic fixtures;
   points/surface/wireframe display modes.
+- Phase 4 (foundation library and per-leg editing) — done: parametric rectangular
+  pad-pedestal and stepped-rectangular foundation types, independent per-leg base
+  elevation, copy-to-other-legs.
+- Phase 5 (geotechnical layers and groundwater) — done: terrain-relative and
+  absolute-elevation boundary surfaces, groundwater table, inversion/intersection
+  validation.
+- Phase 6 (excavation geometry) — done: working-space offset, H:V side slopes,
+  terrain-intersection solving, approximate volume with explicit blocking/truncation
+  status.
+- Phase 7 (sections and measurements) — done: longitudinal/transverse/leg/custom
+  vertical sections rendered as flat 2D diagrams derived from the same geometry as
+  the 3D view, a horizontal clipping plane, fixed camera views, and point/distance/
+  slope/clearance measurement tools with explicit staleness tracking after geometry
+  changes.
 
 See [docs/architecture](docs/architecture) for the phase plan and
 [docs/decisions](docs/decisions) for Architecture Decision Records.

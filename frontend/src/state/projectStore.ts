@@ -1,12 +1,26 @@
 import { create } from "zustand";
-import type { LocalCoordinate, ProjectCoordinate } from "../domain/coordinates";
+import { localCoordinate } from "../domain/coordinates";
+import type { LocalCoordinate, LocalFrameDefinition, ProjectCoordinate } from "../domain/coordinates";
+import { localToProject } from "../geometry/coordinateTransform";
 import type { SideSlope } from "../domain/excavation";
 import type { FoundationParameters } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { BoundaryDefinition } from "../domain/geotech";
+import type { Measurement, MeasurementKind, MeasurementPointRecord } from "../domain/measurement";
 import type { ClassificationCount, ProcessingWarning } from "../domain/pointCloud";
 import type { Project, ProjectLayerStyles } from "../domain/project";
+import type { SectionDefinition, SectionMode, SectionPlane } from "../domain/section";
 import type { ElevationQuerySource } from "../domain/terrain";
+import { buildSectionPlane } from "../geometry/section";
+import {
+  measureDepthBelowTerrain,
+  measureFoundationToBearingLayerClearance,
+  measureFoundationToGroundwaterSeparation,
+  measureHorizontalDistance,
+  measureSlope,
+  measureThreeDDistance,
+  measureVerticalDifference,
+} from "../geometry/measurements";
 import { BackendClipBlockedError, BackendRequestError } from "../services/backendClient";
 import { withFoundationType } from "../services/buildFoundationInstances";
 import { generateTerrainFromPointCloud } from "../services/terrainGeneration";
@@ -35,11 +49,41 @@ const IDLE_TERRAIN_REGENERATION: TerrainRegenerationState = {
   errorMessage: null,
 };
 
+export interface HorizontalClipState {
+  readonly enabled: boolean;
+  readonly elevationLocalZ: number;
+}
+
+const DEFAULT_HORIZONTAL_CLIP: HorizontalClipState = { enabled: false, elevationLocalZ: 0 };
+
+export interface PendingMeasurement {
+  readonly kind: MeasurementKind;
+  readonly points: readonly MeasurementPointRecord[];
+}
+
+export type FixedViewPreset = "top" | "front" | "side" | "isometric" | "reset";
+
+export interface CameraPresetRequest {
+  readonly preset: FixedViewPreset;
+  readonly nonce: number;
+}
+
+const ONE_POINT_MEASUREMENT_KINDS: readonly MeasurementKind[] = ["point-coordinate", "elevation", "depth-below-terrain"];
+
+function requiredPointCount(kind: MeasurementKind): number {
+  return ONE_POINT_MEASUREMENT_KINDS.includes(kind) ? 1 : 2;
+}
+
 interface ProjectStoreState {
   readonly project: Project | null;
   readonly hover: HoverReadout | null;
   readonly terrainRegeneration: TerrainRegenerationState;
   readonly selectedLegId: string | null;
+  readonly activeSectionId: string | null;
+  readonly horizontalClip: HorizontalClipState;
+  readonly pendingMeasurement: PendingMeasurement | null;
+  readonly cameraPresetRequest: CameraPresetRequest | null;
+  requestCameraPreset(preset: FixedViewPreset): void;
   setProject(project: Project): void;
   setLayerVisible(layer: LayerKey, visible: boolean): void;
   setLayerOpacity(layer: LayerKey, opacity: number): void;
@@ -66,6 +110,24 @@ interface ProjectStoreState {
     excavationId: string,
     params: Partial<{ bottomElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope }>
   ): void;
+  setActiveSectionId(sectionId: string | null): void;
+  addSection(mode: SectionMode, legId: string | null): void;
+  updateSectionPlane(sectionId: string, plane: SectionPlane): void;
+  setSectionPointTolerance(sectionId: string, toleranceM: number): void;
+  setSectionVisible(sectionId: string, visible: boolean): void;
+  removeSection(sectionId: string): void;
+  setHorizontalClipEnabled(enabled: boolean): void;
+  setHorizontalClipElevation(elevationLocalZ: number): void;
+  startMeasurement(kind: MeasurementKind): void;
+  cancelMeasurement(): void;
+  pickMeasurementPoint(local: LocalCoordinate): void;
+  addFoundationClearanceMeasurement(
+    kind: "foundation-to-bearing-layer" | "foundation-to-groundwater",
+    legId: string,
+    geotechLayerId?: string
+  ): void;
+  removeMeasurement(measurementId: string): void;
+  recalculateMeasurement(measurementId: string): void;
 }
 
 /**
@@ -81,7 +143,14 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   hover: null,
   terrainRegeneration: IDLE_TERRAIN_REGENERATION,
   selectedLegId: null,
-  setProject: (project) => set({ project }),
+  activeSectionId: null,
+  horizontalClip: DEFAULT_HORIZONTAL_CLIP,
+  pendingMeasurement: null,
+  cameraPresetRequest: null,
+  requestCameraPreset: (preset) =>
+    set((state) => ({ cameraPresetRequest: { preset, nonce: (state.cameraPresetRequest?.nonce ?? 0) + 1 } })),
+  setProject: (project) =>
+    set({ project, activeSectionId: project.sections[0]?.id ?? null, pendingMeasurement: null }),
   setLayerVisible: (layer, visible) =>
     set((state) => {
       if (!state.project) return {};
@@ -195,7 +264,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       if (!instance) return {};
 
       const foundationType = requireFoundationTypeById(foundationTypeId);
-      const updated = withFoundationType(instance, state.project.poleModel, foundationType, new Date().toISOString());
+      const nowIso = new Date().toISOString();
+      const updated = withFoundationType(instance, state.project.poleModel, foundationType, nowIso);
 
       return {
         project: {
@@ -203,6 +273,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           foundationInstances: state.project.foundationInstances.map((f) =>
             f.legId === legId ? updated : f
           ),
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: nowIso,
         },
       };
     }),
@@ -213,11 +285,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       if (!instance) return {};
 
       const foundationType = requireFoundationTypeById(instance.foundationTypeId);
+      const nowIso = new Date().toISOString();
       const updated = withFoundationType(
         instance,
         state.project.poleModel,
         foundationType,
-        new Date().toISOString(),
+        nowIso,
         parameters
       );
 
@@ -227,6 +300,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           foundationInstances: state.project.foundationInstances.map((f) =>
             f.legId === legId ? updated : f
           ),
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: nowIso,
         },
       };
     }),
@@ -253,6 +328,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
               ? f
               : withFoundationType(f, project.poleModel, foundationType, nowIso, source.parameters)
           ),
+          geometryVersion: project.geometryVersion + 1,
+          modifiedAt: nowIso,
         },
       };
     }),
@@ -278,6 +355,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           geotechLayers: state.project.geotechLayers.map((l) =>
             l.id === layerId ? { ...l, [key]: boundary } : l
           ),
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
         },
       };
     }),
@@ -289,7 +368,14 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   setGroundwaterBoundary: (boundary) =>
     set((state) => {
       if (!state.project?.groundwater) return {};
-      return { project: { ...state.project, groundwater: { ...state.project.groundwater, boundary } } };
+      return {
+        project: {
+          ...state.project,
+          groundwater: { ...state.project.groundwater, boundary },
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
+        },
+      };
     }),
   setExcavationStyle: (excavationId, style) =>
     set((state) => {
@@ -312,7 +398,326 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           excavationInstances: state.project.excavationInstances.map((e) =>
             e.id === excavationId ? { ...e, ...params } : e
           ),
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  setActiveSectionId: (sectionId) => set({ activeSectionId: sectionId }),
+  addSection: (mode, legId) =>
+    set((state) => {
+      const project = state.project;
+      if (!project) return {};
+      const nowIso = new Date().toISOString();
+      const id = `section-${mode}-${nowIso}`;
+      const name =
+        mode === "leg" && legId
+          ? `Section through ${legId}`
+          : mode === "custom"
+            ? "Custom section"
+            : mode === "longitudinal"
+              ? "Longitudinal (through mast centre)"
+              : "Transverse (through mast centre)";
+      const newSection: SectionDefinition = {
+        id,
+        name,
+        mode,
+        legId: mode === "leg" ? legId : null,
+        plane: buildSectionPlane(project, mode, legId),
+        pointToleranceM: 1.0,
+        visible: true,
+      };
+      return {
+        project: { ...project, sections: [...project.sections, newSection] },
+        activeSectionId: id,
+      };
+    }),
+  updateSectionPlane: (sectionId, plane) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          sections: state.project.sections.map((s) => (s.id === sectionId ? { ...s, plane } : s)),
+        },
+      };
+    }),
+  setSectionPointTolerance: (sectionId, toleranceM) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          sections: state.project.sections.map((s) =>
+            s.id === sectionId ? { ...s, pointToleranceM: toleranceM } : s
+          ),
+        },
+      };
+    }),
+  setSectionVisible: (sectionId, visible) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          sections: state.project.sections.map((s) => (s.id === sectionId ? { ...s, visible } : s)),
+        },
+      };
+    }),
+  removeSection: (sectionId) =>
+    set((state) => {
+      if (!state.project) return {};
+      const remaining = state.project.sections.filter((s) => s.id !== sectionId);
+      return {
+        project: { ...state.project, sections: remaining },
+        activeSectionId: get().activeSectionId === sectionId ? (remaining[0]?.id ?? null) : get().activeSectionId,
+      };
+    }),
+  setHorizontalClipEnabled: (enabled) =>
+    set((state) => ({ horizontalClip: { ...state.horizontalClip, enabled } })),
+  setHorizontalClipElevation: (elevationLocalZ) =>
+    set((state) => ({ horizontalClip: { ...state.horizontalClip, elevationLocalZ } })),
+  startMeasurement: (kind) => set({ pendingMeasurement: { kind, points: [] } }),
+  cancelMeasurement: () => set({ pendingMeasurement: null }),
+  pickMeasurementPoint: (local) =>
+    set((state) => {
+      const project = state.project;
+      const pending = state.pendingMeasurement;
+      if (!project || !pending) return {};
+
+      const localFrame: LocalFrameDefinition = {
+        mastCentreProject: project.mastCentreProject,
+        lineBearingRadians: project.lineBearingRadians,
+      };
+      const point: MeasurementPointRecord = { local, project: localToProject(local, localFrame) };
+      const points = [...pending.points, point];
+
+      if (points.length < requiredPointCount(pending.kind)) {
+        return { pendingMeasurement: { kind: pending.kind, points } };
+      }
+
+      const measurement = buildPointBasedMeasurement(pending.kind, points, project);
+      if (!measurement) return { pendingMeasurement: null };
+
+      return {
+        pendingMeasurement: null,
+        project: { ...project, measurements: [...project.measurements, measurement] },
+      };
+    }),
+  addFoundationClearanceMeasurement: (kind, legId, geotechLayerId) =>
+    set((state) => {
+      const project = state.project;
+      if (!project || !project.terrainSurface) return {};
+      const foundation = project.foundationInstances.find((f) => f.legId === legId);
+      if (!foundation) return {};
+
+      const nowIso = new Date().toISOString();
+      const localFrame: LocalFrameDefinition = {
+        mastCentreProject: project.mastCentreProject,
+        lineBearingRadians: project.lineBearingRadians,
+      };
+      const foundationBaseLocal = localCoordinate(foundation.position.x, foundation.position.y, foundation.baseElevation);
+      const basePoint: MeasurementPointRecord = {
+        local: foundationBaseLocal,
+        project: localToProject(foundationBaseLocal, localFrame),
+      };
+
+      let resultValue: number | null = null;
+      let label: string;
+      let relatedObjectIds: string[];
+
+      if (kind === "foundation-to-bearing-layer") {
+        const layer = geotechLayerId
+          ? project.geotechLayers.find((l) => l.id === geotechLayerId)
+          : project.geotechLayers.find((l) => l.category === "competent-bearing") ?? project.geotechLayers[0];
+        if (!layer) return {};
+        resultValue = measureFoundationToBearingLayerClearance(
+          foundation,
+          layer,
+          project.terrainSurface,
+          project.mastCentreProject.elevation
+        );
+        label = `${foundation.legId} base to "${layer.name}" clearance`;
+        relatedObjectIds = [foundation.instanceId, layer.id];
+      } else {
+        if (!project.groundwater) return {};
+        resultValue = measureFoundationToGroundwaterSeparation(
+          foundation,
+          project.groundwater,
+          project.terrainSurface,
+          project.mastCentreProject.elevation
+        );
+        label = `${foundation.legId} base to groundwater separation`;
+        relatedObjectIds = [foundation.instanceId, project.groundwater.id];
+      }
+
+      const measurement: Measurement = {
+        id: `measurement-${nowIso}-${Math.random().toString(36).slice(2, 8)}`,
+        kind,
+        label,
+        points: [basePoint],
+        resultValue,
+        resultUnit: "m",
+        relatedObjectIds,
+        geometryVersionAtCalculation: project.geometryVersion,
+        calculatedAtIso: nowIso,
+      };
+
+      return { project: { ...project, measurements: [...project.measurements, measurement] } };
+    }),
+  removeMeasurement: (measurementId) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          measurements: state.project.measurements.filter((m) => m.id !== measurementId),
+        },
+      };
+    }),
+  recalculateMeasurement: (measurementId) =>
+    set((state) => {
+      const project = state.project;
+      if (!project) return {};
+      const existing = project.measurements.find((m) => m.id === measurementId);
+      if (!existing) return {};
+
+      const nowIso = new Date().toISOString();
+      let updated: Measurement;
+
+      if (existing.kind === "foundation-to-bearing-layer" || existing.kind === "foundation-to-groundwater") {
+        const foundationId = existing.relatedObjectIds?.[0];
+        const foundation = project.foundationInstances.find((f) => f.instanceId === foundationId);
+        if (!foundation || !project.terrainSurface) return {};
+
+        let resultValue: number | null = null;
+        if (existing.kind === "foundation-to-bearing-layer") {
+          const layerId = existing.relatedObjectIds?.[1];
+          const layer = project.geotechLayers.find((l) => l.id === layerId);
+          if (!layer) return {};
+          resultValue = measureFoundationToBearingLayerClearance(
+            foundation,
+            layer,
+            project.terrainSurface,
+            project.mastCentreProject.elevation
+          );
+        } else {
+          if (!project.groundwater) return {};
+          resultValue = measureFoundationToGroundwaterSeparation(
+            foundation,
+            project.groundwater,
+            project.terrainSurface,
+            project.mastCentreProject.elevation
+          );
+        }
+        updated = {
+          ...existing,
+          resultValue,
+          geometryVersionAtCalculation: project.geometryVersion,
+          calculatedAtIso: nowIso,
+        };
+      } else {
+        const recalculated = buildPointBasedMeasurement(existing.kind, existing.points, project);
+        if (!recalculated) return {};
+        updated = { ...recalculated, id: existing.id, label: existing.label };
+      }
+
+      return {
+        project: {
+          ...project,
+          measurements: project.measurements.map((m) => (m.id === measurementId ? updated : m)),
         },
       };
     }),
 }));
+
+function buildPointBasedMeasurement(
+  kind: MeasurementKind,
+  points: readonly MeasurementPointRecord[],
+  project: Project
+): Measurement | null {
+  const nowIso = new Date().toISOString();
+  const id = `measurement-${nowIso}-${Math.random().toString(36).slice(2, 8)}`;
+  const base = {
+    id,
+    points,
+    geometryVersionAtCalculation: project.geometryVersion,
+    calculatedAtIso: nowIso,
+  };
+
+  const p0 = points[0];
+  const p1 = points[1];
+  if (!p0) return null;
+
+  switch (kind) {
+    case "point-coordinate":
+      return {
+        ...base,
+        kind,
+        label: `Point (${p0.local.x.toFixed(2)}, ${p0.local.y.toFixed(2)}, ${p0.local.z.toFixed(2)})`,
+        resultValue: null,
+        resultUnit: "m",
+      };
+    case "elevation":
+      return {
+        ...base,
+        kind,
+        label: "Elevation",
+        resultValue: p0.local.z,
+        resultUnit: "m",
+      };
+    case "depth-below-terrain": {
+      if (!project.terrainSurface) return null;
+      const depth = measureDepthBelowTerrain(p0.local, project.terrainSurface);
+      return { ...base, kind, label: "Depth below terrain", resultValue: depth, resultUnit: "m" };
+    }
+    case "horizontal-distance": {
+      if (!p1) return null;
+      return {
+        ...base,
+        kind,
+        label: "Horizontal distance",
+        resultValue: measureHorizontalDistance(p0.local, p1.local),
+        resultUnit: "m",
+      };
+    }
+    case "three-d-distance": {
+      if (!p1) return null;
+      return {
+        ...base,
+        kind,
+        label: "3D distance",
+        resultValue: measureThreeDDistance(p0.local, p1.local),
+        resultUnit: "m",
+      };
+    }
+    case "vertical-difference": {
+      if (!p1) return null;
+      return {
+        ...base,
+        kind,
+        label: "Vertical difference",
+        resultValue: measureVerticalDifference(p0.local, p1.local),
+        resultUnit: "m",
+      };
+    }
+    case "slope": {
+      if (!p1) return null;
+      const slope = measureSlope(p0.local, p1.local);
+      const angleDeg = (slope.angleFromHorizontalRadians * 180) / Math.PI;
+      return {
+        ...base,
+        kind,
+        label: "Slope",
+        resultValue: slope.ratioHtoV,
+        resultUnit: "ratio",
+        ...(slope.percentGrade !== null
+          ? { resultDetail: `${slope.percentGrade.toFixed(1)}% grade, ${angleDeg.toFixed(1)} deg` }
+          : {}),
+      };
+    }
+    case "foundation-to-bearing-layer":
+    case "foundation-to-groundwater":
+      return null; // built by addFoundationClearanceMeasurement, not point picking
+  }
+}

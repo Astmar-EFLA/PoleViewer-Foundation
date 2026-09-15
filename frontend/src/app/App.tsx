@@ -4,8 +4,11 @@ import { ExcavationPanel } from "../rendering/ExcavationPanel";
 import { FoundationPanel } from "../rendering/FoundationPanel";
 import { GeotechPanel } from "../rendering/GeotechPanel";
 import { LayerPanel } from "../rendering/LayerPanel";
+import { MeasurementPanel } from "../rendering/MeasurementPanel";
 import { Scene } from "../rendering/Scene";
+import { SectionPanel } from "../rendering/SectionPanel";
 import { TerrainPanel } from "../rendering/TerrainPanel";
+import { ViewportControls } from "../rendering/ViewportControls";
 import { buildSyntheticDemoProject } from "../services/buildSyntheticDemoProject";
 import { useProjectStore } from "../state/projectStore";
 
@@ -25,10 +28,13 @@ export function App() {
         <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading synthetic demo project...</div>
       )}
       <LayerPanel />
+      <ViewportControls />
       <TerrainPanel />
       <FoundationPanel />
       <GeotechPanel />
       <ExcavationPanel />
+      <SectionPanel />
+      <MeasurementPanel />
       <CoordinateReadout />
     </div>
   );

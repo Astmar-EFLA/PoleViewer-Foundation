@@ -102,6 +102,33 @@ function buildSyntheticProject(): Project {
       foundations: { visible: true, opacity: 1 },
       terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false },
     },
+    sections: [
+      {
+        id: "section-longitudinal",
+        name: "Longitudinal (through mast centre)",
+        mode: "longitudinal",
+        legId: null,
+        plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+        pointToleranceM: 1.0,
+        visible: true,
+      },
+    ],
+    measurements: [
+      {
+        id: "measurement-1",
+        kind: "horizontal-distance",
+        label: "Leg NE to leg SE",
+        points: [
+          { local: localCoordinate(6, 6, -2), project: projectCoordinate(512_351.678, 487_660.321, 121.456) },
+          { local: localCoordinate(6, -6, -2), project: projectCoordinate(512_351.678, 487_648.321, 121.456) },
+        ],
+        resultValue: 12,
+        resultUnit: "m",
+        geometryVersionAtCalculation: 1,
+        calculatedAtIso: NOW,
+      },
+    ],
+    geometryVersion: 1,
   };
 }
 

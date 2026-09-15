@@ -14,6 +14,7 @@ interface TerrainMeshProps {
   readonly wireframe?: boolean;
   readonly onHoverLocalXY?: (localX: number, localY: number) => void;
   readonly onHoverEnd?: () => void;
+  readonly onPickLocalXY?: (localX: number, localY: number) => void;
 }
 
 /**
@@ -31,6 +32,7 @@ export function TerrainMesh({
   wireframe = false,
   onHoverLocalXY,
   onHoverEnd,
+  onPickLocalXY,
 }: TerrainMeshProps) {
   const geometry = useMemo(() => {
     const geom = new THREE.BufferGeometry();
@@ -65,11 +67,20 @@ export function TerrainMesh({
     onHoverLocalXY(local.x, local.y);
   }
 
+  function handleClick(event: ThreeEvent<MouseEvent>) {
+    event.stopPropagation();
+    if (!onPickLocalXY) return;
+    const viewerPoint = fromThreeVector3(event.point);
+    const local = viewerToLocal(viewerPoint, viewerFrame);
+    onPickLocalXY(local.x, local.y);
+  }
+
   return (
     <mesh
       geometry={geometry}
       onPointerMove={handlePointerMove}
       onPointerOut={() => onHoverEnd?.()}
+      onClick={handleClick}
     >
       <meshStandardMaterial
         color="#8a9a7b"

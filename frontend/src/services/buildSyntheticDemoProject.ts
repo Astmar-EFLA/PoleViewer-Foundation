@@ -16,6 +16,7 @@ import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
 import type { TerrainPoint } from "../domain/terrain";
+import type { SectionDefinition } from "../domain/section";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
 import { buildFoundationInstanceForLeg } from "./buildFoundationInstances";
@@ -91,6 +92,31 @@ function buildDemoExcavations(foundationInstances: readonly FoundationInstance[]
       notes: "Synthetic demo assumption: bottom elevation set to the foundation base, 0.5m working space, 1.5H:1V slope.",
     },
   }));
+}
+
+const DEFAULT_SECTION_POINT_TOLERANCE_M = 1.0;
+
+function buildDemoSections(): SectionDefinition[] {
+  return [
+    {
+      id: "section-longitudinal",
+      name: "Longitudinal (through mast centre)",
+      mode: "longitudinal",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: DEFAULT_SECTION_POINT_TOLERANCE_M,
+      visible: true,
+    },
+    {
+      id: "section-transverse",
+      name: "Transverse (through mast centre)",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: 0 },
+      pointToleranceM: DEFAULT_SECTION_POINT_TOLERANCE_M,
+      visible: true,
+    },
+  ];
 }
 
 function buildDemoGroundwater(): Groundwater {
@@ -180,5 +206,8 @@ export function buildSyntheticDemoProject(): Project {
       foundations: { visible: true, opacity: 1 },
       terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false },
     },
+    sections: buildDemoSections(),
+    measurements: [],
+    geometryVersion: 1,
   };
 }

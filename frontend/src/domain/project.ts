@@ -2,16 +2,18 @@ import type { CoordinateReferenceSystem, LocalCoordinate, ProjectCoordinate } fr
 import type { ExcavationInstance } from "./excavation";
 import type { FoundationInstance } from "./foundation";
 import type { GeotechLayer, Groundwater } from "./geotech";
+import type { Measurement } from "./measurement";
 import type { PoleModel } from "./poleModel";
 import type { PointCloudSourceReference, TerrainGenerationSettings } from "./pointCloud";
+import type { SectionDefinition } from "./section";
 import type { TerrainSurface } from "./terrain";
 
 /**
- * Phase 1-5 subset of the full project schema (spec section 19). Fields
- * not yet needed (excavation, sections, measurements,
- * validation-results-as-saved-state) are deliberately omitted here rather
- * than stubbed -- they are added in the phases that actually implement
- * them, per "don't design for hypothetical future requirements."
+ * Phase 1-7 subset of the full project schema (spec section 19). Fields
+ * not yet needed (validation-results-as-saved-state) are deliberately
+ * omitted here rather than stubbed -- they are added in the phases that
+ * actually implement them, per "don't design for hypothetical future
+ * requirements."
  */
 export interface LayerStyle {
   readonly visible: boolean;
@@ -63,4 +65,15 @@ export interface Project {
   readonly terrainGenerationSettings: TerrainGenerationSettings;
   readonly terrainSurface: TerrainSurface | null;
   readonly layerStyles: ProjectLayerStyles;
+  readonly sections: readonly SectionDefinition[];
+  readonly measurements: readonly Measurement[];
+  /**
+   * Incremented on every change to geometry-affecting engineering data
+   * (foundation type/parameters, excavation parameters, geotech/groundwater
+   * boundaries, terrain regeneration) -- never on style-only changes
+   * (visibility, colour, opacity, wireframe). Sections and measurements
+   * reference the version they were computed against so a stale one is
+   * detectable (spec section 15) rather than silently kept.
+   */
+  readonly geometryVersion: number;
 }

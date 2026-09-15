@@ -3,10 +3,12 @@ import type { Project } from "../domain/project";
 import { excavationInstanceSchema } from "./excavationSchema";
 import { foundationInstanceSchema } from "./foundationSchema";
 import { geotechLayerSchema, groundwaterSchema } from "./geotechSchema";
+import { measurementSchema } from "./measurementSchema";
 import type { ParseResult } from "./parseResult";
 import { fromZodSafeParse } from "./parseResult";
 import { poleModelSchema } from "./poleModelSchema";
 import { pointCloudSourceReferenceSchema, terrainGenerationSettingsSchema } from "./pointCloudSchema";
+import { sectionDefinitionSchema } from "./sectionSchema";
 import { crsSchema, lengthUnitSchema, localCoordinateSchema, projectCoordinateSchema } from "./sharedSchemas";
 import { terrainSurfaceSchema } from "./terrainSchema";
 
@@ -47,6 +49,9 @@ export const projectSchema = z.object({
     foundations: layerStyleSchema,
     terrain: terrainLayerStyleSchema,
   }),
+  sections: z.array(sectionDefinitionSchema),
+  measurements: z.array(measurementSchema),
+  geometryVersion: z.number().int().nonnegative(),
 });
 
 /**
