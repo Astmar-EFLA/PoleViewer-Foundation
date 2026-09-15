@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { LocalCoordinate, ProjectCoordinate } from "../domain/coordinates";
+import type { SideSlope } from "../domain/excavation";
 import type { FoundationParameters } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { BoundaryDefinition } from "../domain/geotech";
@@ -57,6 +58,14 @@ interface ProjectStoreState {
   setGeotechLayerBoundary(layerId: string, which: "top" | "bottom", boundary: BoundaryDefinition): void;
   setGroundwaterStyle(style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
   setGroundwaterBoundary(boundary: BoundaryDefinition): void;
+  setExcavationStyle(
+    excavationId: string,
+    style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>
+  ): void;
+  setExcavationParameters(
+    excavationId: string,
+    params: Partial<{ bottomElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope }>
+  ): void;
 }
 
 /**
@@ -281,5 +290,29 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set((state) => {
       if (!state.project?.groundwater) return {};
       return { project: { ...state.project, groundwater: { ...state.project.groundwater, boundary } } };
+    }),
+  setExcavationStyle: (excavationId, style) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          excavationInstances: state.project.excavationInstances.map((e) =>
+            e.id === excavationId ? { ...e, ...style } : e
+          ),
+        },
+      };
+    }),
+  setExcavationParameters: (excavationId, params) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          excavationInstances: state.project.excavationInstances.map((e) =>
+            e.id === excavationId ? { ...e, ...params } : e
+          ),
+        },
+      };
     }),
 }));

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Project } from "../domain/project";
+import { excavationInstanceSchema } from "./excavationSchema";
 import { foundationInstanceSchema } from "./foundationSchema";
 import { geotechLayerSchema, groundwaterSchema } from "./geotechSchema";
 import type { ParseResult } from "./parseResult";
@@ -35,6 +36,7 @@ export const projectSchema = z.object({
   renderOriginLocal: localCoordinateSchema,
   poleModel: poleModelSchema,
   foundationInstances: z.array(foundationInstanceSchema),
+  excavationInstances: z.array(excavationInstanceSchema),
   geotechLayers: z.array(geotechLayerSchema),
   groundwater: groundwaterSchema.nullable(),
   pointCloudSource: pointCloudSourceReferenceSchema.nullable(),

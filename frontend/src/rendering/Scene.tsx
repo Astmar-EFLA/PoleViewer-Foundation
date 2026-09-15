@@ -6,6 +6,7 @@ import type { Project } from "../domain/project";
 import { localToProject, localToViewer } from "../geometry/coordinateTransform";
 import { queryElevation } from "../geometry/terrain";
 import { useProjectStore } from "../state/projectStore";
+import { ExcavationMesh } from "./ExcavationMesh";
 import { FoundationMeshes } from "./FoundationMeshes";
 import { GeotechLayers } from "./GeotechLayers";
 import { GroundPointsCloud } from "./GroundPointsCloud";
@@ -22,6 +23,7 @@ export function Scene({ project }: SceneProps) {
   const selectedLegId = useProjectStore((s) => s.selectedLegId);
   const selectedInstanceId =
     project.foundationInstances.find((f) => f.legId === selectedLegId)?.instanceId ?? null;
+  const terrainSurface = project.terrainSurface;
 
   const viewerFrame: ViewerFrameDefinition = { renderOriginLocal: project.renderOriginLocal };
   const localFrame: LocalFrameDefinition = {
@@ -101,6 +103,24 @@ export function Scene({ project }: SceneProps) {
         mastCentreProjectElevation={project.mastCentreProject.elevation}
         viewerFrame={viewerFrame}
       />
+
+      {terrainSurface &&
+        project.excavationInstances.map((excavation) => {
+          const foundation = project.foundationInstances.find(
+            (f) => f.instanceId === excavation.foundationInstanceId
+          );
+          if (!foundation) return null;
+          return (
+            <ExcavationMesh
+              key={excavation.id}
+              excavation={excavation}
+              foundation={foundation}
+              terrainSurface={terrainSurface}
+              viewerFrame={viewerFrame}
+              selected={foundation.legId === selectedLegId}
+            />
+          );
+        })}
 
       <OrbitControls makeDefault />
     </Canvas>

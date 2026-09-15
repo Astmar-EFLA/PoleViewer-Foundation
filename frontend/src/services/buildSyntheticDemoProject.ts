@@ -9,6 +9,8 @@
 import poleLattice4LegJson from "../../../fixtures/synthetic/pole-lattice-4leg.json";
 import terrainSlopeJson from "../../../fixtures/synthetic/terrain-slope.json";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
+import type { ExcavationInstance } from "../domain/excavation";
+import type { FoundationInstance } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
@@ -67,6 +69,28 @@ function buildDemoGeotechLayers(mastElevationM: number): GeotechLayer[] {
       source: ASSUMED_GEOTECH_PROVENANCE,
     },
   ];
+}
+
+function buildDemoExcavations(foundationInstances: readonly FoundationInstance[]): ExcavationInstance[] {
+  return foundationInstances.map((foundation) => ({
+    id: `excavation-${foundation.legId}`,
+    foundationInstanceId: foundation.instanceId,
+    // Default assumption: dig exactly to the foundation's own base level.
+    bottomElevationM: foundation.baseElevation,
+    workingSpaceOffsetM: 0.5,
+    // 1.5H:1V, matching ADR-009's default convention (unconfirmed against
+    // a real EFLA reference document -- see the ADR).
+    sideSlope: { h: 1.5, v: 1 },
+    colour: "#c9a227",
+    opacity: 0.35,
+    visible: true,
+    wireframe: false,
+    provenance: {
+      originType: "assumed",
+      verificationState: "unverified",
+      notes: "Synthetic demo assumption: bottom elevation set to the foundation base, 0.5m working space, 1.5H:1V slope.",
+    },
+  }));
 }
 
 function buildDemoGroundwater(): Groundwater {
@@ -137,6 +161,7 @@ export function buildSyntheticDemoProject(): Project {
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
+    excavationInstances: buildDemoExcavations(foundationInstances),
     geotechLayers: buildDemoGeotechLayers(mastCentreProject.elevation),
     groundwater: buildDemoGroundwater(),
     // Points at the real synthetic LAS fixture (backend/workspace/, copied

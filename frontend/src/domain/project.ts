@@ -1,4 +1,5 @@
 import type { CoordinateReferenceSystem, LocalCoordinate, ProjectCoordinate } from "./coordinates";
+import type { ExcavationInstance } from "./excavation";
 import type { FoundationInstance } from "./foundation";
 import type { GeotechLayer, Groundwater } from "./geotech";
 import type { PoleModel } from "./poleModel";
@@ -55,6 +56,7 @@ export interface Project {
   readonly renderOriginLocal: LocalCoordinate;
   readonly poleModel: PoleModel;
   readonly foundationInstances: readonly FoundationInstance[];
+  readonly excavationInstances: readonly ExcavationInstance[];
   readonly geotechLayers: readonly GeotechLayer[];
   readonly groundwater: Groundwater | null;
   readonly pointCloudSource: PointCloudSourceReference | null;

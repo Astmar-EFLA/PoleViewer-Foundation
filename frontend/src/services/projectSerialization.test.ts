@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import type { Project } from "../domain/project";
+import type { ExcavationInstance } from "../domain/excavation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
@@ -52,6 +53,20 @@ function buildSyntheticProject(): Project {
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
+    excavationInstances: foundationInstances.map(
+      (f): ExcavationInstance => ({
+        id: `excavation-${f.legId}`,
+        foundationInstanceId: f.instanceId,
+        bottomElevationM: f.baseElevation,
+        workingSpaceOffsetM: 0.5,
+        sideSlope: { h: 1.5, v: 1 },
+        colour: "#c9a227",
+        opacity: 0.35,
+        visible: true,
+        wireframe: false,
+        provenance: { originType: "assumed", verificationState: "unverified" },
+      })
+    ),
     geotechLayers: [
       {
         id: "geotech-topsoil",
