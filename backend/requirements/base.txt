@@ -1,0 +1,13 @@
+# PDAL (the point-cloud processing engine itself) is intentionally NOT
+# listed here: there is no Windows wheel on PyPI for the `pdal` Python
+# bindings (only a source distribution requiring the native PDAL C++
+# library and a full build toolchain). See ADR-003. Install it from
+# conda-forge instead: `conda install -c conda-forge pdal python-pdal`
+# into the same environment these requirements are installed into.
+
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.9,<3.0
+numpy>=1.26,<3.0
+scipy>=1.13,<2.0
+shapely>=2.0,<3.0

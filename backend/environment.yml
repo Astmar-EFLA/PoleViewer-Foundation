@@ -1,0 +1,23 @@
+# Conda-forge environment for the backend. PDAL has no Windows wheel on
+# PyPI (see ADR-003), so the environment -- not just pip -- is the unit of
+# setup here.
+#
+# Create with:
+#   conda env create -f backend/environment.yml
+# or, if you already created the env by hand:
+#   conda install -n pole-viewer-backend -c conda-forge python=3.11 pdal python-pdal gdal proj
+#   pip install -r backend/requirements/dev.txt
+#   pip install -e backend
+name: pole-viewer-backend
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pdal
+  - python-pdal
+  - gdal
+  - proj
+  - pip
+  - pip:
+      - -r requirements/dev.txt
+      - -e .

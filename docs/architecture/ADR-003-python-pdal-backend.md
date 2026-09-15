@@ -1,7 +1,7 @@
 # ADR-003: Python + PDAL for point-cloud processing
 
-Status: Accepted, with an explicitly unresolved packaging risk
-Date: 2026-09-15
+Status: Accepted; dev-environment packaging resolved (2026-09-15, Phase 2), end-user packaging still open (see Phase 9 note below)
+Date: 2026-09-15, updated 2026-09-15 (Phase 2)
 
 ## Context
 
@@ -38,12 +38,41 @@ geometry, and Pydantic for request/response schemas.
   Phase 9 (per the prompt's own instruction not to default to Electron), but the risk
   is recorded here so it is not a Phase-9 surprise.
 
-## Unresolved risks
+## Update (Phase 2, 2026-09-15): dev-environment packaging resolved
 
-- **PDAL on Windows packaging is unresolved.** Phase 2 will start by running the
-  backend in a conda-forge environment (or WSL2) as the known-working path; the final
-  end-user packaging story is explicitly deferred to Phase 9 and must be resolved
-  before this ADR can be considered fully closed.
+This machine had none of conda, WSL2, or Docker installed, and had no admin
+rights available non-interactively (Node.js's own MSI installer failed for
+exactly this reason during Phase 1). PDAL's Python bindings confirmed to have
+no Windows wheel on PyPI (`pip index`/PyPI JSON for the `pdal` package shows
+only a source `.tar.gz`, no `win_amd64` wheel) -- the risk recorded above was
+accurate, not hypothetical.
+
+**Resolution**: Miniforge's Windows `.exe` installer supports
+`/InstallationType=JustMe /AddToPath=0 /S`, a fully silent, user-scope,
+no-admin install (verified: no UAC prompt, installs to a user-writable
+path). `conda create -c conda-forge python=3.11 pdal python-pdal gdal proj`
+into a dedicated env then gives a working `import pdal` (verified: PDAL
+2.10.2, exercised against real synthetic LAS fixtures via
+`filters.crop`/`filters.expression`/`filters.decimation` -- see
+`backend/tests/processing/` and `backend/README.md`). This is now the
+documented, reproducible dev-setup path (`backend/environment.yml`), not
+just a one-off workaround.
+
+This resolves the **development-environment** packaging risk. It does
+**not** resolve end-user packaging (a non-technical user cannot be expected
+to run installer flags from a README) -- that comparison (Tauri sidecar vs.
+Docker-backed service vs. bundled conda-forge env vs. something else) is
+still explicitly deferred to Phase 9, per the original decision above.
+
+## Other unresolved risks
+
 - LAZ decompression of malformed/hostile files is a resource-exhaustion vector; the
   backend must apply file-size and point-count guards before full decompression
-  (tracked as a Phase 2/Phase 9 security requirement, not purely a packaging concern).
+  (tracked as a Phase 2/Phase 9 security requirement -- not yet implemented; Phase 2
+  so far only exercises small synthetic LAS files, not LAZ or adversarial input).
+- The Phase 2 `/pointcloud/clip` endpoint is synchronous (no job queue,
+  cancellation, or progress reporting), a deliberate scope reduction from the
+  original processing-layer requirements list: the synthetic fixtures process
+  in milliseconds, so there is nothing yet to cancel or report progress on.
+  Revisit once real, larger LAS/LAZ files are in scope (Phase 9 hardening
+  explicitly re-lists "processing can be cancelled or stopped safely").

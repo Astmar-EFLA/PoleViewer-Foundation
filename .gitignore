@@ -10,6 +10,11 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+*.egg-info/
+.pytest_cache/
+
+# Backend runtime workspace (uploaded/processed point-cloud files; never committed)
+backend/workspace/
 
 # Editor/OS
 .vscode/
