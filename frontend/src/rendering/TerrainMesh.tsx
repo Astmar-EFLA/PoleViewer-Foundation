@@ -5,6 +5,7 @@ import { localCoordinate, type ViewerFrameDefinition } from "../domain/coordinat
 import type { TerrainSurface } from "../domain/terrain";
 import { localToViewer, viewerToLocal } from "../geometry/coordinateTransform";
 import { fromThreeVector3, toThreeVector3 } from "./threeAdapters";
+import { useAutoDispose } from "./useAutoDispose";
 
 interface TerrainMeshProps {
   readonly surface: TerrainSurface;
@@ -34,28 +35,30 @@ export function TerrainMesh({
   onHoverEnd,
   onPickLocalXY,
 }: TerrainMeshProps) {
-  const geometry = useMemo(() => {
-    const geom = new THREE.BufferGeometry();
-    const positions = new Float32Array(surface.points.length * 3);
+  const geometry = useAutoDispose(
+    useMemo(() => {
+      const geom = new THREE.BufferGeometry();
+      const positions = new Float32Array(surface.points.length * 3);
 
-    for (let i = 0; i < surface.points.length; i += 1) {
-      const p = surface.points[i]!;
-      const viewer = localToViewer(localCoordinate(p.x, p.y, p.z), viewerFrame);
-      const v3 = toThreeVector3(viewer);
-      positions[i * 3] = v3.x;
-      positions[i * 3 + 1] = v3.y;
-      positions[i * 3 + 2] = v3.z;
-    }
-    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      for (let i = 0; i < surface.points.length; i += 1) {
+        const p = surface.points[i]!;
+        const viewer = localToViewer(localCoordinate(p.x, p.y, p.z), viewerFrame);
+        const v3 = toThreeVector3(viewer);
+        positions[i * 3] = v3.x;
+        positions[i * 3 + 1] = v3.y;
+        positions[i * 3 + 2] = v3.z;
+      }
+      geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
-    const indices: number[] = [];
-    for (const triangle of surface.triangles) {
-      indices.push(triangle.indices[0], triangle.indices[1], triangle.indices[2]);
-    }
-    geom.setIndex(indices);
-    geom.computeVertexNormals();
-    return geom;
-  }, [surface, viewerFrame]);
+      const indices: number[] = [];
+      for (const triangle of surface.triangles) {
+        indices.push(triangle.indices[0], triangle.indices[1], triangle.indices[2]);
+      }
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+      return geom;
+    }, [surface, viewerFrame])
+  );
 
   if (!visible) return null;
 

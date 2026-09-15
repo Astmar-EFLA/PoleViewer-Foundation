@@ -42,10 +42,13 @@ export interface TerrainRegenerationState {
   readonly warnings: readonly ProcessingWarning[];
   readonly classificationCounts: readonly ClassificationCount[];
   readonly errorMessage: string | null;
+  /** Client-side TIN build time from the last successful regeneration (Phase 9 performance instrumentation); null until one has completed. */
+  readonly tinGenerationDurationMs: number | null;
 }
 
 const IDLE_TERRAIN_REGENERATION: TerrainRegenerationState = {
   status: "idle",
+  tinGenerationDurationMs: null,
   warnings: [],
   classificationCounts: [],
   errorMessage: null,
@@ -105,12 +108,15 @@ interface ProjectStoreState {
   readonly reportOpen: boolean;
   readonly sectionsPanelOpen: boolean;
   readonly projectFileLoad: ProjectFileLoadState;
+  readonly terrainRegenerationController: AbortController | null;
+  readonly assetStatusController: AbortController | null;
   requestCameraPreset(preset: FixedViewPreset): void;
   setCanvasElement(canvas: HTMLCanvasElement | null): void;
   setReportOpen(open: boolean): void;
   setSectionsPanelOpen(open: boolean): void;
   setProjectNotes(notes: string): void;
   checkPointCloudAssetStatus(baseUrl?: string): Promise<void>;
+  cancelAssetStatusCheck(): void;
   openProjectFromFile(file: File): Promise<void>;
   dismissProjectFileLoadError(): void;
   setProject(project: Project): void;
@@ -120,6 +126,7 @@ interface ProjectStoreState {
   setTerrainWireframe(wireframe: boolean): void;
   setHover(hover: HoverReadout | null): void;
   regenerateTerrainFromPointCloud(): Promise<void>;
+  cancelTerrainRegeneration(): void;
   setSelectedLeg(legId: string | null): void;
   setFoundationType(legId: string, foundationTypeId: string): void;
   setFoundationParameters(legId: string, parameters: FoundationParameters): void;
@@ -181,6 +188,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   reportOpen: false,
   sectionsPanelOpen: false,
   projectFileLoad: IDLE_PROJECT_FILE_LOAD,
+  terrainRegenerationController: null,
+  assetStatusController: null,
   requestCameraPreset: (preset) =>
     set((state) => ({ cameraPresetRequest: { preset, nonce: (state.cameraPresetRequest?.nonce ?? 0) + 1 } })),
   setCanvasElement: (canvas) => set({ canvasElement: canvas }),
@@ -195,10 +204,17 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     const project = get().project;
     if (!project?.pointCloudSource) return;
 
-    set({ assetStatus: { status: "loading", result: null, errorMessage: null } });
+    // Cancel any check already in flight rather than letting two race --
+    // whichever response lands last would otherwise silently win.
+    get().assetStatusController?.abort();
+    const controller = new AbortController();
+    set({
+      assetStatus: { status: "loading", result: null, errorMessage: null },
+      assetStatusController: controller,
+    });
     try {
-      const result = await requestFileStatus(project.pointCloudSource.filePath, baseUrl);
-      set({ assetStatus: { status: "success", result, errorMessage: null } });
+      const result = await requestFileStatus(project.pointCloudSource.filePath, baseUrl, controller.signal);
+      set({ assetStatus: { status: "success", result, errorMessage: null }, assetStatusController: null });
 
       // A confirmed hash is recorded on the project the first time it's
       // successfully checked, so future checks (including on reopen) have
@@ -217,10 +233,17 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         });
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        set({ assetStatus: IDLE_ASSET_STATUS, assetStatusController: null });
+        return;
+      }
       const message =
         error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
-      set({ assetStatus: { status: "error", result: null, errorMessage: message } });
+      set({ assetStatus: { status: "error", result: null, errorMessage: message }, assetStatusController: null });
     }
+  },
+  cancelAssetStatusCheck: () => {
+    get().assetStatusController?.abort();
   },
   openProjectFromFile: async (file) => {
     const result = await readProjectJsonFile(file);
@@ -311,7 +334,14 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       return;
     }
 
-    set({ terrainRegeneration: { ...IDLE_TERRAIN_REGENERATION, status: "loading" } });
+    // Cancel any regeneration already in flight rather than letting two
+    // race -- whichever response lands last would otherwise silently win.
+    get().terrainRegenerationController?.abort();
+    const controller = new AbortController();
+    set({
+      terrainRegeneration: { ...IDLE_TERRAIN_REGENERATION, status: "loading" },
+      terrainRegenerationController: controller,
+    });
 
     try {
       const result = await generateTerrainFromPointCloud(
@@ -322,7 +352,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         },
         project.pointCloudSource,
         project.terrainGenerationSettings,
-        new Date().toISOString()
+        new Date().toISOString(),
+        DEFAULT_BACKEND_BASE_URL,
+        controller.signal
       );
 
       // Only replace terrain on success -- a failed/blocked regeneration
@@ -336,19 +368,35 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
             warnings: result.warnings,
             classificationCounts: result.classificationCounts,
             errorMessage: null,
+            tinGenerationDurationMs: result.tinGenerationDurationMs,
           },
+          terrainRegenerationController: null,
         };
       });
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        set({ terrainRegeneration: IDLE_TERRAIN_REGENERATION, terrainRegenerationController: null });
+        return;
+      }
       const warnings = error instanceof BackendClipBlockedError ? error.warnings : [];
       const message =
         error instanceof BackendRequestError
           ? error.message
           : `Unexpected error: ${(error as Error).message}`;
       set({
-        terrainRegeneration: { status: "error", warnings, classificationCounts: [], errorMessage: message },
+        terrainRegeneration: {
+          status: "error",
+          warnings,
+          classificationCounts: [],
+          errorMessage: message,
+          tinGenerationDurationMs: null,
+        },
+        terrainRegenerationController: null,
       });
     }
+  },
+  cancelTerrainRegeneration: () => {
+    get().terrainRegenerationController?.abort();
   },
   setSelectedLeg: (legId) => set({ selectedLegId: legId }),
   setFoundationType: (legId, foundationTypeId) =>

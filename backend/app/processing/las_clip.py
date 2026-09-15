@@ -29,6 +29,7 @@ from app.schemas.pointcloud import (
     ClipResultPoint,
     ProcessingWarning,
 )
+from app.services.limits import max_returned_point_count
 from app.validation.pointcloud_validation import crs_consistency_warnings
 
 
@@ -93,6 +94,23 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
     step = request.decimation_step or 1
     if step > 1 and arr is not None:
         arr = arr[::step]
+
+    result_count = 0 if arr is None else int(arr.size)
+    limit = max_returned_point_count()
+    if result_count > limit:
+        raise ClipBlockedError(
+            [
+                ProcessingWarning(
+                    code="pointcloud.result-too-large",
+                    severity="blocking",
+                    message=(
+                        f"This clip would return {result_count:,} points, over the configured limit of "
+                        f"{limit:,} (POLE_VIEWER_MAX_RETURNED_POINTS). Reduce the clip boundary or increase "
+                        "the decimation step -- points are never silently dropped to fit under the limit."
+                    ),
+                )
+            ]
+        )
 
     points: list[ClipResultPoint] = []
     if arr is not None and arr.size > 0:

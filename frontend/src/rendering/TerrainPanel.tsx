@@ -10,6 +10,7 @@ export function TerrainPanel() {
   const pointCloudSource = useProjectStore((s) => s.project?.pointCloudSource);
   const regeneration = useProjectStore((s) => s.terrainRegeneration);
   const regenerate = useProjectStore((s) => s.regenerateTerrainFromPointCloud);
+  const cancelRegeneration = useProjectStore((s) => s.cancelTerrainRegeneration);
 
   if (!pointCloudSource) return null;
 
@@ -33,14 +34,21 @@ export function TerrainPanel() {
         Source: {pointCloudSource.filePath}
       </div>
 
-      <button
-        type="button"
-        onClick={() => void regenerate()}
-        disabled={regeneration.status === "loading"}
-        style={{ width: "100%", padding: "6px 8px", cursor: "pointer" }}
-      >
-        {regeneration.status === "loading" ? "Generating..." : "Regenerate from point cloud"}
-      </button>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button
+          type="button"
+          onClick={() => void regenerate()}
+          disabled={regeneration.status === "loading"}
+          style={{ flex: 1, padding: "6px 8px", cursor: "pointer" }}
+        >
+          {regeneration.status === "loading" ? "Generating..." : "Regenerate from point cloud"}
+        </button>
+        {regeneration.status === "loading" && (
+          <button type="button" onClick={cancelRegeneration} style={{ padding: "6px 8px", cursor: "pointer" }}>
+            Cancel
+          </button>
+        )}
+      </div>
 
       {regeneration.status === "error" && regeneration.errorMessage && (
         <div style={{ marginTop: 8, color: "#c02020" }}>{regeneration.errorMessage}</div>
@@ -64,6 +72,12 @@ export function TerrainPanel() {
               class {c.classificationCode}: {c.pointCount}
             </div>
           ))}
+        </div>
+      )}
+
+      {regeneration.status === "success" && regeneration.tinGenerationDurationMs !== null && (
+        <div style={{ marginTop: 6, opacity: 0.6 }}>
+          TIN build: {regeneration.tinGenerationDurationMs.toFixed(1)} ms
         </div>
       )}
     </div>

@@ -61,6 +61,7 @@ describe("generateTerrainFromPointCloud", () => {
     expect(result.clippedPointCount).toBe(4);
     expect(result.warnings).toEqual(backendBody.warnings);
     expect(result.classificationCounts).toEqual(backendBody.classificationCounts);
+    expect(result.tinGenerationDurationMs).toBeGreaterThanOrEqual(0);
 
     // request body sent to the backend reflects the project + settings passed in
     const [, init] = fetchMock.mock.calls[0]!;

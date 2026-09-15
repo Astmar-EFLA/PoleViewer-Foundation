@@ -1,5 +1,5 @@
 import type { PointCloudSourceReference } from "../domain/pointCloud";
-import type { ValidationResult } from "../domain/validation";
+import { CALCULATION_VERSION, type ValidationResult } from "../domain/validation";
 import type { BackendFileStatus } from "./backendWorkspaceSchema";
 
 /**
@@ -25,7 +25,7 @@ export function validatePointCloudAssetStatus(
         title: "Point-cloud source file is missing",
         detail: `The registered point-cloud source "${source.filePath}" was not found in the backend workspace. Terrain cannot be regenerated from this source until it is restored or re-registered.`,
         timestamp: nowIso,
-        dataVersion: "0.1.0",
+        dataVersion: CALCULATION_VERSION,
         status: "open",
       },
     ];
@@ -46,7 +46,7 @@ export function validatePointCloudAssetStatus(
           12
         )}...). Regenerating terrain from it will use the new content -- confirm this is expected before relying on the result.`,
         timestamp: nowIso,
-        dataVersion: "0.1.0",
+        dataVersion: CALCULATION_VERSION,
         status: "open",
       },
     ];

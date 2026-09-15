@@ -1,7 +1,7 @@
 import type { FoundationInstance } from "../domain/foundation";
 import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import type { TerrainSurface } from "../domain/terrain";
-import type { ValidationResult } from "../domain/validation";
+import { CALCULATION_VERSION, type ValidationResult } from "../domain/validation";
 import { generateBoundarySurface, queryBoundarySurfaceZ } from "../geometry/geotechBoundary";
 
 /** Absorbs float64 rounding noise from the two independent boundary-surface generations being compared. */
@@ -41,7 +41,7 @@ export function validateGeotechLayer(
       title: "Geotechnical layer boundaries are inverted",
       detail: `Layer "${layer.name}" has its top boundary below its bottom boundary at ${invertedCount} of ${topSurface.points.length} sampled point(s). Check the depth/elevation values for each boundary.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     },
   ];
@@ -74,7 +74,7 @@ export function validateGroundwaterFoundationIntersection(
         3
       )} m local) is below the groundwater level (${waterZ.toFixed(3)} m local) at its position.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     },
   ];

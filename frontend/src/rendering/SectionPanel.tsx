@@ -3,6 +3,7 @@ import { useMemo, useRef } from "react";
 import type { SectionMode } from "../domain/section";
 import { generateSectionResult } from "../geometry/section";
 import { radiansToDegrees, degreesToRadians } from "../geometry/angles";
+import { measureSync } from "../geometry/perf";
 import { downloadSectionSvg } from "../services/exportImage";
 import { useProjectStore } from "../state/projectStore";
 import { SectionView } from "./SectionView";
@@ -52,10 +53,14 @@ export function SectionPanel() {
   const activeSection = project?.sections.find((s) => s.id === activeSectionId) ?? null;
   const sectionContainerRef = useRef<HTMLDivElement>(null);
 
-  const result = useMemo(() => {
+  const timedResult = useMemo(() => {
     if (!project || !activeSection) return null;
-    return generateSectionResult(project, activeSection);
+    // Phase 9 performance instrumentation: a section recomputes on every
+    // relevant geometry change, so its cost is worth surfacing directly
+    // rather than only inferring it from a laggy UI.
+    return measureSync(() => generateSectionResult(project, activeSection));
   }, [project, activeSection]);
+  const result = timedResult?.result ?? null;
 
   function handleExportSectionImage() {
     const svg = sectionContainerRef.current?.querySelector("svg");
@@ -185,6 +190,11 @@ export function SectionPanel() {
           {activeSection.visible && result && (
             <div ref={sectionContainerRef}>
               <SectionView result={result} mastCentreProjectElevation={project.mastCentreProject.elevation} width={432} height={360} />
+              {timedResult && (
+                <div style={{ opacity: 0.5, fontSize: 10, marginTop: 2 }}>
+                  computed in {timedResult.durationMs.toFixed(1)} ms
+                </div>
+              )}
             </div>
           )}
         </>

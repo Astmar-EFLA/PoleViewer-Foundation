@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.processing.las_clip import ClipBlockedError, clip_las
 from app.processing.las_inspect import LasReadError, inspect_las
 from app.schemas.pointcloud import ClipRequest, ClipResult, InspectRequest, PointCloudMetadata
+from app.services.limits import ProcessingLimitError
 from app.services.workspace import WorkspacePathError, resolve_workspace_path
 
 router = APIRouter(prefix="/pointcloud", tags=["pointcloud"])
@@ -25,7 +26,7 @@ def inspect(request: InspectRequest) -> PointCloudMetadata:
     path = _resolve_existing_file(request.file_path)
     try:
         return inspect_las(path)
-    except LasReadError as exc:
+    except (LasReadError, ProcessingLimitError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
@@ -42,5 +43,5 @@ def clip(request: ClipRequest) -> ClipResult:
                 "warnings": [w.model_dump(by_alias=True) for w in exc.warnings],
             },
         ) from exc
-    except LasReadError as exc:
+    except (LasReadError, ProcessingLimitError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

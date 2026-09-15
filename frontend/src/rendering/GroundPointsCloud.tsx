@@ -4,6 +4,7 @@ import { localCoordinate, type ViewerFrameDefinition } from "../domain/coordinat
 import type { TerrainSurface } from "../domain/terrain";
 import { localToViewer } from "../geometry/coordinateTransform";
 import { toThreeVector3 } from "./threeAdapters";
+import { useAutoDispose } from "./useAutoDispose";
 
 interface GroundPointsCloudProps {
   readonly surface: TerrainSurface;
@@ -29,20 +30,22 @@ export function GroundPointsCloud({
   pointSize = 0.3,
   color = "#3a6b35",
 }: GroundPointsCloudProps) {
-  const geometry = useMemo(() => {
-    const geom = new THREE.BufferGeometry();
-    const positions = new Float32Array(surface.points.length * 3);
-    for (let i = 0; i < surface.points.length; i += 1) {
-      const p = surface.points[i]!;
-      const viewer = localToViewer(localCoordinate(p.x, p.y, p.z), viewerFrame);
-      const v3 = toThreeVector3(viewer);
-      positions[i * 3] = v3.x;
-      positions[i * 3 + 1] = v3.y;
-      positions[i * 3 + 2] = v3.z;
-    }
-    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    return geom;
-  }, [surface, viewerFrame]);
+  const geometry = useAutoDispose(
+    useMemo(() => {
+      const geom = new THREE.BufferGeometry();
+      const positions = new Float32Array(surface.points.length * 3);
+      for (let i = 0; i < surface.points.length; i += 1) {
+        const p = surface.points[i]!;
+        const viewer = localToViewer(localCoordinate(p.x, p.y, p.z), viewerFrame);
+        const v3 = toThreeVector3(viewer);
+        positions[i * 3] = v3.x;
+        positions[i * 3 + 1] = v3.y;
+        positions[i * 3 + 2] = v3.z;
+      }
+      geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      return geom;
+    }, [surface, viewerFrame])
+  );
 
   if (!visible) return null;
 

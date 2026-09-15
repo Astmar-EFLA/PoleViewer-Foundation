@@ -37,6 +37,15 @@ and quantities are not an approved design or a certified construction quantity.
   covered); an engineering parameter summary separated into imported/user-entered/
   assumed/calculated; a validation summary aggregating every existing validator; and
   screenshot + section-image export.
+- Phase 9 (hardening and packaging) — done: backend processing guards (file-size and
+  returned-point-count limits, extension validation, all fail visibly rather than
+  hanging or erroring obscurely), a generic 500 handler that never leaks a traceback,
+  cancellable point-cloud requests (AbortController end to end), React error
+  boundaries around the 3D view and every panel, GPU geometry disposal, lightweight
+  performance instrumentation (TIN build time, section computation time), a shared
+  calculation-version constant, and an optional single-process packaged run mode
+  (see [ADR-011](docs/architecture/ADR-011-packaging-strategy.md)). Known gaps are
+  tracked in [docs/architecture/known-limitations.md](docs/architecture/known-limitations.md).
 
 See [docs/architecture](docs/architecture) for the phase plan and
 [docs/decisions](docs/decisions) for Architecture Decision Records.
@@ -48,12 +57,26 @@ files are inspected (see ADR-003 and the Phase 0 notes in docs/architecture).
 
 ## Running it locally
 
+### Development (two processes, hot reload)
+
 1. Backend: see [backend/README.md](backend/README.md) (`conda env create -f backend/environment.yml`,
    then `uvicorn app.main:app --port 8100`).
 2. Frontend: `cd frontend && npm install && npm run dev`, then open the printed
    `localhost` URL. The demo project loads a synthetic terrain immediately (no backend
    required); the "Regenerate from point cloud" button in the viewer calls the backend
    for a real PDAL-clipped terrain if it's running.
+
+### Packaged (one process) — see ADR-011
+
+1. `cd frontend && npm install && npm run build` (produces `frontend/dist/`).
+2. Run the backend as above (same conda environment). It detects `frontend/dist/`
+   automatically and serves it at `/`, alongside the API — no separate frontend
+   process, no CORS involved.
+3. Open `http://127.0.0.1:8100/`.
+
+Backend processing limits (`POST /pointcloud/inspect`, `/clip`) are configurable via
+`POLE_VIEWER_MAX_FILE_SIZE_MB` (default 500) and `POLE_VIEWER_MAX_RETURNED_POINTS`
+(default 2,000,000) — see [backend/README.md](backend/README.md).
 
 ## Repository layout
 

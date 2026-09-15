@@ -24,6 +24,7 @@ from app.schemas.pointcloud import (
     PointCloudMetadata,
     ProcessingWarning,
 )
+from app.services.limits import check_file_size, check_point_cloud_extension
 
 RGB_DIMENSIONS = {"Red", "Green", "Blue"}
 RETURN_INFO_DIMENSIONS = {"ReturnNumber", "NumberOfReturns"}
@@ -44,6 +45,14 @@ def _extract_crs(srs_json: dict, srs_wkt: str) -> CoordinateReferenceSystem:
 
 
 def inspect_las(file_path: Path) -> PointCloudMetadata:
+    # Fail fast on an obviously-wrong or oversized file before PDAL ever
+    # touches it (Phase 9 "file validation" / "processing guards") -- a
+    # clear rejection here beats a cryptic PDAL RuntimeError, or a request
+    # thread tied up reading a file too large for this synchronous,
+    # single-request-at-a-time backend to process safely.
+    check_point_cloud_extension(file_path)
+    check_file_size(file_path)
+
     try:
         reader = pdal.Reader.las(filename=str(file_path))
         pipeline = reader.pipeline()

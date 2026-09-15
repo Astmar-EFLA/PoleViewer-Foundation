@@ -72,6 +72,27 @@ exists and, if so, its current SHA-256 -- used by the frontend to detect a
 moved, missing, or externally-modified source file (ADR-008) rather than
 trusting a project's recorded reference forever.
 
+## Processing guards
+
+`app/services/limits.py` rejects a request before PDAL ever touches the
+file, rather than letting a single-threaded, synchronous backend hang or
+exhaust memory on an unbounded input:
+
+- `POLE_VIEWER_MAX_FILE_SIZE_MB` (default 500) -- files over this size are
+  rejected (422) on both `/pointcloud/inspect` and `/pointcloud/clip`.
+- `POLE_VIEWER_MAX_RETURNED_POINTS` (default 2,000,000) -- a clip whose
+  result (after decimation) would exceed this is rejected (422, as a
+  structured `pointcloud.result-too-large` warning) rather than silently
+  truncated; the client is expected to add decimation or shrink the clip
+  boundary instead.
+- Only `.las`/`.laz` extensions are accepted; anything else is rejected
+  (422) before PDAL is invoked at all.
+
+Any other unhandled exception is caught by a global handler in
+`app/main.py`, logged server-side, and returned as a generic
+`{"detail": "An unexpected server error occurred."}` (500) -- never a raw
+Python traceback.
+
 ## Testing
 
 ```bash
@@ -97,8 +118,15 @@ fixtures are copied into an isolated per-test workspace.
   response body) on a missing or mismatched CRS rather than silently
   clipping against the wrong reference frame.
 
+- `POST /workspace/file-status` -- SHA-256 + existence check for any
+  workspace-relative file (see Workspace above).
+
 Not yet implemented (deferred, tracked rather than silently dropped):
-circular clip boundaries, async job/cancellation for long-running clips
-(current implementation is synchronous -- fine for the synthetic fixtures
-used so far, revisit once real large files are in scope), and an
-algorithmic ground-classification fallback for files with no ground class.
+circular clip boundaries, and an algorithmic ground-classification fallback
+for files with no ground class. Client-side request cancellation exists
+(the frontend can abort waiting on a request -- see Phase 9 in the root
+README), but there is still no true server-side cooperative cancellation:
+the backend's own PDAL pipeline for an already-dispatched request keeps
+running briefly even after the frontend gives up on it. Processing guards
+(above) bound the worst case per request; they are not a substitute for a
+queue or worker pool, which this backend still does not have.

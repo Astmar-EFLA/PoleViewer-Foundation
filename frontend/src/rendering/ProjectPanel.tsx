@@ -39,6 +39,7 @@ export function ProjectPanel() {
   const project = useProjectStore((s) => s.project);
   const assetStatus = useProjectStore((s) => s.assetStatus);
   const checkPointCloudAssetStatus = useProjectStore((s) => s.checkPointCloudAssetStatus);
+  const cancelAssetStatusCheck = useProjectStore((s) => s.cancelAssetStatusCheck);
   const openProjectFromFile = useProjectStore((s) => s.openProjectFromFile);
   const projectFileLoad = useProjectStore((s) => s.projectFileLoad);
   const dismissProjectFileLoadError = useProjectStore((s) => s.dismissProjectFileLoadError);
@@ -97,9 +98,15 @@ export function ProjectPanel() {
         <div style={{ marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ opacity: 0.8, wordBreak: "break-all" }}>{project.pointCloudSource.filePath}</span>
-            <button style={buttonStyle} onClick={() => void checkPointCloudAssetStatus()}>
-              Check
-            </button>
+            {assetStatus.status === "loading" ? (
+              <button style={buttonStyle} onClick={cancelAssetStatusCheck}>
+                Cancel
+              </button>
+            ) : (
+              <button style={buttonStyle} onClick={() => void checkPointCloudAssetStatus()}>
+                Check
+              </button>
+            )}
           </div>
           <div style={{ color: assetStatusLine(assetStatus).colour }}>{assetStatusLine(assetStatus).text}</div>
         </div>

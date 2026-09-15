@@ -1,6 +1,6 @@
 import type { ExcavationInstance } from "../domain/excavation";
 import type { FoundationInstance } from "../domain/foundation";
-import type { ValidationResult } from "../domain/validation";
+import { CALCULATION_VERSION, type ValidationResult } from "../domain/validation";
 import type { ExcavationGeometry } from "../geometry/excavationGeometry";
 
 const ELEVATION_TOLERANCE_M = 1e-9;
@@ -21,7 +21,7 @@ export function validateExcavationInstance(
       title: "Invalid side-slope ratio",
       detail: `Excavation "${excavation.id}" has a non-positive H:V slope value (H=${excavation.sideSlope.h}, V=${excavation.sideSlope.v}). Both must be positive.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }
@@ -34,7 +34,7 @@ export function validateExcavationInstance(
       title: "Negative working-space offset",
       detail: `Excavation "${excavation.id}" has a negative working-space offset (${excavation.workingSpaceOffsetM} m); the excavation would not fully contain its foundation.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }
@@ -51,7 +51,7 @@ export function validateExcavationInstance(
         3
       )} m); the foundation would not fit in the excavation.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }
@@ -64,7 +64,7 @@ export function validateExcavationInstance(
       title: "Excavation-terrain intersection is truncated",
       detail: `Excavation "${excavation.id}" could not fully resolve where its side slopes meet the terrain -- part of the intersection falls outside the extracted terrain coverage or the search height bound. Approximate volume is blocked until this is resolved (e.g. widen the terrain extraction).`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }

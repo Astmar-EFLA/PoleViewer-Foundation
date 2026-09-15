@@ -6,6 +6,7 @@ import type {
   TerrainGenerationSettings,
 } from "../domain/pointCloud";
 import type { TerrainPoint, TerrainSurface } from "../domain/terrain";
+import { measureSync } from "../geometry/perf";
 import { generateTin } from "../geometry/terrain";
 import { DEFAULT_BACKEND_BASE_URL, requestClip } from "./backendClient";
 
@@ -15,6 +16,8 @@ export interface TerrainGenerationResult {
   readonly classificationCounts: readonly ClassificationCount[];
   readonly sourcePointCount: number;
   readonly clippedPointCount: number;
+  /** Time spent building the TIN client-side (Phase 9 performance instrumentation) -- distinct from the backend's own reported clip duration, so a slow regeneration can be attributed to the right half of the pipeline. */
+  readonly tinGenerationDurationMs: number;
 }
 
 export interface TerrainGenerationProjectContext {
@@ -36,7 +39,8 @@ export async function generateTerrainFromPointCloud(
   source: PointCloudSourceReference,
   settings: TerrainGenerationSettings,
   nowIso: string,
-  baseUrl: string = DEFAULT_BACKEND_BASE_URL
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
 ): Promise<TerrainGenerationResult> {
   const clipResult = await requestClip(
     {
@@ -50,16 +54,19 @@ export async function generateTerrainFromPointCloud(
       classificationFilter: settings.classificationFilter as number[] | null,
       decimationStep: settings.decimationStep,
     },
-    baseUrl
+    baseUrl,
+    signal
   );
 
   const groundPoints: TerrainPoint[] = clipResult.points.map((p) => ({ x: p.x, y: p.y, z: p.z }));
 
-  const terrainSurface = generateTin(groundPoints, {
-    maxEdgeLengthM: settings.maxEdgeLengthM,
-    terrainVersion: `terrain-${nowIso}`,
-    generatedAtIso: nowIso,
-  });
+  const { result: terrainSurface, durationMs: tinGenerationDurationMs } = measureSync(() =>
+    generateTin(groundPoints, {
+      maxEdgeLengthM: settings.maxEdgeLengthM,
+      terrainVersion: `terrain-${nowIso}`,
+      generatedAtIso: nowIso,
+    })
+  );
 
   return {
     terrainSurface,
@@ -67,5 +74,6 @@ export async function generateTerrainFromPointCloud(
     classificationCounts: clipResult.classificationCounts,
     sourcePointCount: clipResult.sourcePointCount,
     clippedPointCount: clipResult.clippedPointCount,
+    tinGenerationDurationMs,
   };
 }

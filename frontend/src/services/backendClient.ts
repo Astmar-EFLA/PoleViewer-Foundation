@@ -26,15 +26,18 @@ export class BackendRequestError extends Error {
   }
 }
 
-async function postJson(path: string, body: unknown, baseUrl: string): Promise<unknown> {
+/** Thrown (name "AbortError", the standard DOM name) when the caller's AbortSignal was triggered -- callers treat this as a clean cancellation, not a failure to surface as an error. */
+async function postJson(path: string, body: unknown, baseUrl: string, signal?: AbortSignal): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(`${baseUrl}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      ...(signal ? { signal } : {}),
     });
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new BackendRequestError(
       `Could not reach the local backend at ${baseUrl}${path}. Is it running? (${(error as Error).message})`
     );
@@ -88,11 +91,12 @@ function isBlockedErrorBody(body: unknown): body is { message: string; warnings:
 
 export async function requestClip(
   request: ClipRequestBody,
-  baseUrl: string = DEFAULT_BACKEND_BASE_URL
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
 ): Promise<BackendClipResult> {
   let json: unknown;
   try {
-    json = await postJson("/pointcloud/clip", request, baseUrl);
+    json = await postJson("/pointcloud/clip", request, baseUrl, signal);
   } catch (error) {
     if (error instanceof BackendRequestError && error.status === 422 && isBlockedErrorBody(error.body)) {
       throw new BackendClipBlockedError(error.body.warnings);
@@ -126,9 +130,10 @@ export async function requestInspect(
  */
 export async function requestFileStatus(
   filePath: string,
-  baseUrl: string = DEFAULT_BACKEND_BASE_URL
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
 ): Promise<BackendFileStatus> {
-  const json = await postJson("/workspace/file-status", { filePath }, baseUrl);
+  const json = await postJson("/workspace/file-status", { filePath }, baseUrl, signal);
   const parsed = parseFileStatus(json);
   if (!parsed.success) {
     throw new BackendRequestError(`Backend file-status response failed validation: ${parsed.errors.join("; ")}`);

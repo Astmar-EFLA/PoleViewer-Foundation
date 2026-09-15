@@ -8,6 +8,7 @@ import type { TerrainSurface } from "../domain/terrain";
 import { localToViewer } from "../geometry/coordinateTransform";
 import { generateExcavationGeometry } from "../geometry/excavationGeometry";
 import { toThreeVector3 } from "./threeAdapters";
+import { useAutoDispose } from "./useAutoDispose";
 
 interface ExcavationMeshProps {
   readonly excavation: ExcavationInstance;
@@ -39,54 +40,58 @@ export function ExcavationMesh({
     [excavation, foundation, terrainSurface]
   );
 
-  const bottomGeometry = useMemo(() => {
-    const geom = new THREE.BufferGeometry();
-    const positions = new Float32Array(geometry.bottomCorners.length * 3);
-    geometry.bottomCorners.forEach((c, i) => {
-      const v3 = toThreeVector3(localToViewer(c, viewerFrame));
-      positions[i * 3] = v3.x;
-      positions[i * 3 + 1] = v3.y;
-      positions[i * 3 + 2] = v3.z;
-    });
-    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geom.setIndex([0, 1, 2, 0, 2, 3]);
-    geom.computeVertexNormals();
-    return geom;
-  }, [geometry.bottomCorners, viewerFrame]);
+  const bottomGeometry = useAutoDispose(
+    useMemo(() => {
+      const geom = new THREE.BufferGeometry();
+      const positions = new Float32Array(geometry.bottomCorners.length * 3);
+      geometry.bottomCorners.forEach((c, i) => {
+        const v3 = toThreeVector3(localToViewer(c, viewerFrame));
+        positions[i * 3] = v3.x;
+        positions[i * 3 + 1] = v3.y;
+        positions[i * 3 + 2] = v3.z;
+      });
+      geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geom.setIndex([0, 1, 2, 0, 2, 3]);
+      geom.computeVertexNormals();
+      return geom;
+    }, [geometry.bottomCorners, viewerFrame])
+  );
 
-  const skirtGeometry = useMemo(() => {
-    const n = geometry.bottomRing.length;
-    const positions = new Float32Array(n * 2 * 3);
-    geometry.bottomRing.forEach((c, i) => {
-      const v3 = toThreeVector3(localToViewer(c, viewerFrame));
-      positions[i * 3] = v3.x;
-      positions[i * 3 + 1] = v3.y;
-      positions[i * 3 + 2] = v3.z;
-    });
-    geometry.topRing.forEach((p, i) => {
-      const v3 = toThreeVector3(localToViewer(p.point, viewerFrame));
-      const idx = n + i;
-      positions[idx * 3] = v3.x;
-      positions[idx * 3 + 1] = v3.y;
-      positions[idx * 3 + 2] = v3.z;
-    });
+  const skirtGeometry = useAutoDispose(
+    useMemo(() => {
+      const n = geometry.bottomRing.length;
+      const positions = new Float32Array(n * 2 * 3);
+      geometry.bottomRing.forEach((c, i) => {
+        const v3 = toThreeVector3(localToViewer(c, viewerFrame));
+        positions[i * 3] = v3.x;
+        positions[i * 3 + 1] = v3.y;
+        positions[i * 3 + 2] = v3.z;
+      });
+      geometry.topRing.forEach((p, i) => {
+        const v3 = toThreeVector3(localToViewer(p.point, viewerFrame));
+        const idx = n + i;
+        positions[idx * 3] = v3.x;
+        positions[idx * 3 + 1] = v3.y;
+        positions[idx * 3 + 2] = v3.z;
+      });
 
-    const indices: number[] = [];
-    for (let i = 0; i < n; i += 1) {
-      const next = (i + 1) % n;
-      const b0 = i;
-      const b1 = next;
-      const t0 = n + i;
-      const t1 = n + next;
-      indices.push(b0, b1, t1, b0, t1, t0);
-    }
+      const indices: number[] = [];
+      for (let i = 0; i < n; i += 1) {
+        const next = (i + 1) % n;
+        const b0 = i;
+        const b1 = next;
+        const t0 = n + i;
+        const t1 = n + next;
+        indices.push(b0, b1, t1, b0, t1, t0);
+      }
 
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geom.setIndex(indices);
-    geom.computeVertexNormals();
-    return geom;
-  }, [geometry.bottomRing, geometry.topRing, viewerFrame]);
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+      return geom;
+    }, [geometry.bottomRing, geometry.topRing, viewerFrame])
+  );
 
   const intersectionLinePoints = useMemo(
     () =>

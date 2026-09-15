@@ -1,6 +1,6 @@
 import type { LocalCoordinate } from "../domain/coordinates";
 import type { FoundationInstance, FoundationParameters } from "../domain/foundation";
-import type { ValidationResult } from "../domain/validation";
+import { CALCULATION_VERSION, type ValidationResult } from "../domain/validation";
 import { generateFoundationGeometry } from "../geometry/foundationGeometry";
 
 /** Loose enough to absorb float64 rounding noise, tight enough to catch a real parameter mismatch (a wrong pedestal height by even 1 cm is a real engineering discrepancy worth flagging). */
@@ -46,7 +46,7 @@ export function validateFoundationInstance(
       title: "Stepped foundation has no steps",
       detail: `Foundation "${instance.instanceId}" is a stepped-rectangular type with zero steps defined.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }
@@ -60,7 +60,7 @@ export function validateFoundationInstance(
       title: "Non-positive foundation dimension",
       detail: `Foundation "${instance.instanceId}" has non-positive value(s) for: ${nonPositiveFields.join(", ")}.`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }
@@ -93,7 +93,7 @@ export function validateFoundationInstance(
       )} m horizontally and ${verticalOffset.toFixed(4)} m vertically. Check baseElevation and foundation height, or the foundation's horizontal position.`,
       evidence: `topConnectionPoint=(${geometry.topConnectionPoint.x.toFixed(4)}, ${geometry.topConnectionPoint.y.toFixed(4)}, ${geometry.topConnectionPoint.z.toFixed(4)}), anchor=(${placedAnchorPosition.x.toFixed(4)}, ${placedAnchorPosition.y.toFixed(4)}, ${placedAnchorPosition.z.toFixed(4)})`,
       timestamp: nowIso,
-      dataVersion: "0.1.0",
+      dataVersion: CALCULATION_VERSION,
       status: "open",
     });
   }
