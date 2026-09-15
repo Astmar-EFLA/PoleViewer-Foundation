@@ -1,12 +1,13 @@
 import type { CoordinateReferenceSystem, LocalCoordinate, ProjectCoordinate } from "./coordinates";
 import type { FoundationInstance } from "./foundation";
+import type { GeotechLayer, Groundwater } from "./geotech";
 import type { PoleModel } from "./poleModel";
 import type { PointCloudSourceReference, TerrainGenerationSettings } from "./pointCloud";
 import type { TerrainSurface } from "./terrain";
 
 /**
- * Phase 1-3 subset of the full project schema (spec section 19). Fields
- * not yet needed (geotechnical layers, excavation, sections, measurements,
+ * Phase 1-5 subset of the full project schema (spec section 19). Fields
+ * not yet needed (excavation, sections, measurements,
  * validation-results-as-saved-state) are deliberately omitted here rather
  * than stubbed -- they are added in the phases that actually implement
  * them, per "don't design for hypothetical future requirements."
@@ -22,6 +23,14 @@ export interface TerrainLayerStyle extends LayerStyle {
   readonly wireframe: boolean;
 }
 
+/**
+ * Note: geotechnical layers and groundwater are NOT represented in this
+ * map -- each GeotechLayer/Groundwater already carries its own
+ * visible/opacity/wireframe (spec section 11), so a parallel per-item
+ * style bucket here would just be a second, redundant source of truth for
+ * the same values. A group-level "hide all geotech layers at once" toggle
+ * is a full layer-tree UI concern, deferred (see Phase 8's layer manager).
+ */
 export interface ProjectLayerStyles {
   readonly pole: LayerStyle;
   readonly foundations: LayerStyle;
@@ -46,6 +55,8 @@ export interface Project {
   readonly renderOriginLocal: LocalCoordinate;
   readonly poleModel: PoleModel;
   readonly foundationInstances: readonly FoundationInstance[];
+  readonly geotechLayers: readonly GeotechLayer[];
+  readonly groundwater: Groundwater | null;
   readonly pointCloudSource: PointCloudSourceReference | null;
   readonly terrainGenerationSettings: TerrainGenerationSettings;
   readonly terrainSurface: TerrainSurface | null;

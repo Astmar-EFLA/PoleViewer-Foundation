@@ -1,5 +1,6 @@
 import Delaunator from "delaunator";
 import type { ElevationQueryResult, TerrainPoint, TerrainSurface } from "../domain/terrain";
+import { interpolateZAtXY } from "./barycentric";
 
 export interface GenerateTinOptions {
   readonly maxEdgeLengthM: number;
@@ -125,24 +126,9 @@ export function queryElevation(
     }
   }
 
-  for (let t = 0; t < surface.triangles.length; t += 1) {
-    const [ia, ib, ic] = surface.triangles[t]!.indices;
-    const a = surface.points[ia]!;
-    const b = surface.points[ib]!;
-    const c = surface.points[ic]!;
-
-    const denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
-    if (denom === 0) continue; // degenerate triangle, skip
-
-    const wa = ((b.y - c.y) * (x - c.x) + (c.x - b.x) * (y - c.y)) / denom;
-    const wb = ((c.y - a.y) * (x - c.x) + (a.x - c.x) * (y - c.y)) / denom;
-    const wc = 1 - wa - wb;
-
-    const EPSILON = -1e-9; // tolerate points exactly on an edge
-    if (wa >= EPSILON && wb >= EPSILON && wc >= EPSILON) {
-      const elevation = wa * a.z + wb * b.z + wc * c.z;
-      return { source: "interpolated", elevation, triangleIndex: t };
-    }
+  const interpolated = interpolateZAtXY(surface.points, surface.triangles, x, y);
+  if (interpolated) {
+    return { source: "interpolated", elevation: interpolated.z, triangleIndex: interpolated.triangleIndex };
   }
 
   return { source: "no-data", elevation: null };

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { CoordinateReadout } from "../rendering/CoordinateReadout";
 import { FoundationPanel } from "../rendering/FoundationPanel";
+import { GeotechPanel } from "../rendering/GeotechPanel";
 import { LayerPanel } from "../rendering/LayerPanel";
 import { Scene } from "../rendering/Scene";
 import { TerrainPanel } from "../rendering/TerrainPanel";
@@ -25,6 +26,7 @@ export function App() {
       <LayerPanel />
       <TerrainPanel />
       <FoundationPanel />
+      <GeotechPanel />
       <CoordinateReadout />
     </div>
   );

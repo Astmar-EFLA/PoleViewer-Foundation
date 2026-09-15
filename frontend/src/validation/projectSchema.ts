@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Project } from "../domain/project";
 import { foundationInstanceSchema } from "./foundationSchema";
+import { geotechLayerSchema, groundwaterSchema } from "./geotechSchema";
 import type { ParseResult } from "./parseResult";
 import { fromZodSafeParse } from "./parseResult";
 import { poleModelSchema } from "./poleModelSchema";
@@ -34,6 +35,8 @@ export const projectSchema = z.object({
   renderOriginLocal: localCoordinateSchema,
   poleModel: poleModelSchema,
   foundationInstances: z.array(foundationInstanceSchema),
+  geotechLayers: z.array(geotechLayerSchema),
+  groundwater: groundwaterSchema.nullable(),
   pointCloudSource: pointCloudSourceReferenceSchema.nullable(),
   terrainGenerationSettings: terrainGenerationSettingsSchema,
   terrainSurface: terrainSurfaceSchema.nullable(),

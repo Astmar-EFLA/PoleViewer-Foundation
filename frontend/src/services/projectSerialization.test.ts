@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import type { Project } from "../domain/project";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
+import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
@@ -51,6 +52,30 @@ function buildSyntheticProject(): Project {
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
+    geotechLayers: [
+      {
+        id: "geotech-topsoil",
+        name: "Topsoil",
+        category: "topsoil",
+        topBoundary: { method: "terrain-relative", depthBelowTerrainM: 0 },
+        bottomBoundary: { method: "terrain-relative", depthBelowTerrainM: 0.5 },
+        colour: "#6b4a2f",
+        opacity: 0.55,
+        visible: true,
+        wireframe: false,
+        source: { originType: "assumed", verificationState: "unverified" },
+      } satisfies GeotechLayer,
+    ],
+    groundwater: {
+      id: "groundwater-1",
+      name: "Groundwater",
+      boundary: { method: "terrain-relative", depthBelowTerrainM: 1.8 },
+      colour: "#3070c0",
+      opacity: 0.35,
+      visible: true,
+      wireframe: false,
+      source: { originType: "assumed", verificationState: "unverified" },
+    } satisfies Groundwater,
     pointCloudSource: {
       filePath: "pointcloud-mixed-classification.las",
       crs: { kind: "epsg", epsgCode: 3057 },

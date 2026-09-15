@@ -7,7 +7,9 @@ import { localToProject, localToViewer } from "../geometry/coordinateTransform";
 import { queryElevation } from "../geometry/terrain";
 import { useProjectStore } from "../state/projectStore";
 import { FoundationMeshes } from "./FoundationMeshes";
+import { GeotechLayers } from "./GeotechLayers";
 import { GroundPointsCloud } from "./GroundPointsCloud";
+import { GroundwaterSurface } from "./GroundwaterSurface";
 import { PoleAnchors } from "./PoleAnchors";
 import { TerrainMesh } from "./TerrainMesh";
 
@@ -84,6 +86,20 @@ export function Scene({ project }: SceneProps) {
         visible={project.layerStyles.foundations.visible}
         opacity={project.layerStyles.foundations.opacity}
         selectedInstanceId={selectedInstanceId}
+      />
+
+      <GeotechLayers
+        layers={project.geotechLayers}
+        terrainSurface={project.terrainSurface}
+        mastCentreProjectElevation={project.mastCentreProject.elevation}
+        viewerFrame={viewerFrame}
+      />
+
+      <GroundwaterSurface
+        groundwater={project.groundwater}
+        terrainSurface={project.terrainSurface}
+        mastCentreProjectElevation={project.mastCentreProject.elevation}
+        viewerFrame={viewerFrame}
       />
 
       <OrbitControls makeDefault />

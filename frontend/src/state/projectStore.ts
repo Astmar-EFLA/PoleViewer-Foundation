@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { LocalCoordinate, ProjectCoordinate } from "../domain/coordinates";
 import type { FoundationParameters } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
+import type { BoundaryDefinition } from "../domain/geotech";
 import type { ClassificationCount, ProcessingWarning } from "../domain/pointCloud";
 import type { Project, ProjectLayerStyles } from "../domain/project";
 import type { ElevationQuerySource } from "../domain/terrain";
@@ -49,6 +50,13 @@ interface ProjectStoreState {
   setFoundationType(legId: string, foundationTypeId: string): void;
   setFoundationParameters(legId: string, parameters: FoundationParameters): void;
   copyFoundationToOtherLegs(sourceLegId: string): void;
+  setGeotechLayerStyle(
+    layerId: string,
+    style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>
+  ): void;
+  setGeotechLayerBoundary(layerId: string, which: "top" | "bottom", boundary: BoundaryDefinition): void;
+  setGroundwaterStyle(style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
+  setGroundwaterBoundary(boundary: BoundaryDefinition): void;
 }
 
 /**
@@ -238,5 +246,40 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ),
         },
       };
+    }),
+  setGeotechLayerStyle: (layerId, style) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          geotechLayers: state.project.geotechLayers.map((l) =>
+            l.id === layerId ? { ...l, ...style } : l
+          ),
+        },
+      };
+    }),
+  setGeotechLayerBoundary: (layerId, which, boundary) =>
+    set((state) => {
+      if (!state.project) return {};
+      const key = which === "top" ? "topBoundary" : "bottomBoundary";
+      return {
+        project: {
+          ...state.project,
+          geotechLayers: state.project.geotechLayers.map((l) =>
+            l.id === layerId ? { ...l, [key]: boundary } : l
+          ),
+        },
+      };
+    }),
+  setGroundwaterStyle: (style) =>
+    set((state) => {
+      if (!state.project?.groundwater) return {};
+      return { project: { ...state.project, groundwater: { ...state.project.groundwater, ...style } } };
+    }),
+  setGroundwaterBoundary: (boundary) =>
+    set((state) => {
+      if (!state.project?.groundwater) return {};
+      return { project: { ...state.project, groundwater: { ...state.project.groundwater, boundary } } };
     }),
 }));

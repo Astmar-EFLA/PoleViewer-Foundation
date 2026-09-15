@@ -10,6 +10,7 @@ import poleLattice4LegJson from "../../../fixtures/synthetic/pole-lattice-4leg.j
 import terrainSlopeJson from "../../../fixtures/synthetic/terrain-slope.json";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
+import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
 import type { TerrainPoint } from "../domain/terrain";
@@ -17,6 +18,69 @@ import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
 import { buildFoundationInstanceForLeg } from "./buildFoundationInstances";
 import { parsePoleModel } from "../validation/poleModelSchema";
+
+const ASSUMED_GEOTECH_PROVENANCE = {
+  originType: "assumed" as const,
+  verificationState: "unverified" as const,
+  notes: "Synthetic demo assumption, not derived from any borehole or geotechnical investigation.",
+};
+
+function buildDemoGeotechLayers(mastElevationM: number): GeotechLayer[] {
+  return [
+    {
+      id: "geotech-topsoil",
+      name: "Topsoil",
+      category: "topsoil",
+      description: "Assumed topsoil/organic layer.",
+      topBoundary: { method: "terrain-relative", depthBelowTerrainM: 0 },
+      bottomBoundary: { method: "terrain-relative", depthBelowTerrainM: 0.5 },
+      colour: "#6b4a2f",
+      opacity: 0.28,
+      visible: true,
+      wireframe: false,
+      source: ASSUMED_GEOTECH_PROVENANCE,
+    },
+    {
+      id: "geotech-fill",
+      name: "Fill / loose soil",
+      category: "loose-soil",
+      description: "Assumed loose soil below topsoil.",
+      topBoundary: { method: "terrain-relative", depthBelowTerrainM: 0.5 },
+      bottomBoundary: { method: "terrain-relative", depthBelowTerrainM: 2.5 },
+      colour: "#a68a5b",
+      opacity: 0.25,
+      visible: true,
+      wireframe: false,
+      source: ASSUMED_GEOTECH_PROVENANCE,
+    },
+    {
+      id: "geotech-competent",
+      name: "Competent bearing material",
+      category: "competent-bearing",
+      description: "Assumed competent material, modelled as a flat layer at a fixed project elevation.",
+      topBoundary: { method: "terrain-relative", depthBelowTerrainM: 2.5 },
+      bottomBoundary: { method: "absolute-elevation", elevationProjectM: mastElevationM - 10 },
+      colour: "#8a8a8a",
+      opacity: 0.22,
+      visible: true,
+      wireframe: false,
+      source: ASSUMED_GEOTECH_PROVENANCE,
+    },
+  ];
+}
+
+function buildDemoGroundwater(): Groundwater {
+  return {
+    id: "groundwater-1",
+    name: "Groundwater",
+    boundary: { method: "terrain-relative", depthBelowTerrainM: 1.8 },
+    colour: "#3070c0",
+    opacity: 0.25,
+    visible: true,
+    wireframe: false,
+    source: ASSUMED_GEOTECH_PROVENANCE,
+  };
+}
 
 export function buildSyntheticDemoProject(): Project {
   const nowIso = new Date().toISOString();
@@ -28,6 +92,8 @@ export function buildSyntheticDemoProject(): Project {
     );
   }
   const poleModel = poleModelParsed.data;
+
+  const mastCentreProject = projectCoordinate(512_345.678, 487_654.321, 123.456);
 
   const terrainPoints = (terrainSlopeJson as { points: TerrainPoint[] }).points;
   const terrainSurface = generateTin(terrainPoints, {
@@ -66,11 +132,13 @@ export function buildSyntheticDemoProject(): Project {
     horizontalUnits: "m",
     verticalUnits: "m",
     elevationReferenceType: "unknown",
-    mastCentreProject: projectCoordinate(512_345.678, 487_654.321, 123.456),
+    mastCentreProject,
     lineBearingRadians: degreesToRadians(64),
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
+    geotechLayers: buildDemoGeotechLayers(mastCentreProject.elevation),
+    groundwater: buildDemoGroundwater(),
     // Points at the real synthetic LAS fixture (backend/workspace/, copied
     // from fixtures/synthetic/) so the "regenerate from point cloud" action
     // has a sensible default target. The terrain shown on load is still the
