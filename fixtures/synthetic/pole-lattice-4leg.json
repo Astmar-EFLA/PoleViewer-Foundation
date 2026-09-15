@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "0.1.0",
+  "modelId": "synthetic-lattice-4leg-001",
+  "name": "Synthetic 4-leg lattice tower",
+  "description": "Synthetic fixture for Phase 1 coordinate/anchor proof, with deliberately unequal leg base elevations to exercise independent per-leg foundation levels on sloping terrain. Not a real engineering model.",
+  "source": {
+    "originType": "imported",
+    "sourceFile": "fixtures/synthetic/pole-lattice-4leg.json",
+    "importedAt": "2026-09-15T00:00:00.000Z",
+    "verificationState": "unverified",
+    "notes": "Synthetic fixture."
+  },
+  "units": "m",
+  "coordinateConvention": "right-handed-x-transverse-y-longitudinal-z-up",
+  "localOrigin": { "space": "local", "x": 0, "y": 0, "z": 0 },
+  "modelOrientationRadians": 0,
+  "mastCentreAnchorId": "anchor-mast-centre",
+  "anchors": [
+    {
+      "id": "anchor-mast-centre",
+      "name": "Mast centre",
+      "anchorType": "mast-centre",
+      "localPosition": { "space": "local", "x": 0, "y": 0, "z": 0 },
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-leg-ne",
+      "name": "Leg NE / foundation connection",
+      "anchorType": "leg-to-foundation",
+      "localPosition": { "space": "local", "x": 2.0, "y": 2.0, "z": -0.1 },
+      "linkedLegId": "leg-ne",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-leg-se",
+      "name": "Leg SE / foundation connection",
+      "anchorType": "leg-to-foundation",
+      "localPosition": { "space": "local", "x": 2.0, "y": -2.0, "z": -0.3 },
+      "linkedLegId": "leg-se",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-leg-sw",
+      "name": "Leg SW / foundation connection",
+      "anchorType": "leg-to-foundation",
+      "localPosition": { "space": "local", "x": -2.0, "y": -2.0, "z": -0.5 },
+      "linkedLegId": "leg-sw",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-leg-nw",
+      "name": "Leg NW / foundation connection",
+      "anchorType": "leg-to-foundation",
+      "localPosition": { "space": "local", "x": -2.0, "y": 2.0, "z": -0.2 },
+      "linkedLegId": "leg-nw",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." },
+      "verificationState": "unverified"
+    }
+  ],
+  "structuralLegs": [
+    {
+      "id": "leg-ne",
+      "name": "Leg NE",
+      "linkedFoundationAnchorId": "anchor-leg-ne",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." }
+    },
+    {
+      "id": "leg-se",
+      "name": "Leg SE",
+      "linkedFoundationAnchorId": "anchor-leg-se",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." }
+    },
+    {
+      "id": "leg-sw",
+      "name": "Leg SW",
+      "linkedFoundationAnchorId": "anchor-leg-sw",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." }
+    },
+    {
+      "id": "leg-nw",
+      "name": "Leg NW",
+      "linkedFoundationAnchorId": "anchor-leg-nw",
+      "source": { "originType": "assumed", "verificationState": "unverified", "notes": "Synthetic fixture." }
+    }
+  ],
+  "metadata": { "synthetic": true },
+  "warnings": []
+}

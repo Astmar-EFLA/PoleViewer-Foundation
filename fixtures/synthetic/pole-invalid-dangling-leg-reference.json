@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "0.1.0",
+  "modelId": "synthetic-invalid-dangling-001",
+  "name": "Synthetic invalid fixture: dangling leg-to-anchor reference",
+  "description": "Deliberately invalid fixture for validation tests. leg-a references an anchor id that does not exist.",
+  "source": {
+    "originType": "imported",
+    "sourceFile": "fixtures/synthetic/pole-invalid-dangling-leg-reference.json",
+    "importedAt": "2026-09-15T00:00:00.000Z",
+    "verificationState": "unverified",
+    "notes": "Synthetic invalid fixture, used only in validation tests."
+  },
+  "units": "m",
+  "coordinateConvention": "right-handed-x-transverse-y-longitudinal-z-up",
+  "localOrigin": { "space": "local", "x": 0, "y": 0, "z": 0 },
+  "modelOrientationRadians": 0,
+  "mastCentreAnchorId": "anchor-mast-centre",
+  "anchors": [
+    {
+      "id": "anchor-mast-centre",
+      "name": "Mast centre",
+      "anchorType": "mast-centre",
+      "localPosition": { "space": "local", "x": 0, "y": 0, "z": 0 },
+      "source": { "originType": "assumed", "verificationState": "unverified" },
+      "verificationState": "unverified"
+    }
+  ],
+  "structuralLegs": [
+    {
+      "id": "leg-a",
+      "name": "Leg A",
+      "linkedFoundationAnchorId": "anchor-leg-a-does-not-exist",
+      "source": { "originType": "assumed", "verificationState": "unverified" }
+    }
+  ],
+  "metadata": { "synthetic": true },
+  "warnings": []
+}

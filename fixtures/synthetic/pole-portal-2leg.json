@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "0.1.0",
+  "modelId": "synthetic-portal-2leg-001",
+  "name": "Synthetic 2-leg portal pole",
+  "description": "Synthetic fixture for Phase 1 coordinate/anchor proof. Not a real engineering model.",
+  "source": {
+    "originType": "imported",
+    "sourceFile": "fixtures/synthetic/pole-portal-2leg.json",
+    "importedAt": "2026-09-15T00:00:00.000Z",
+    "verificationState": "unverified",
+    "notes": "Synthetic fixture."
+  },
+  "units": "m",
+  "coordinateConvention": "right-handed-x-transverse-y-longitudinal-z-up",
+  "localOrigin": { "space": "local", "x": 0, "y": 0, "z": 0 },
+  "modelOrientationRadians": 0,
+  "mastCentreAnchorId": "anchor-mast-centre",
+  "anchors": [
+    {
+      "id": "anchor-mast-centre",
+      "name": "Mast centre",
+      "anchorType": "mast-centre",
+      "localPosition": { "space": "local", "x": 0, "y": 0, "z": 0 },
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture; mast centre coincides with model origin by construction."
+      },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-leg-a",
+      "name": "Leg A / foundation connection",
+      "anchorType": "leg-to-foundation",
+      "localPosition": { "space": "local", "x": -1.5, "y": 0, "z": -0.2 },
+      "linkedLegId": "leg-a",
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture."
+      },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-leg-b",
+      "name": "Leg B / foundation connection",
+      "anchorType": "leg-to-foundation",
+      "localPosition": { "space": "local", "x": 1.5, "y": 0, "z": -0.2 },
+      "linkedLegId": "leg-b",
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture."
+      },
+      "verificationState": "unverified"
+    }
+  ],
+  "structuralLegs": [
+    {
+      "id": "leg-a",
+      "name": "Leg A",
+      "linkedFoundationAnchorId": "anchor-leg-a",
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture."
+      }
+    },
+    {
+      "id": "leg-b",
+      "name": "Leg B",
+      "linkedFoundationAnchorId": "anchor-leg-b",
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture."
+      }
+    }
+  ],
+  "metadata": { "synthetic": true },
+  "warnings": []
+}
