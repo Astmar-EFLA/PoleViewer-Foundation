@@ -30,6 +30,13 @@ and quantities are not an approved design or a certified construction quantity.
   the 3D view, a horizontal clipping plane, fixed camera views, and point/distance/
   slope/clearance measurement tools with explicit staleness tracking after geometry
   changes.
+- Phase 8 (project persistence and reporting) — done: save/reopen a `project.json`
+  file (schema-validated, with a migration-framework scaffold gating unsupported
+  schema versions); a backend asset-status check (SHA-256, missing/modified
+  detection per ADR-008 — see its "Phase 8 resolution" note for what is and isn't
+  covered); an engineering parameter summary separated into imported/user-entered/
+  assumed/calculated; a validation summary aggregating every existing validator; and
+  screenshot + section-image export.
 
 See [docs/architecture](docs/architecture) for the phase plan and
 [docs/decisions](docs/decisions) for Architecture Decision Records.

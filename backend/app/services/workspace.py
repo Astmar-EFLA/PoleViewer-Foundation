@@ -8,6 +8,7 @@ frontend-supplied path directly.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -57,3 +58,19 @@ def resolve_workspace_path(relative_path: str) -> Path:
         ) from exc
 
     return resolved
+
+
+_HASH_CHUNK_SIZE = 1024 * 1024
+
+
+def compute_sha256(path: Path) -> str:
+    """
+    Streams the file in chunks rather than reading it whole -- LAS/LAZ point
+    clouds can be large, and this must not load an entire source file into
+    memory just to detect whether it changed.
+    """
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(_HASH_CHUNK_SIZE), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

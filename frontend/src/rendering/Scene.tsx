@@ -56,6 +56,19 @@ function CameraRig() {
   return <OrbitControls ref={controlsRef} makeDefault />;
 }
 
+/** Runs inside the Canvas -- publishes the underlying WebGL canvas DOM element to the store once, so an HTML overlay button (ViewportControls, outside the Canvas tree) can capture a screenshot of it (spec section 20: "screenshot export"). */
+function CanvasElementBridge() {
+  const { gl } = useThree();
+  const setCanvasElement = useProjectStore((s) => s.setCanvasElement);
+
+  useEffect(() => {
+    setCanvasElement(gl.domElement);
+    return () => setCanvasElement(null);
+  }, [gl, setCanvasElement]);
+
+  return null;
+}
+
 /** Runs inside the Canvas -- applies the horizontal clipping plane as a WebGLRenderer-global clipping plane (spec section 14: "horizontal clipping plane"), so every material is clipped consistently without touching each one individually. */
 function HorizontalClipController({ renderOriginLocalZ }: { readonly renderOriginLocalZ: number }) {
   const { gl } = useThree();
@@ -116,13 +129,17 @@ export function Scene({ project }: SceneProps) {
   }
 
   return (
-    <Canvas camera={{ position: [30, 25, 30], fov: 50 }} gl={{ localClippingEnabled: true }}>
+    <Canvas
+      camera={{ position: [30, 25, 30], fov: 50 }}
+      gl={{ localClippingEnabled: true, preserveDrawingBuffer: true }}
+    >
       <ambientLight intensity={0.6} />
       <directionalLight position={[20, 30, 10]} intensity={0.8} />
       <gridHelper args={[100, 20]} />
       <axesHelper args={[5]} />
 
       <CameraRig />
+      <CanvasElementBridge />
       <HorizontalClipController renderOriginLocalZ={project.renderOriginLocal.z} />
 
       {project.terrainSurface && (

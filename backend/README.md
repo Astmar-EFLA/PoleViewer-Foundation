@@ -67,6 +67,11 @@ path traversal (`app/services/workspace.py`). The workspace root defaults
 to `backend/workspace/` (created on first use, gitignored) and can be
 overridden with the `POLE_VIEWER_WORKSPACE_ROOT` environment variable.
 
+`POST /workspace/file-status` reports whether a registered asset still
+exists and, if so, its current SHA-256 -- used by the frontend to detect a
+moved, missing, or externally-modified source file (ADR-008) rather than
+trusting a project's recorded reference forever.
+
 ## Testing
 
 ```bash

@@ -197,6 +197,7 @@ describe("buildSectionPlane", () => {
       sections: [],
       measurements: [],
       geometryVersion: 1,
+      notes: "",
     };
   }
 
@@ -263,6 +264,7 @@ describe("generateSectionResult", () => {
       sections: [],
       measurements: [],
       geometryVersion: 1,
+      notes: "",
     };
   }
 

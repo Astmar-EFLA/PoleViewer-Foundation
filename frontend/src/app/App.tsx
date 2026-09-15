@@ -5,6 +5,8 @@ import { FoundationPanel } from "../rendering/FoundationPanel";
 import { GeotechPanel } from "../rendering/GeotechPanel";
 import { LayerPanel } from "../rendering/LayerPanel";
 import { MeasurementPanel } from "../rendering/MeasurementPanel";
+import { ProjectPanel } from "../rendering/ProjectPanel";
+import { ReportModal } from "../rendering/ReportModal";
 import { Scene } from "../rendering/Scene";
 import { SectionPanel } from "../rendering/SectionPanel";
 import { TerrainPanel } from "../rendering/TerrainPanel";
@@ -29,6 +31,7 @@ export function App() {
       )}
       <LayerPanel />
       <ViewportControls />
+      <ProjectPanel />
       <TerrainPanel />
       <FoundationPanel />
       <GeotechPanel />
@@ -36,6 +39,7 @@ export function App() {
       <SectionPanel />
       <MeasurementPanel />
       <CoordinateReadout />
+      <ReportModal />
     </div>
   );
 }

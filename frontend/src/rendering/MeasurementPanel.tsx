@@ -6,7 +6,7 @@ import { useProjectStore } from "../state/projectStore";
 const panelStyle: CSSProperties = {
   position: "absolute",
   bottom: 44,
-  right: 12,
+  left: 620,
   background: "rgba(255,255,255,0.94)",
   borderRadius: 6,
   padding: "10px 12px",

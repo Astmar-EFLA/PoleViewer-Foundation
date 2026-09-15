@@ -4,6 +4,7 @@ import { crsSchema } from "./sharedSchemas";
 export const pointCloudSourceReferenceSchema = z.object({
   filePath: z.string().min(1),
   crs: crsSchema,
+  contentHash: z.string().nullable(),
 });
 
 const rectangularClipBoundarySettingsSchema = z.object({

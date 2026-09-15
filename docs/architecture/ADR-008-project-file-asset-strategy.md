@@ -44,3 +44,22 @@ inlined into `project.json`.
 - Behaviour when an asset is present but has a different hash than recorded (edited
   externally) needs a defined UX (block vs. warn-and-relink-with-new-hash) — deferred to
   Phase 8 design, tracked here so it isn't forgotten.
+
+## Phase 8 resolution (partial)
+
+The missing/mismatched-hash behaviour above is resolved: `PointCloudSourceReference`
+carries a `contentHash` (SHA-256, computed by a new backend endpoint,
+`POST /workspace/file-status`, added specifically because the frontend cannot read
+workspace files directly). A missing asset is a **blocking** validation result
+(`asset.point-cloud-missing`); a present-but-hash-mismatched asset is a **warning**
+(`asset.point-cloud-hash-mismatch`) — usable, but flagged, never silently re-linked or
+silently ignored. See `validation/assetValidation.ts`.
+
+What is **not** yet implemented: `project.json` is not actually written into the
+backend's workspace folder next to `assets/`. "Save"/"Reopen" (Phase 8) currently use a
+plain browser file download/upload for `project.json`, wherever the user chooses to keep
+it -- independent of the backend's `POLE_VIEWER_WORKSPACE_ROOT`. This means a project
+file and the workspace its `pointCloudSource.filePath` is relative to are not guaranteed
+to travel together as one folder, which is what "a project is a workspace folder" was
+meant to guarantee. Closing that gap (writing/reading `project.json` through the backend
+workspace, or a real single-archive packaging step) remains open for a later phase.

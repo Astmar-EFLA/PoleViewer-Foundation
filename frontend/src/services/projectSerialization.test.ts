@@ -94,6 +94,7 @@ function buildSyntheticProject(): Project {
     pointCloudSource: {
       filePath: "pointcloud-mixed-classification.las",
       crs: { kind: "epsg", epsgCode: 3057 },
+      contentHash: "a".repeat(64),
     },
     terrainGenerationSettings: DEFAULT_TERRAIN_GENERATION_SETTINGS,
     terrainSurface,
@@ -129,6 +130,7 @@ function buildSyntheticProject(): Project {
       },
     ],
     geometryVersion: 1,
+    notes: "Synthetic Phase 1 test project -- not a real site.",
   };
 }
 

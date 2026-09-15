@@ -8,6 +8,14 @@ import type { CoordinateReferenceSystem } from "./coordinates";
 export interface PointCloudSourceReference {
   readonly filePath: string;
   readonly crs: CoordinateReferenceSystem;
+  /**
+   * SHA-256 of the file's content the last time it was registered or
+   * confirmed, so a moved/edited/missing source file can be detected on
+   * load (ADR-008) rather than silently re-linked. Null until the backend
+   * has computed it at least once (e.g. a project authored before this
+   * field existed, or before the backend has ever been reached).
+   */
+  readonly contentHash: string | null;
 }
 
 export interface RectangularClipBoundarySettings {

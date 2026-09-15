@@ -1,24 +1,33 @@
 import type { CSSProperties } from "react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { SectionMode } from "../domain/section";
 import { generateSectionResult } from "../geometry/section";
 import { radiansToDegrees, degreesToRadians } from "../geometry/angles";
+import { downloadSectionSvg } from "../services/exportImage";
 import { useProjectStore } from "../state/projectStore";
 import { SectionView } from "./SectionView";
 
+/**
+ * Docked as a full-height right-hand sidebar, shown only when toggled open
+ * (ViewportControls' "Sections" button) rather than as a permanent corner
+ * widget -- the embedded diagram needs real room to be legible, and this
+ * viewport already has more permanently-docked corner panels than a
+ * 1280x680 window has space for without them overlapping.
+ */
 const panelStyle: CSSProperties = {
   position: "absolute",
   top: 12,
   right: 12,
-  background: "rgba(255,255,255,0.94)",
+  bottom: 12,
+  background: "rgba(255,255,255,0.96)",
   borderRadius: 6,
   padding: "10px 12px",
   boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  width: 420,
-  maxHeight: "70vh",
+  width: 460,
   overflowY: "auto",
   fontFamily: "system-ui, sans-serif",
   fontSize: 12,
+  zIndex: 50,
 };
 
 const MODE_LABELS: Record<SectionMode, string> = {
@@ -30,6 +39,8 @@ const MODE_LABELS: Record<SectionMode, string> = {
 
 export function SectionPanel() {
   const project = useProjectStore((s) => s.project);
+  const sectionsPanelOpen = useProjectStore((s) => s.sectionsPanelOpen);
+  const setSectionsPanelOpen = useProjectStore((s) => s.setSectionsPanelOpen);
   const activeSectionId = useProjectStore((s) => s.activeSectionId);
   const setActiveSectionId = useProjectStore((s) => s.setActiveSectionId);
   const addSection = useProjectStore((s) => s.addSection);
@@ -39,17 +50,29 @@ export function SectionPanel() {
   const removeSection = useProjectStore((s) => s.removeSection);
 
   const activeSection = project?.sections.find((s) => s.id === activeSectionId) ?? null;
+  const sectionContainerRef = useRef<HTMLDivElement>(null);
 
   const result = useMemo(() => {
     if (!project || !activeSection) return null;
     return generateSectionResult(project, activeSection);
   }, [project, activeSection]);
 
-  if (!project) return null;
+  function handleExportSectionImage() {
+    const svg = sectionContainerRef.current?.querySelector("svg");
+    if (!svg || !activeSection) return;
+    downloadSectionSvg(svg, activeSection.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  }
+
+  if (!project || !sectionsPanelOpen) return null;
 
   return (
     <div style={panelStyle}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Sections</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>Sections</div>
+        <button style={smallButtonStyle} onClick={() => setSectionsPanelOpen(false)}>
+          Close
+        </button>
+      </div>
 
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
         {project.sections.map((s) => (
@@ -91,11 +114,16 @@ export function SectionPanel() {
               Visible
             </label>
             <span style={{ opacity: 0.6 }}>{MODE_LABELS[activeSection.mode]}</span>
-            {(activeSection.mode === "custom" || activeSection.mode === "leg") && (
-              <button style={smallButtonStyle} onClick={() => removeSection(activeSection.id)}>
-                Remove
+            <span style={{ display: "flex", gap: 4 }}>
+              <button style={smallButtonStyle} onClick={handleExportSectionImage}>
+                Export image
               </button>
-            )}
+              {(activeSection.mode === "custom" || activeSection.mode === "leg") && (
+                <button style={smallButtonStyle} onClick={() => removeSection(activeSection.id)}>
+                  Remove
+                </button>
+              )}
+            </span>
           </div>
 
           {activeSection.mode === "custom" && (
@@ -155,7 +183,9 @@ export function SectionPanel() {
           </label>
 
           {activeSection.visible && result && (
-            <SectionView result={result} mastCentreProjectElevation={project.mastCentreProject.elevation} width={392} height={280} />
+            <div ref={sectionContainerRef}>
+              <SectionView result={result} mastCentreProjectElevation={project.mastCentreProject.elevation} width={432} height={360} />
+            </div>
           )}
         </>
       )}

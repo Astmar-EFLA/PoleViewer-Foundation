@@ -6,6 +6,7 @@ import {
   type BackendClipResult,
   type BackendPointCloudMetadata,
 } from "../validation/backendPointCloudSchema";
+import { parseFileStatus, type BackendFileStatus } from "../validation/backendWorkspaceSchema";
 
 /**
  * The local-only FastAPI backend (see backend/README.md). Never a remote
@@ -113,6 +114,24 @@ export async function requestInspect(
   const parsed = parsePointCloudMetadata(json);
   if (!parsed.success) {
     throw new BackendRequestError(`Backend inspect response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Asks the backend whether a workspace-relative asset still exists and, if
+ * so, its current content hash -- used to detect a moved, missing or
+ * externally-modified source file (ADR-008) rather than trusting a
+ * project's recorded reference forever.
+ */
+export async function requestFileStatus(
+  filePath: string,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL
+): Promise<BackendFileStatus> {
+  const json = await postJson("/workspace/file-status", { filePath }, baseUrl);
+  const parsed = parseFileStatus(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend file-status response failed validation: ${parsed.errors.join("; ")}`);
   }
   return parsed.data;
 }

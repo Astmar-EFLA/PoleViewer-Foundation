@@ -21,9 +21,11 @@ import {
   measureThreeDDistance,
   measureVerticalDifference,
 } from "../geometry/measurements";
-import { BackendClipBlockedError, BackendRequestError } from "../services/backendClient";
+import { BackendClipBlockedError, BackendRequestError, DEFAULT_BACKEND_BASE_URL, requestFileStatus } from "../services/backendClient";
 import { withFoundationType } from "../services/buildFoundationInstances";
+import { readProjectJsonFile } from "../services/projectFile";
 import { generateTerrainFromPointCloud } from "../services/terrainGeneration";
+import type { BackendFileStatus } from "../validation/backendWorkspaceSchema";
 
 export type LayerKey = keyof ProjectLayerStyles;
 
@@ -74,6 +76,21 @@ function requiredPointCount(kind: MeasurementKind): number {
   return ONE_POINT_MEASUREMENT_KINDS.includes(kind) ? 1 : 2;
 }
 
+export interface AssetStatusState {
+  readonly status: "idle" | "loading" | "success" | "error";
+  readonly result: BackendFileStatus | null;
+  readonly errorMessage: string | null;
+}
+
+const IDLE_ASSET_STATUS: AssetStatusState = { status: "idle", result: null, errorMessage: null };
+
+export interface ProjectFileLoadState {
+  readonly status: "idle" | "error";
+  readonly errors: readonly string[];
+}
+
+const IDLE_PROJECT_FILE_LOAD: ProjectFileLoadState = { status: "idle", errors: [] };
+
 interface ProjectStoreState {
   readonly project: Project | null;
   readonly hover: HoverReadout | null;
@@ -83,7 +100,19 @@ interface ProjectStoreState {
   readonly horizontalClip: HorizontalClipState;
   readonly pendingMeasurement: PendingMeasurement | null;
   readonly cameraPresetRequest: CameraPresetRequest | null;
+  readonly canvasElement: HTMLCanvasElement | null;
+  readonly assetStatus: AssetStatusState;
+  readonly reportOpen: boolean;
+  readonly sectionsPanelOpen: boolean;
+  readonly projectFileLoad: ProjectFileLoadState;
   requestCameraPreset(preset: FixedViewPreset): void;
+  setCanvasElement(canvas: HTMLCanvasElement | null): void;
+  setReportOpen(open: boolean): void;
+  setSectionsPanelOpen(open: boolean): void;
+  setProjectNotes(notes: string): void;
+  checkPointCloudAssetStatus(baseUrl?: string): Promise<void>;
+  openProjectFromFile(file: File): Promise<void>;
+  dismissProjectFileLoadError(): void;
   setProject(project: Project): void;
   setLayerVisible(layer: LayerKey, visible: boolean): void;
   setLayerOpacity(layer: LayerKey, opacity: number): void;
@@ -147,10 +176,75 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   horizontalClip: DEFAULT_HORIZONTAL_CLIP,
   pendingMeasurement: null,
   cameraPresetRequest: null,
+  canvasElement: null,
+  assetStatus: IDLE_ASSET_STATUS,
+  reportOpen: false,
+  sectionsPanelOpen: false,
+  projectFileLoad: IDLE_PROJECT_FILE_LOAD,
   requestCameraPreset: (preset) =>
     set((state) => ({ cameraPresetRequest: { preset, nonce: (state.cameraPresetRequest?.nonce ?? 0) + 1 } })),
+  setCanvasElement: (canvas) => set({ canvasElement: canvas }),
+  setReportOpen: (open) => set({ reportOpen: open }),
+  setSectionsPanelOpen: (open) => set({ sectionsPanelOpen: open }),
+  setProjectNotes: (notes) =>
+    set((state) => {
+      if (!state.project) return {};
+      return { project: { ...state.project, notes } };
+    }),
+  checkPointCloudAssetStatus: async (baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    const project = get().project;
+    if (!project?.pointCloudSource) return;
+
+    set({ assetStatus: { status: "loading", result: null, errorMessage: null } });
+    try {
+      const result = await requestFileStatus(project.pointCloudSource.filePath, baseUrl);
+      set({ assetStatus: { status: "success", result, errorMessage: null } });
+
+      // A confirmed hash is recorded on the project the first time it's
+      // successfully checked, so future checks (including on reopen) have
+      // something to compare against (ADR-008) -- but only when nothing
+      // was recorded yet; a mismatch must stay visible as a mismatch, not
+      // be silently re-baselined by simply checking again.
+      if (result.exists && result.sha256 && !project.pointCloudSource.contentHash) {
+        set((state) => {
+          if (!state.project?.pointCloudSource) return {};
+          return {
+            project: {
+              ...state.project,
+              pointCloudSource: { ...state.project.pointCloudSource, contentHash: result.sha256 },
+            },
+          };
+        });
+      }
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ assetStatus: { status: "error", result: null, errorMessage: message } });
+    }
+  },
+  openProjectFromFile: async (file) => {
+    const result = await readProjectJsonFile(file);
+    if (!result.success) {
+      set({ projectFileLoad: { status: "error", errors: result.errors } });
+      return;
+    }
+    set({
+      project: result.data,
+      activeSectionId: result.data.sections[0]?.id ?? null,
+      pendingMeasurement: null,
+      assetStatus: IDLE_ASSET_STATUS,
+      projectFileLoad: IDLE_PROJECT_FILE_LOAD,
+    });
+  },
+  dismissProjectFileLoadError: () => set({ projectFileLoad: IDLE_PROJECT_FILE_LOAD }),
   setProject: (project) =>
-    set({ project, activeSectionId: project.sections[0]?.id ?? null, pendingMeasurement: null }),
+    set({
+      project,
+      activeSectionId: project.sections[0]?.id ?? null,
+      pendingMeasurement: null,
+      assetStatus: IDLE_ASSET_STATUS,
+      projectFileLoad: IDLE_PROJECT_FILE_LOAD,
+    }),
   setLayerVisible: (layer, visible) =>
     set((state) => {
       if (!state.project) return {};

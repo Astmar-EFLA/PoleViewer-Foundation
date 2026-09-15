@@ -198,6 +198,10 @@ export function buildSyntheticDemoProject(): Project {
     pointCloudSource: {
       filePath: "pointcloud-mixed-classification.las",
       crs: { kind: "epsg", epsgCode: 3057 },
+      // Not yet confirmed against the backend in this synthetic demo --
+      // checkPointCloudAssetStatus() fills this in once the backend has
+      // been reached (see ProjectPanel).
+      contentHash: null,
     },
     terrainGenerationSettings: DEFAULT_TERRAIN_GENERATION_SETTINGS,
     terrainSurface,
@@ -209,5 +213,6 @@ export function buildSyntheticDemoProject(): Project {
     sections: buildDemoSections(),
     measurements: [],
     geometryVersion: 1,
+    notes: "",
   };
 }

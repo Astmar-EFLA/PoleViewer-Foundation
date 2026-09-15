@@ -1,6 +1,7 @@
 import type { Project } from "../domain/project";
 import type { ParseResult } from "../validation/parseResult";
 import { parseProject } from "../validation/projectSchema";
+import { migrateProjectJson } from "./projectMigration";
 
 export function serializeProject(project: Project): string {
   return JSON.stringify(project, null, 2);
@@ -13,5 +14,11 @@ export function deserializeProject(json: string): ParseResult<Project> {
   } catch (error) {
     return { success: false, errors: [`Invalid JSON: ${(error as Error).message}`] };
   }
-  return parseProject(parsedJson);
+
+  const migrated = migrateProjectJson(parsedJson);
+  if (!migrated.success) {
+    return migrated;
+  }
+
+  return parseProject(migrated.data);
 }

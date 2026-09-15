@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.pointcloud import router as pointcloud_router
+from app.api.workspace import router as workspace_router
 
 app = FastAPI(title="Pole/Tower Viewer Backend", version="0.1.0")
 
@@ -23,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(pointcloud_router)
+app.include_router(workspace_router)
 
 
 @app.get("/health")

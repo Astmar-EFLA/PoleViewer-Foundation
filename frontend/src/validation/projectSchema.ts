@@ -52,6 +52,7 @@ export const projectSchema = z.object({
   sections: z.array(sectionDefinitionSchema),
   measurements: z.array(measurementSchema),
   geometryVersion: z.number().int().nonnegative(),
+  notes: z.string(),
 });
 
 /**

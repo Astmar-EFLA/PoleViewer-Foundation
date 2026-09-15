@@ -13,7 +13,11 @@ const PROJECT_CONTEXT = {
   crs: { kind: "epsg" as const, epsgCode: 3057 },
 };
 
-const SOURCE = { filePath: "pointcloud-mixed-classification.las", crs: { kind: "epsg" as const, epsgCode: 3057 } };
+const SOURCE = {
+  filePath: "pointcloud-mixed-classification.las",
+  crs: { kind: "epsg" as const, epsgCode: 3057 },
+  contentHash: null,
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -9,11 +9,11 @@ import type { SectionDefinition } from "./section";
 import type { TerrainSurface } from "./terrain";
 
 /**
- * Phase 1-7 subset of the full project schema (spec section 19). Fields
- * not yet needed (validation-results-as-saved-state) are deliberately
- * omitted here rather than stubbed -- they are added in the phases that
- * actually implement them, per "don't design for hypothetical future
- * requirements."
+ * Phase 1-8 subset of the full project schema (spec section 19).
+ * Validation results are deliberately NOT persisted here -- they are
+ * always recomputed from current state (validation/projectReport.ts), so
+ * there is no risk of a saved result silently going stale against the
+ * engineering data it describes.
  */
 export interface LayerStyle {
   readonly visible: boolean;
@@ -76,4 +76,6 @@ export interface Project {
    * detectable (spec section 15) rather than silently kept.
    */
   readonly geometryVersion: number;
+  /** Free-text project notes (spec section 19). Never engineering-authoritative -- purely a human record. */
+  readonly notes: string;
 }
