@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import type { Project } from "../domain/project";
 import type { RectangularPadPedestalParameters } from "../domain/foundation";
+import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
@@ -54,11 +55,16 @@ function buildSyntheticProject(): Project {
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
+    pointCloudSource: {
+      filePath: "pointcloud-mixed-classification.las",
+      crs: { kind: "epsg", epsgCode: 3057 },
+    },
+    terrainGenerationSettings: DEFAULT_TERRAIN_GENERATION_SETTINGS,
     terrainSurface,
     layerStyles: {
       pole: { visible: true, opacity: 1 },
       foundations: { visible: true, opacity: 1 },
-      terrain: { visible: true, opacity: 0.85 },
+      terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false },
     },
   };
 }

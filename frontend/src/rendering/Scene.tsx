@@ -7,6 +7,7 @@ import { localToProject, localToViewer } from "../geometry/coordinateTransform";
 import { queryElevation } from "../geometry/terrain";
 import { useProjectStore } from "../state/projectStore";
 import { FoundationMeshes } from "./FoundationMeshes";
+import { GroundPointsCloud } from "./GroundPointsCloud";
 import { PoleAnchors } from "./PoleAnchors";
 import { TerrainMesh } from "./TerrainMesh";
 
@@ -48,14 +49,23 @@ export function Scene({ project }: SceneProps) {
       <axesHelper args={[5]} />
 
       {project.terrainSurface && (
-        <TerrainMesh
-          surface={project.terrainSurface}
-          viewerFrame={viewerFrame}
-          visible={project.layerStyles.terrain.visible}
-          opacity={project.layerStyles.terrain.opacity}
-          onHoverLocalXY={handleTerrainHover}
-          onHoverEnd={() => setHover(null)}
-        />
+        <>
+          <TerrainMesh
+            surface={project.terrainSurface}
+            viewerFrame={viewerFrame}
+            visible={project.layerStyles.terrain.visible}
+            opacity={project.layerStyles.terrain.opacity}
+            wireframe={project.layerStyles.terrain.wireframe}
+            onHoverLocalXY={handleTerrainHover}
+            onHoverEnd={() => setHover(null)}
+          />
+          <GroundPointsCloud
+            surface={project.terrainSurface}
+            viewerFrame={viewerFrame}
+            visible={project.layerStyles.terrain.showPoints}
+            opacity={project.layerStyles.terrain.opacity}
+          />
+        </>
       )}
 
       <PoleAnchors

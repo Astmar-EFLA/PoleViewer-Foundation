@@ -4,12 +4,18 @@ import { foundationInstanceSchema } from "./foundationSchema";
 import type { ParseResult } from "./parseResult";
 import { fromZodSafeParse } from "./parseResult";
 import { poleModelSchema } from "./poleModelSchema";
+import { pointCloudSourceReferenceSchema, terrainGenerationSettingsSchema } from "./pointCloudSchema";
 import { crsSchema, lengthUnitSchema, localCoordinateSchema, projectCoordinateSchema } from "./sharedSchemas";
 import { terrainSurfaceSchema } from "./terrainSchema";
 
 const layerStyleSchema = z.object({
   visible: z.boolean(),
   opacity: z.number().min(0).max(1),
+});
+
+const terrainLayerStyleSchema = layerStyleSchema.extend({
+  showPoints: z.boolean(),
+  wireframe: z.boolean(),
 });
 
 export const projectSchema = z.object({
@@ -28,11 +34,13 @@ export const projectSchema = z.object({
   renderOriginLocal: localCoordinateSchema,
   poleModel: poleModelSchema,
   foundationInstances: z.array(foundationInstanceSchema),
+  pointCloudSource: pointCloudSourceReferenceSchema.nullable(),
+  terrainGenerationSettings: terrainGenerationSettingsSchema,
   terrainSurface: terrainSurfaceSchema.nullable(),
   layerStyles: z.object({
     pole: layerStyleSchema,
     foundations: layerStyleSchema,
-    terrain: layerStyleSchema,
+    terrain: terrainLayerStyleSchema,
   }),
 });
 

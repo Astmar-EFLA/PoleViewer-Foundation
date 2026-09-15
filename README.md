@@ -9,13 +9,30 @@ and quantities are not an approved design or a certified construction quantity.
 
 ## Status
 
-Phase 1 (coordinate-safe vertical slice) — in progress. See [docs/architecture](docs/architecture)
-for the phase plan and [docs/decisions](docs/decisions) for Architecture Decision Records.
+- Phase 1 (coordinate-safe vertical slice) — done: coordinate chain, pole anchors,
+  per-leg foundations, synthetic terrain, save/reopen, R3F viewer.
+- Phase 2 (FastAPI + PDAL point-cloud backend) — done: metadata inspection, rectangular
+  clip (rotatable/offsettable), classification selection, decimation, CRS validation.
+- Phase 3 (terrain surface from the real point cloud) — done: the frontend's TIN
+  generator now runs on real backend-clipped LAS points, not just synthetic fixtures;
+  points/surface/wireframe display modes.
+
+See [docs/architecture](docs/architecture) for the phase plan and
+[docs/decisions](docs/decisions) for Architecture Decision Records.
 
 No representative project files (pole JSON, GLB, LAS/LAZ, foundation tables) have been
 supplied yet. All fixtures under `fixtures/synthetic` are synthetic and clearly labelled
 as such — format support for any real-world source system remains unverified until real
 files are inspected (see ADR-003 and the Phase 0 notes in docs/architecture).
+
+## Running it locally
+
+1. Backend: see [backend/README.md](backend/README.md) (`conda env create -f backend/environment.yml`,
+   then `uvicorn app.main:app --port 8100`).
+2. Frontend: `cd frontend && npm install && npm run dev`, then open the printed
+   `localhost` URL. The demo project loads a synthetic terrain immediately (no backend
+   required); the "Regenerate from point cloud" button in the viewer calls the backend
+   for a real PDAL-clipped terrain if it's running.
 
 ## Repository layout
 

@@ -51,6 +51,15 @@ conda run -n pole-viewer-backend uvicorn app.main:app --reload --port 8100
 
 `GET /health` should return `{"status": "ok"}`.
 
+## CORS
+
+The frontend dev server (`localhost:5173`) and this backend (`localhost:8100`)
+are different origins, so the browser preflights every POST. CORS is scoped
+to the known local dev server addresses (`localhost`/`127.0.0.1:5173`) in
+`app/main.py`, not a wildcard -- this backend is local-only (ADR-001) but
+still reachable from any origin an operator's browser happens to have open,
+so the allowlist stays explicit.
+
 ## Workspace
 
 All file paths in requests are workspace-relative and validated against

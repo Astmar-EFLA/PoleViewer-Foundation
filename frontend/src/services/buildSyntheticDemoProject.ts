@@ -10,6 +10,7 @@ import poleLattice4LegJson from "../../../fixtures/synthetic/pole-lattice-4leg.j
 import terrainSlopeJson from "../../../fixtures/synthetic/terrain-slope.json";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import type { RectangularPadPedestalParameters } from "../domain/foundation";
+import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
 import type { TerrainPoint } from "../domain/terrain";
 import { degreesToRadians } from "../geometry/angles";
@@ -69,11 +70,21 @@ export function buildSyntheticDemoProject(): Project {
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
+    // Points at the real synthetic LAS fixture (backend/workspace/, copied
+    // from fixtures/synthetic/) so the "regenerate from point cloud" action
+    // has a sensible default target. The terrain shown on load is still the
+    // Phase 1 synthetic fixture below, so the app works with no backend
+    // running; this reference is only used once the user asks to regenerate.
+    pointCloudSource: {
+      filePath: "pointcloud-mixed-classification.las",
+      crs: { kind: "epsg", epsgCode: 3057 },
+    },
+    terrainGenerationSettings: DEFAULT_TERRAIN_GENERATION_SETTINGS,
     terrainSurface,
     layerStyles: {
       pole: { visible: true, opacity: 1 },
       foundations: { visible: true, opacity: 1 },
-      terrain: { visible: true, opacity: 0.85 },
+      terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false },
     },
   };
 }

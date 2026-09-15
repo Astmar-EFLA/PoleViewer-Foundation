@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { CoordinateReadout } from "../rendering/CoordinateReadout";
 import { LayerPanel } from "../rendering/LayerPanel";
 import { Scene } from "../rendering/Scene";
+import { TerrainPanel } from "../rendering/TerrainPanel";
 import { buildSyntheticDemoProject } from "../services/buildSyntheticDemoProject";
 import { useProjectStore } from "../state/projectStore";
 
@@ -21,6 +22,7 @@ export function App() {
         <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>Loading synthetic demo project...</div>
       )}
       <LayerPanel />
+      <TerrainPanel />
       <CoordinateReadout />
     </div>
   );

@@ -11,6 +11,7 @@ interface TerrainMeshProps {
   readonly viewerFrame: ViewerFrameDefinition;
   readonly visible: boolean;
   readonly opacity: number;
+  readonly wireframe?: boolean;
   readonly onHoverLocalXY?: (localX: number, localY: number) => void;
   readonly onHoverEnd?: () => void;
 }
@@ -27,6 +28,7 @@ export function TerrainMesh({
   viewerFrame,
   visible,
   opacity,
+  wireframe = false,
   onHoverLocalXY,
   onHoverEnd,
 }: TerrainMeshProps) {
@@ -75,6 +77,7 @@ export function TerrainMesh({
         opacity={opacity}
         side={THREE.DoubleSide}
         depthWrite={opacity >= 0.999}
+        wireframe={wireframe}
       />
     </mesh>
   );
