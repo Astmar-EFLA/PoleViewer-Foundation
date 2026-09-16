@@ -5,9 +5,9 @@ import { localToProject } from "../geometry/coordinateTransform";
 import type { SideSlope } from "../domain/excavation";
 import type { FoundationParameters } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
-import type { BoundaryDefinition } from "../domain/geotech";
+import type { BoundaryDefinition, GeotechLayer } from "../domain/geotech";
 import type { Measurement, MeasurementKind, MeasurementPointRecord } from "../domain/measurement";
-import type { ClassificationCount, ProcessingWarning } from "../domain/pointCloud";
+import type { ClassificationCount, ProcessingWarning, RectangularClipBoundarySettings } from "../domain/pointCloud";
 import type { Project, ProjectLayerStyles } from "../domain/project";
 import type { SectionDefinition, SectionMode, SectionPlane } from "../domain/section";
 import type { ElevationQuerySource } from "../domain/terrain";
@@ -21,10 +21,25 @@ import {
   measureThreeDDistance,
   measureVerticalDifference,
 } from "../geometry/measurements";
-import { BackendClipBlockedError, BackendRequestError, DEFAULT_BACKEND_BASE_URL, requestFileStatus } from "../services/backendClient";
-import { withFoundationType } from "../services/buildFoundationInstances";
+import {
+  BackendClipBlockedError,
+  BackendRequestError,
+  DEFAULT_BACKEND_BASE_URL,
+  requestCentreline,
+  requestFileStatus,
+  requestInspect,
+  requestPoleModelImport,
+  requestUpload,
+} from "../services/backendClient";
+import { buildDefaultFoundationInstances, withFoundationType } from "../services/buildFoundationInstances";
+import { syncExcavationBottomsToFoundations, syncFoundationBaseToExcavation } from "../services/excavationFoundationSync";
+import type { LineMastRow } from "../services/csvParsing";
+import { parseLineMastCsv } from "../services/csvParsing";
 import { readProjectJsonFile } from "../services/projectFile";
+import { buildDefaultExcavationInstances, buildDefaultSections } from "../services/projectDefaults";
 import { generateTerrainFromPointCloud } from "../services/terrainGeneration";
+import type { PolylinePoint } from "../geometry/centreline";
+import { bearingForMast } from "../geometry/centreline";
 import type { BackendFileStatus } from "../validation/backendWorkspaceSchema";
 
 export type LayerKey = keyof ProjectLayerStyles;
@@ -94,11 +109,59 @@ export interface ProjectFileLoadState {
 
 const IDLE_PROJECT_FILE_LOAD: ProjectFileLoadState = { status: "idle", errors: [] };
 
+export interface PoleModelImportState {
+  readonly status: "idle" | "loading" | "success" | "error";
+  readonly warnings: readonly string[];
+  readonly errorMessage: string | null;
+}
+
+const IDLE_POLE_MODEL_IMPORT: PoleModelImportState = { status: "idle", warnings: [], errorMessage: null };
+
+export interface PointCloudRegistrationState {
+  readonly status: "idle" | "loading" | "success" | "error";
+  readonly errorMessage: string | null;
+}
+
+const IDLE_POINT_CLOUD_REGISTRATION: PointCloudRegistrationState = { status: "idle", errorMessage: null };
+
+/**
+ * A whole-line import: the CSV mast list plus (optionally) the centreline
+ * shapefile, kept as session-only UI state -- never part of the saved
+ * `Project` (see the plan this was built from). Picking a mast rebuilds the
+ * ordinary single-mast `Project` around that row; everything downstream
+ * (save/open, report, sections) is unaware a line was ever involved.
+ */
+export interface LineImportState {
+  readonly masts: readonly LineMastRow[];
+  readonly csvStatus: "idle" | "success" | "error";
+  readonly csvErrorMessage: string | null;
+  readonly selectedMastIndex: number | null;
+  readonly selectMastStatus: "idle" | "loading" | "error";
+  readonly selectMastErrorMessage: string | null;
+  readonly centreline: readonly PolylinePoint[] | null;
+  readonly centrelineStatus: "idle" | "loading" | "success" | "error";
+  readonly centrelineErrorMessage: string | null;
+  readonly centrelineWarnings: readonly string[];
+}
+
+const IDLE_LINE_IMPORT: LineImportState = {
+  masts: [],
+  csvStatus: "idle",
+  csvErrorMessage: null,
+  selectedMastIndex: null,
+  selectMastStatus: "idle",
+  selectMastErrorMessage: null,
+  centreline: null,
+  centrelineStatus: "idle",
+  centrelineErrorMessage: null,
+  centrelineWarnings: [],
+};
+
 interface ProjectStoreState {
   readonly project: Project | null;
   readonly hover: HoverReadout | null;
   readonly terrainRegeneration: TerrainRegenerationState;
-  readonly selectedLegId: string | null;
+  readonly selectedFoundationInstanceId: string | null;
   readonly activeSectionId: string | null;
   readonly horizontalClip: HorizontalClipState;
   readonly pendingMeasurement: PendingMeasurement | null;
@@ -110,11 +173,22 @@ interface ProjectStoreState {
   readonly projectFileLoad: ProjectFileLoadState;
   readonly terrainRegenerationController: AbortController | null;
   readonly assetStatusController: AbortController | null;
+  readonly poleModelImport: PoleModelImportState;
+  readonly pointCloudRegistration: PointCloudRegistrationState;
+  readonly lineImport: LineImportState;
+  importPoleModel(filePath: string, baseUrl?: string): Promise<void>;
+  importPoleModelFromFile(file: File, baseUrl?: string): Promise<void>;
+  registerPointCloudFromFile(file: File, baseUrl?: string): Promise<void>;
+  importLineCsv(file: File): Promise<void>;
+  importLineCentreline(file: File, baseUrl?: string): Promise<void>;
+  selectLineMast(index: number, baseUrl?: string): Promise<void>;
   requestCameraPreset(preset: FixedViewPreset): void;
   setCanvasElement(canvas: HTMLCanvasElement | null): void;
   setReportOpen(open: boolean): void;
   setSectionsPanelOpen(open: boolean): void;
   setProjectNotes(notes: string): void;
+  setMastCentreProject(mastCentreProject: ProjectCoordinate): void;
+  setLineBearingRadians(lineBearingRadians: number): void;
   checkPointCloudAssetStatus(baseUrl?: string): Promise<void>;
   cancelAssetStatusCheck(): void;
   openProjectFromFile(file: File): Promise<void>;
@@ -127,15 +201,19 @@ interface ProjectStoreState {
   setHover(hover: HoverReadout | null): void;
   regenerateTerrainFromPointCloud(): Promise<void>;
   cancelTerrainRegeneration(): void;
-  setSelectedLeg(legId: string | null): void;
-  setFoundationType(legId: string, foundationTypeId: string): void;
-  setFoundationParameters(legId: string, parameters: FoundationParameters): void;
-  copyFoundationToOtherLegs(sourceLegId: string): void;
+  setClipBoundary(patch: Partial<RectangularClipBoundarySettings>): void;
+  setSelectedFoundationInstance(instanceId: string | null): void;
+  setFoundationType(instanceId: string, foundationTypeId: string): void;
+  setFoundationParameters(instanceId: string, parameters: FoundationParameters): void;
+  copyFoundationToSimilar(sourceInstanceId: string): void;
   setGeotechLayerStyle(
     layerId: string,
     style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>
   ): void;
   setGeotechLayerBoundary(layerId: string, which: "top" | "bottom", boundary: BoundaryDefinition): void;
+  setGeotechLayerLabel(layerId: string, label: Partial<{ name: string; category: string }>): void;
+  addGeotechLayer(): void;
+  removeGeotechLayer(layerId: string): void;
   setGroundwaterStyle(style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
   setGroundwaterBoundary(boundary: BoundaryDefinition): void;
   setExcavationStyle(
@@ -159,7 +237,7 @@ interface ProjectStoreState {
   pickMeasurementPoint(local: LocalCoordinate): void;
   addFoundationClearanceMeasurement(
     kind: "foundation-to-bearing-layer" | "foundation-to-groundwater",
-    legId: string,
+    instanceId: string,
     geotechLayerId?: string
   ): void;
   removeMeasurement(measurementId: string): void;
@@ -178,7 +256,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   project: null,
   hover: null,
   terrainRegeneration: IDLE_TERRAIN_REGENERATION,
-  selectedLegId: null,
+  selectedFoundationInstanceId: null,
   activeSectionId: null,
   horizontalClip: DEFAULT_HORIZONTAL_CLIP,
   pendingMeasurement: null,
@@ -190,6 +268,212 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   projectFileLoad: IDLE_PROJECT_FILE_LOAD,
   terrainRegenerationController: null,
   assetStatusController: null,
+  poleModelImport: IDLE_POLE_MODEL_IMPORT,
+  pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
+  lineImport: IDLE_LINE_IMPORT,
+  importPoleModel: async (filePath, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    const project = get().project;
+    if (!project) return;
+
+    set({ poleModelImport: { status: "loading", warnings: [], errorMessage: null } });
+    try {
+      const poleModel = await requestPoleModelImport(filePath, baseUrl);
+      const nowIso = new Date().toISOString();
+      const defaultLegFoundationType = requireFoundationTypeById("rectangular-pad-pedestal-v1");
+      const defaultGuyFoundationType = requireFoundationTypeById("guy-anchor-block-v1");
+      const foundationInstances = buildDefaultFoundationInstances(
+        poleModel,
+        defaultLegFoundationType,
+        defaultGuyFoundationType,
+        nowIso
+      );
+      const excavationInstances = buildDefaultExcavationInstances(foundationInstances);
+      const sections = buildDefaultSections();
+
+      set((state) => {
+        if (!state.project) return {};
+        return {
+          project: {
+            ...state.project,
+            poleModel,
+            foundationInstances,
+            excavationInstances,
+            // A pole-model import replaces the legs and foundations
+            // wholesale, so anything that referenced the old ones by id
+            // (a "selected leg" section, a measurement tied to an old
+            // foundation instance) would silently point at nothing --
+            // reset to the same clean defaults a brand-new project starts
+            // with, rather than leave dangling references around.
+            sections,
+            measurements: [],
+            geometryVersion: state.project.geometryVersion + 1,
+            modifiedAt: nowIso,
+          },
+          selectedFoundationInstanceId: null,
+          activeSectionId: sections[0]?.id ?? null,
+          pendingMeasurement: null,
+          poleModelImport: { status: "success", warnings: poleModel.warnings, errorMessage: null },
+        };
+      });
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ poleModelImport: { status: "error", warnings: [], errorMessage: message } });
+    }
+  },
+  importPoleModelFromFile: async (file, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    set({ poleModelImport: { status: "loading", warnings: [], errorMessage: null } });
+    try {
+      const uploaded = await requestUpload(file, "pole-model", baseUrl);
+      await get().importPoleModel(uploaded.filePath, baseUrl);
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ poleModelImport: { status: "error", warnings: [], errorMessage: message } });
+    }
+  },
+  registerPointCloudFromFile: async (file, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    if (!get().project) return;
+    set({ pointCloudRegistration: { status: "loading", errorMessage: null } });
+    try {
+      const uploaded = await requestUpload(file, "point-cloud", baseUrl);
+      // Read the file's own CRS from its header rather than assuming it
+      // matches the project's -- if it doesn't, the existing clip-blocked
+      // safety net (BackendClipBlockedError) is what catches that, not
+      // anything decided here.
+      const metadata = await requestInspect(uploaded.filePath, baseUrl);
+      const nowIso = new Date().toISOString();
+      set((state) => {
+        if (!state.project) return {};
+        return {
+          project: {
+            ...state.project,
+            pointCloudSource: { filePath: uploaded.filePath, crs: metadata.crs, contentHash: null },
+            modifiedAt: nowIso,
+          },
+          pointCloudRegistration: { status: "success", errorMessage: null },
+        };
+      });
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ pointCloudRegistration: { status: "error", errorMessage: message } });
+    }
+  },
+  importLineCsv: async (file) => {
+    try {
+      const text = await file.text();
+      const parsed = parseLineMastCsv(text);
+      if (!parsed.success) {
+        set((state) => ({
+          lineImport: { ...state.lineImport, csvStatus: "error", csvErrorMessage: parsed.errors.join("; ") },
+        }));
+        return;
+      }
+      set((state) => ({
+        lineImport: {
+          ...state.lineImport,
+          masts: parsed.data,
+          csvStatus: "success",
+          csvErrorMessage: null,
+          selectedMastIndex: null,
+        },
+      }));
+    } catch (error) {
+      set((state) => ({
+        lineImport: { ...state.lineImport, csvStatus: "error", csvErrorMessage: `Unexpected error: ${(error as Error).message}` },
+      }));
+    }
+  },
+  importLineCentreline: async (file, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    const project = get().project;
+    if (!project) return;
+    set((state) => ({ lineImport: { ...state.lineImport, centrelineStatus: "loading", centrelineErrorMessage: null } }));
+    try {
+      const uploaded = await requestUpload(file, "line-centreline", baseUrl);
+      const result = await requestCentreline(uploaded.filePath, project.crs, baseUrl);
+      set((state) => ({
+        lineImport: {
+          ...state.lineImport,
+          centreline: result.vertices,
+          centrelineStatus: "success",
+          centrelineErrorMessage: null,
+          centrelineWarnings: result.warnings.map((w) => w.message),
+        },
+      }));
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set((state) => ({
+        lineImport: { ...state.lineImport, centrelineStatus: "error", centrelineErrorMessage: message },
+      }));
+    }
+  },
+  selectLineMast: async (index, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    const row = get().lineImport.masts[index];
+    const project = get().project;
+    if (!row || !project) return;
+
+    set((state) => ({ lineImport: { ...state.lineImport, selectMastStatus: "loading", selectMastErrorMessage: null } }));
+    try {
+      const poleModel = await requestPoleModelImport(row.modelPath, baseUrl);
+      const nowIso = new Date().toISOString();
+      const defaultLegFoundationType = requireFoundationTypeById("rectangular-pad-pedestal-v1");
+      const defaultGuyFoundationType = requireFoundationTypeById("guy-anchor-block-v1");
+      const foundationInstances = buildDefaultFoundationInstances(
+        poleModel,
+        defaultLegFoundationType,
+        defaultGuyFoundationType,
+        nowIso
+      );
+      const excavationInstances = buildDefaultExcavationInstances(foundationInstances);
+      const sections = buildDefaultSections();
+      const lineBearingRadians = bearingForMast(get().lineImport.masts, get().lineImport.centreline, index);
+
+      set((state) => {
+        if (!state.project) return {};
+        return {
+          project: {
+            ...state.project,
+            poleModel,
+            foundationInstances,
+            excavationInstances,
+            sections,
+            measurements: [],
+            mastCentreProject: row.position,
+            lineBearingRadians,
+            // Same two fields the CSV promises per row (spec: "dýpi á
+            // fastan botn" / "dýpi á grunnvatn") -- everything else about
+            // these layers (name, colour, other boundaries) is untouched.
+            geotechLayers: state.project.geotechLayers.map((l) =>
+              l.category === "competent-bearing"
+                ? { ...l, topBoundary: { method: "terrain-relative", depthBelowTerrainM: row.bearingLayerDepthM } }
+                : l
+            ),
+            groundwater: state.project.groundwater
+              ? {
+                  ...state.project.groundwater,
+                  boundary: { method: "terrain-relative", depthBelowTerrainM: row.groundwaterDepthM },
+                }
+              : state.project.groundwater,
+            geometryVersion: state.project.geometryVersion + 1,
+            modifiedAt: nowIso,
+          },
+          selectedFoundationInstanceId: null,
+          activeSectionId: sections[0]?.id ?? null,
+          pendingMeasurement: null,
+          poleModelImport: { status: "success", warnings: poleModel.warnings, errorMessage: null },
+          lineImport: { ...state.lineImport, selectMastStatus: "idle", selectedMastIndex: index },
+        };
+      });
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set((state) => ({
+        lineImport: { ...state.lineImport, selectMastStatus: "error", selectMastErrorMessage: message },
+      }));
+    }
+  },
   requestCameraPreset: (preset) =>
     set((state) => ({ cameraPresetRequest: { preset, nonce: (state.cameraPresetRequest?.nonce ?? 0) + 1 } })),
   setCanvasElement: (canvas) => set({ canvasElement: canvas }),
@@ -199,6 +483,28 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set((state) => {
       if (!state.project) return {};
       return { project: { ...state.project, notes } };
+    }),
+  setMastCentreProject: (mastCentreProject) =>
+    set((state) => {
+      if (!state.project) return {};
+      const nowIso = new Date().toISOString();
+      // Moves where the local engineering frame sits in the real world --
+      // every local<->project conversion (LAS clipping, the coordinate
+      // readout, previously-recorded measurement project-coordinates)
+      // is now against a different real-world position, so this counts as
+      // a geometry-affecting change (bumps geometryVersion) even though no
+      // local-frame geometry itself was edited.
+      return {
+        project: { ...state.project, mastCentreProject, geometryVersion: state.project.geometryVersion + 1, modifiedAt: nowIso },
+      };
+    }),
+  setLineBearingRadians: (lineBearingRadians) =>
+    set((state) => {
+      if (!state.project) return {};
+      const nowIso = new Date().toISOString();
+      return {
+        project: { ...state.project, lineBearingRadians, geometryVersion: state.project.geometryVersion + 1, modifiedAt: nowIso },
+      };
     }),
   checkPointCloudAssetStatus: async (baseUrl = DEFAULT_BACKEND_BASE_URL) => {
     const project = get().project;
@@ -257,6 +563,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       pendingMeasurement: null,
       assetStatus: IDLE_ASSET_STATUS,
       projectFileLoad: IDLE_PROJECT_FILE_LOAD,
+      poleModelImport: IDLE_POLE_MODEL_IMPORT,
+      pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
+      lineImport: IDLE_LINE_IMPORT,
     });
   },
   dismissProjectFileLoadError: () => set({ projectFileLoad: IDLE_PROJECT_FILE_LOAD }),
@@ -267,6 +576,9 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       pendingMeasurement: null,
       assetStatus: IDLE_ASSET_STATUS,
       projectFileLoad: IDLE_PROJECT_FILE_LOAD,
+      poleModelImport: IDLE_POLE_MODEL_IMPORT,
+      pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
+      lineImport: IDLE_LINE_IMPORT,
     }),
   setLayerVisible: (layer, visible) =>
     set((state) => {
@@ -398,32 +710,50 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   cancelTerrainRegeneration: () => {
     get().terrainRegenerationController?.abort();
   },
-  setSelectedLeg: (legId) => set({ selectedLegId: legId }),
-  setFoundationType: (legId, foundationTypeId) =>
+  setClipBoundary: (patch) =>
     set((state) => {
       if (!state.project) return {};
-      const instance = state.project.foundationInstances.find((f) => f.legId === legId);
+      return {
+        project: {
+          ...state.project,
+          terrainGenerationSettings: {
+            ...state.project.terrainGenerationSettings,
+            clipBoundary: { ...state.project.terrainGenerationSettings.clipBoundary, ...patch },
+          },
+        },
+      };
+    }),
+  setSelectedFoundationInstance: (instanceId) => set({ selectedFoundationInstanceId: instanceId }),
+  setFoundationType: (instanceId, foundationTypeId) =>
+    set((state) => {
+      if (!state.project) return {};
+      const instance = state.project.foundationInstances.find((f) => f.instanceId === instanceId);
       if (!instance) return {};
 
       const foundationType = requireFoundationTypeById(foundationTypeId);
       const nowIso = new Date().toISOString();
       const updated = withFoundationType(instance, state.project.poleModel, foundationType, nowIso);
+      const foundationInstances = state.project.foundationInstances.map((f) =>
+        f.instanceId === instanceId ? updated : f
+      );
 
       return {
         project: {
           ...state.project,
-          foundationInstances: state.project.foundationInstances.map((f) =>
-            f.legId === legId ? updated : f
-          ),
+          foundationInstances,
+          // The foundation's base just moved (new type -> new solved
+          // elevation) -- its excavation's floor must always sit at the
+          // same elevation as the foundation's own base, never drift.
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
       };
     }),
-  setFoundationParameters: (legId, parameters) =>
+  setFoundationParameters: (instanceId, parameters) =>
     set((state) => {
       if (!state.project) return {};
-      const instance = state.project.foundationInstances.find((f) => f.legId === legId);
+      const instance = state.project.foundationInstances.find((f) => f.instanceId === instanceId);
       if (!instance) return {};
 
       const foundationType = requireFoundationTypeById(instance.foundationTypeId);
@@ -435,41 +765,48 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         nowIso,
         parameters
       );
+      const foundationInstances = state.project.foundationInstances.map((f) =>
+        f.instanceId === instanceId ? updated : f
+      );
 
       return {
         project: {
           ...state.project,
-          foundationInstances: state.project.foundationInstances.map((f) =>
-            f.legId === legId ? updated : f
-          ),
+          foundationInstances,
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
       };
     }),
-  copyFoundationToOtherLegs: (sourceLegId) =>
+  copyFoundationToSimilar: (sourceInstanceId) =>
     set((state) => {
       const project = state.project;
       if (!project) return {};
-      const source = project.foundationInstances.find((f) => f.legId === sourceLegId);
+      const source = project.foundationInstances.find((f) => f.instanceId === sourceInstanceId);
       if (!source) return {};
 
       const foundationType = requireFoundationTypeById(source.foundationTypeId);
       const nowIso = new Date().toISOString();
+      const sourceIsLeg = source.legId !== null;
+      // Each target keeps its own anchor and independently solves its own
+      // base elevation for that anchor's level (withFoundationType
+      // re-derives baseElevation per instance) -- copying a foundation
+      // type/parameters is never allowed to also copy an elevation across
+      // instances on sloping terrain. Only applied to instances of the
+      // same kind (leg <-> leg, guy anchor <-> guy anchor) so a leg-pad
+      // shape never overwrites a guy anchor block, or vice versa.
+      const foundationInstances = project.foundationInstances.map((f) => {
+        if (f.instanceId === sourceInstanceId) return f;
+        if ((f.legId !== null) !== sourceIsLeg) return f;
+        return withFoundationType(f, project.poleModel, foundationType, nowIso, source.parameters);
+      });
 
       return {
         project: {
           ...project,
-          // Each target leg keeps its own anchor and independently solves
-          // its own base elevation for that anchor's level (withFoundationType
-          // re-derives baseElevation per instance) -- copying a foundation
-          // type/parameters is never allowed to also copy an elevation
-          // across legs on sloping terrain.
-          foundationInstances: project.foundationInstances.map((f) =>
-            f.legId === sourceLegId
-              ? f
-              : withFoundationType(f, project.poleModel, foundationType, nowIso, source.parameters)
-          ),
+          foundationInstances,
+          excavationInstances: syncExcavationBottomsToFoundations(project.excavationInstances, foundationInstances),
           geometryVersion: project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
@@ -497,6 +834,61 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           geotechLayers: state.project.geotechLayers.map((l) =>
             l.id === layerId ? { ...l, [key]: boundary } : l
           ),
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  setGeotechLayerLabel: (layerId, label) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          geotechLayers: state.project.geotechLayers.map((l) => (l.id === layerId ? { ...l, ...label } : l)),
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  addGeotechLayer: () =>
+    set((state) => {
+      const project = state.project;
+      if (!project) return {};
+      const nowIso = new Date().toISOString();
+      const id = `geotech-${nowIso}-${Math.random().toString(36).slice(2, 8)}`;
+      const newLayer: GeotechLayer = {
+        id,
+        name: "New layer",
+        category: "custom",
+        topBoundary: { method: "terrain-relative", depthBelowTerrainM: 0 },
+        bottomBoundary: { method: "terrain-relative", depthBelowTerrainM: 1 },
+        colour: "#9a8a72",
+        opacity: 0.3,
+        visible: true,
+        wireframe: false,
+        source: {
+          originType: "user-entered",
+          verificationState: "unverified",
+          modifiedAt: nowIso,
+          notes: "Added by the user; not derived from any borehole or geotechnical investigation.",
+        },
+      };
+      return {
+        project: {
+          ...project,
+          geotechLayers: [...project.geotechLayers, newLayer],
+          geometryVersion: project.geometryVersion + 1,
+          modifiedAt: nowIso,
+        },
+      };
+    }),
+  removeGeotechLayer: (layerId) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          geotechLayers: state.project.geotechLayers.filter((l) => l.id !== layerId),
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: new Date().toISOString(),
         },
@@ -534,12 +926,26 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   setExcavationParameters: (excavationId, params) =>
     set((state) => {
       if (!state.project) return {};
+      const excavationInstances = state.project.excavationInstances.map((e) =>
+        e.id === excavationId ? { ...e, ...params } : e
+      );
+      // A directly-edited bottom elevation is the user explicitly choosing
+      // a dig depth -- the foundation's own base must always follow it
+      // (see excavationFoundationSync.ts), never sit at a stale,
+      // independently-solved elevation. If this now means the foundation
+      // no longer reaches its anchor, validateFoundationInstance's
+      // connection-mismatch rule is what surfaces that, not a silent block
+      // here.
+      const updatedExcavation = excavationInstances.find((e) => e.id === excavationId);
+      const foundationInstances =
+        params.bottomElevationM !== undefined && updatedExcavation
+          ? syncFoundationBaseToExcavation(state.project.foundationInstances, updatedExcavation)
+          : state.project.foundationInstances;
       return {
         project: {
           ...state.project,
-          excavationInstances: state.project.excavationInstances.map((e) =>
-            e.id === excavationId ? { ...e, ...params } : e
-          ),
+          excavationInstances,
+          foundationInstances,
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: new Date().toISOString(),
         },
@@ -646,11 +1052,11 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         project: { ...project, measurements: [...project.measurements, measurement] },
       };
     }),
-  addFoundationClearanceMeasurement: (kind, legId, geotechLayerId) =>
+  addFoundationClearanceMeasurement: (kind, instanceId, geotechLayerId) =>
     set((state) => {
       const project = state.project;
       if (!project || !project.terrainSurface) return {};
-      const foundation = project.foundationInstances.find((f) => f.legId === legId);
+      const foundation = project.foundationInstances.find((f) => f.instanceId === instanceId);
       if (!foundation) return {};
 
       const nowIso = new Date().toISOString();
@@ -679,7 +1085,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           project.terrainSurface,
           project.mastCentreProject.elevation
         );
-        label = `${foundation.legId} base to "${layer.name}" clearance`;
+        label = `${foundation.displayLabel} base to "${layer.name}" clearance`;
         relatedObjectIds = [foundation.instanceId, layer.id];
       } else {
         if (!project.groundwater) return {};
@@ -689,7 +1095,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           project.terrainSurface,
           project.mastCentreProject.elevation
         );
-        label = `${foundation.legId} base to groundwater separation`;
+        label = `${foundation.displayLabel} base to groundwater separation`;
         relatedObjectIds = [foundation.instanceId, project.groundwater.id];
       }
 

@@ -71,17 +71,56 @@ describe("requestClip", () => {
   });
 
   it("throws BackendClipBlockedError with structured warnings on a 422 block response", async () => {
+    // Real shape returned by FastAPI's HTTPException(status_code=422,
+    // detail={"message": ..., "warnings": [...]}) -- the structured body
+    // is nested one level under "detail", not at the response's top
+    // level. A previous version of this test used an unrealistic
+    // un-nested body and passed while the production code was actually
+    // broken against the real backend (see backendClient.ts's
+    // blockedWarningsFromResponseBody) -- verified against the real
+    // running backend before fixing this test.
     const blockedBody = {
-      message: "Clip request blocked: CRS mismatch.",
-      warnings: [
-        { code: "pointcloud.crs-mismatch", severity: "blocking", message: "File CRS does not match project CRS." },
-      ],
+      detail: {
+        message: "Clip request blocked: CRS mismatch.",
+        warnings: [
+          { code: "pointcloud.crs-mismatch", severity: "blocking", message: "File CRS does not match project CRS." },
+        ],
+      },
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(422, blockedBody)));
 
     const error = await requestClip(VALID_CLIP_REQUEST).catch((e) => e);
     expect(error).toBeInstanceOf(BackendClipBlockedError);
     expect((error as BackendClipBlockedError).warnings[0]?.code).toBe("pointcloud.crs-mismatch");
+  });
+
+  it("throws a plain BackendRequestError (not BackendClipBlockedError) for a 422 without a warnings body", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(422, { detail: "Some other 422 reason." })));
+
+    const error = await requestClip(VALID_CLIP_REQUEST).catch((e) => e);
+    expect(error).toBeInstanceOf(BackendRequestError);
+    expect(error).not.toBeInstanceOf(BackendClipBlockedError);
+    expect((error as BackendRequestError).message).toContain("Some other 422 reason.");
+  });
+});
+
+describe("postJson error messages", () => {
+  it("includes the backend's detail string in the thrown error message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse(404, { detail: "File not found in workspace: x.pol" }))
+    );
+
+    const error = await requestInspect("x.pol").catch((e) => e);
+    expect(error).toBeInstanceOf(BackendRequestError);
+    expect((error as BackendRequestError).message).toContain("File not found in workspace: x.pol");
+  });
+
+  it("falls back to a generic message when the body has no usable detail", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(500, { unexpected: "shape" })));
+
+    const error = await requestInspect("x.las").catch((e) => e);
+    expect((error as BackendRequestError).message).toMatch(/failed with status 500/);
   });
 });
 

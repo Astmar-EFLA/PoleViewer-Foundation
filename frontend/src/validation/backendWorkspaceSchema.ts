@@ -16,3 +16,15 @@ export type BackendFileStatus = z.infer<typeof fileStatusSchema>;
 export function parseFileStatus(input: unknown): ParseResult<BackendFileStatus> {
   return fromZodSafeParse(fileStatusSchema.safeParse(input)) as ParseResult<BackendFileStatus>;
 }
+
+export const uploadResultSchema = z.object({
+  filePath: z.string().min(1),
+  originalFileName: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+});
+
+export type BackendUploadResult = z.infer<typeof uploadResultSchema>;
+
+export function parseUploadResult(input: unknown): ParseResult<BackendUploadResult> {
+  return fromZodSafeParse(uploadResultSchema.safeParse(input)) as ParseResult<BackendUploadResult>;
+}

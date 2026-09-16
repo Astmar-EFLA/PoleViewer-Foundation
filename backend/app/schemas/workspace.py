@@ -20,3 +20,12 @@ class FileStatusResult(CamelModel):
     exists: bool
     size_bytes: int | None
     sha256: str | None
+
+
+class UploadResult(CamelModel):
+    """Result of POST /workspace/upload. `file_path` is workspace-relative,
+    ready to pass straight into /polemodel/import or /pointcloud/inspect."""
+
+    file_path: str
+    original_file_name: str
+    size_bytes: int

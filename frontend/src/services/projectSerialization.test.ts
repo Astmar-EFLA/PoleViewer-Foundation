@@ -32,6 +32,7 @@ function buildSyntheticProject(): Project {
   const foundationInstances = buildDefaultFoundationInstances(
     poleModel,
     requireFoundationTypeById("rectangular-pad-pedestal-v1"),
+    requireFoundationTypeById("guy-anchor-block-v1"),
     NOW
   );
 
@@ -55,7 +56,7 @@ function buildSyntheticProject(): Project {
     foundationInstances,
     excavationInstances: foundationInstances.map(
       (f): ExcavationInstance => ({
-        id: `excavation-${f.legId}`,
+        id: `excavation-${f.instanceId}`,
         foundationInstanceId: f.instanceId,
         bottomElevationM: f.baseElevation,
         workingSpaceOffsetM: 0.5,

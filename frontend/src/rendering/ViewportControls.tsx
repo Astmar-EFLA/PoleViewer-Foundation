@@ -1,19 +1,6 @@
-import type { CSSProperties } from "react";
 import { downloadCanvasScreenshot } from "../services/exportImage";
 import type { FixedViewPreset } from "../state/projectStore";
 import { useProjectStore } from "../state/projectStore";
-
-const panelStyle: CSSProperties = {
-  position: "absolute",
-  top: 12,
-  left: 248,
-  background: "rgba(255,255,255,0.92)",
-  borderRadius: 6,
-  padding: "8px 10px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  fontFamily: "system-ui, sans-serif",
-  fontSize: 11,
-};
 
 const PRESETS: { preset: FixedViewPreset; label: string }[] = [
   { preset: "top", label: "Top" },
@@ -23,6 +10,7 @@ const PRESETS: { preset: FixedViewPreset; label: string }[] = [
   { preset: "reset", label: "Fit all" },
 ];
 
+/** Dropdown content only -- see LayerPanel.tsx's note; positioning comes from the DropdownButton in Toolbar.tsx. */
 export function ViewportControls() {
   const requestCameraPreset = useProjectStore((s) => s.requestCameraPreset);
   const horizontalClip = useProjectStore((s) => s.horizontalClip);
@@ -30,8 +18,6 @@ export function ViewportControls() {
   const setHorizontalClipElevation = useProjectStore((s) => s.setHorizontalClipElevation);
   const canvasElement = useProjectStore((s) => s.canvasElement);
   const projectName = useProjectStore((s) => s.project?.name);
-  const sectionsPanelOpen = useProjectStore((s) => s.sectionsPanelOpen);
-  const setSectionsPanelOpen = useProjectStore((s) => s.setSectionsPanelOpen);
 
   function handleScreenshot() {
     if (!canvasElement) return;
@@ -39,8 +25,8 @@ export function ViewportControls() {
   }
 
   return (
-    <div style={panelStyle}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+    <div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
         {PRESETS.map((p) => (
           <button
             key={p.preset}
@@ -56,19 +42,6 @@ export function ViewportControls() {
           style={{ fontSize: 10, padding: "3px 7px", borderRadius: 4, border: "1px solid #ccc", background: "#fff", cursor: canvasElement ? "pointer" : "default" }}
         >
           Screenshot
-        </button>
-        <button
-          onClick={() => setSectionsPanelOpen(!sectionsPanelOpen)}
-          style={{
-            fontSize: 10,
-            padding: "3px 7px",
-            borderRadius: 4,
-            border: sectionsPanelOpen ? "1px solid #3070e0" : "1px solid #ccc",
-            background: sectionsPanelOpen ? "#e8f0ff" : "#fff",
-            cursor: "pointer",
-          }}
-        >
-          Sections
         </button>
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 4 }}>

@@ -16,17 +16,8 @@ export const boundaryDefinitionSchema = z.discriminatedUnion("method", [
   absoluteElevationBoundarySchema,
 ]);
 
-const geotechCategorySchema = z.enum([
-  "topsoil",
-  "organic",
-  "fill",
-  "loose-soil",
-  "dense-soil",
-  "competent-bearing",
-  "weathered-rock",
-  "bedrock",
-  "custom",
-]);
+// Open-ended (see domain/geotech.ts's GeotechCategory) -- any non-empty label is valid.
+const geotechCategorySchema = z.string().min(1);
 
 export const geotechLayerSchema = z.object({
   id: z.string().min(1),

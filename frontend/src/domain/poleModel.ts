@@ -12,6 +12,7 @@ export type AnchorType =
   | "pole-base"
   | "pedestal-connection"
   | "guy-attachment"
+  | "guy-ground-anchor"
   | "cross-arm-reference"
   | "conductor-attachment"
   | "local-alignment-reference"
@@ -40,6 +41,29 @@ export interface StructuralLeg {
   readonly id: string;
   readonly name: string;
   readonly linkedFoundationAnchorId: string;
+  readonly source: Provenance;
+}
+
+export type PoleMemberCategory = "structure" | "cable" | "insulator";
+
+/**
+ * One structural/cable/insulator segment of an imported pole/tower's real
+ * geometry (e.g. from a PLS-POLE .pol import -- see
+ * services/backendClient.ts's requestPoleModelImport). Rendering-only:
+ * never consulted for foundation placement or any other calculation
+ * (ADR-005 -- anchors, not this, are the source of truth). `a`/`b` are in
+ * the pole model's own authoring frame, same as `Anchor.localPosition`.
+ */
+export interface PoleMember {
+  readonly a: LocalCoordinate;
+  readonly b: LocalCoordinate;
+  readonly category: PoleMemberCategory;
+  /** Readable size/profile label, e.g. "Tube 1 · Ø177.8×8.0 mm" or "2x21mm". */
+  readonly component: string;
+}
+
+export interface PoleVisualGeometry {
+  readonly members: readonly PoleMember[];
   readonly source: Provenance;
 }
 
@@ -73,4 +97,6 @@ export interface PoleModel {
   readonly structuralLegs: readonly StructuralLeg[];
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly warnings: readonly string[];
+  /** Rendering-only structural geometry (e.g. from a PLS-POLE import); absent for a model authored/imported without one. */
+  readonly visualGeometry?: PoleVisualGeometry;
 }

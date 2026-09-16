@@ -3,21 +3,6 @@ import { useState } from "react";
 import type { MeasurementKind } from "../domain/measurement";
 import { useProjectStore } from "../state/projectStore";
 
-const panelStyle: CSSProperties = {
-  position: "absolute",
-  bottom: 44,
-  left: 620,
-  background: "rgba(255,255,255,0.94)",
-  borderRadius: 6,
-  padding: "10px 12px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  width: 300,
-  maxHeight: "50vh",
-  overflowY: "auto",
-  fontFamily: "system-ui, sans-serif",
-  fontSize: 12,
-};
-
 const POINT_TOOLS: { kind: MeasurementKind; label: string; points: 1 | 2 }[] = [
   { kind: "point-coordinate", label: "Point coordinate", points: 1 },
   { kind: "elevation", label: "Elevation", points: 1 },
@@ -43,17 +28,15 @@ export function MeasurementPanel() {
   const removeMeasurement = useProjectStore((s) => s.removeMeasurement);
   const recalculateMeasurement = useProjectStore((s) => s.recalculateMeasurement);
 
-  const [clearanceLegId, setClearanceLegId] = useState<string>("");
+  const [clearanceInstanceId, setClearanceInstanceId] = useState<string>("");
   const [clearanceLayerId, setClearanceLayerId] = useState<string>("");
 
   if (!project) return null;
 
-  const legId = clearanceLegId || project.foundationInstances[0]?.legId || "";
+  const instanceId = clearanceInstanceId || project.foundationInstances[0]?.instanceId || "";
 
   return (
-    <div style={panelStyle}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Measurements</div>
-
+    <div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
         {POINT_TOOLS.map((tool) => (
           <button
@@ -86,10 +69,10 @@ export function MeasurementPanel() {
 
       <div style={{ borderTop: "1px solid #ddd", paddingTop: 6, marginBottom: 8 }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Foundation clearance</div>
-        <select value={legId} onChange={(e) => setClearanceLegId(e.target.value)} style={{ width: "100%", marginBottom: 4 }}>
+        <select value={instanceId} onChange={(e) => setClearanceInstanceId(e.target.value)} style={{ width: "100%", marginBottom: 4 }}>
           {project.foundationInstances.map((f) => (
-            <option key={f.legId} value={f.legId}>
-              {f.legId}
+            <option key={f.instanceId} value={f.instanceId}>
+              {f.displayLabel}
             </option>
           ))}
         </select>
@@ -109,14 +92,14 @@ export function MeasurementPanel() {
           <button
             style={smallButtonStyle}
             onClick={() =>
-              addFoundationClearanceMeasurement("foundation-to-bearing-layer", legId, clearanceLayerId || undefined)
+              addFoundationClearanceMeasurement("foundation-to-bearing-layer", instanceId, clearanceLayerId || undefined)
             }
           >
             To bearing layer
           </button>
           <button
             style={smallButtonStyle}
-            onClick={() => addFoundationClearanceMeasurement("foundation-to-groundwater", legId)}
+            onClick={() => addFoundationClearanceMeasurement("foundation-to-groundwater", instanceId)}
           >
             To groundwater
           </button>

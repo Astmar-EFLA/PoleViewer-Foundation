@@ -124,6 +124,33 @@ def build_no_crs_fixture() -> None:
     print(f"wrote {out_path}: {n} points, no SRS set")
 
 
+def build_no_ground_classification_fixture() -> None:
+    """
+    A tiny LAS file with a real CRS but every point left classification 0
+    ("created, never classified") -- a realistic export from a
+    scan/photogrammetry pipeline that never ran a ground-classification
+    step. Isolates the "no usable classification data" scenario from the
+    "no CRS" one (build_no_crs_fixture), for the assumed-ground-for-clip
+    fallback test.
+    """
+    header = laspy.LasHeader(point_format=0, version="1.2")
+    header.scales = np.array([0.01, 0.01, 0.01])
+    header.offsets = np.array([MAST_EASTING, MAST_NORTHING, MAST_ELEVATION])
+    header.add_crs(pyproj.CRS.from_epsg(3057))
+
+    las = laspy.LasData(header)
+    n = 25
+    las.x = MAST_EASTING + np.linspace(-5, 5, n)
+    las.y = MAST_NORTHING + np.linspace(-5, 5, n)
+    las.z = MAST_ELEVATION + np.zeros(n)
+    las.classification = np.zeros(n, dtype=np.uint8)
+
+    out_path = f"{OUTPUT_DIR}/pointcloud-no-ground-classification.las"
+    las.write(out_path)
+    print(f"wrote {out_path}: {n} points, all classification 0 (no ground)")
+
+
 if __name__ == "__main__":
     build_mixed_classification_fixture()
     build_no_crs_fixture()
+    build_no_ground_classification_fixture()

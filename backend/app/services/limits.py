@@ -48,13 +48,30 @@ def check_file_size(path: Path) -> None:
         )
 
 
+def _check_extension(path: Path, allowed: set[str], kind: str) -> None:
+    if path.suffix.lower() not in allowed:
+        raise ProcessingLimitError(
+            f'"{path.name}" does not have a recognised {kind} extension '
+            f"({', '.join(sorted(allowed))})."
+        )
+
+
 ALLOWED_POINT_CLOUD_EXTENSIONS = {".las", ".laz"}
 
 
 def check_point_cloud_extension(path: Path) -> None:
-    if path.suffix.lower() not in ALLOWED_POINT_CLOUD_EXTENSIONS:
-        raise ProcessingLimitError(
-            f'"{path.name}" does not have a recognised point-cloud extension '
-            f"({', '.join(sorted(ALLOWED_POINT_CLOUD_EXTENSIONS))}). Refusing to run it through "
-            "the LAS/LAZ pipeline."
-        )
+    _check_extension(path, ALLOWED_POINT_CLOUD_EXTENSIONS, "point-cloud")
+
+
+ALLOWED_POLE_MODEL_EXTENSIONS = {".pol"}
+
+
+def check_pole_model_extension(path: Path) -> None:
+    _check_extension(path, ALLOWED_POLE_MODEL_EXTENSIONS, "pole-model")
+
+
+ALLOWED_LINE_CENTRELINE_EXTENSIONS = {".zip"}
+
+
+def check_line_centreline_extension(path: Path) -> None:
+    _check_extension(path, ALLOWED_LINE_CENTRELINE_EXTENSIONS, "line-centreline")

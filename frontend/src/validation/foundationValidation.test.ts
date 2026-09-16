@@ -31,6 +31,7 @@ function baseInstance(overrides: Partial<FoundationInstance> = {}): FoundationIn
     poleModelId: "synthetic-lattice-4leg-001",
     legId: "leg-ne",
     anchorId: "anchor-leg-ne",
+    displayLabel: "leg-ne",
     foundationTypeId: "rectangular-pad-pedestal-v1",
     parameters: PARAMS,
     position: { x: 2.0, y: 2.0 },

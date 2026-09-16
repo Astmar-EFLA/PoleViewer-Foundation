@@ -53,6 +53,30 @@
         "notes": "Synthetic fixture."
       },
       "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-guy-a",
+      "name": "Leg A guy ground anchor",
+      "anchorType": "guy-ground-anchor",
+      "localPosition": { "space": "local", "x": -4.0, "y": 0, "z": -0.1 },
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture. Ground-level guy anchor -- where a guy foundation belongs, distinct from the elevated pole-side attachment point (not modelled in this minimal fixture)."
+      },
+      "verificationState": "unverified"
+    },
+    {
+      "id": "anchor-guy-b",
+      "name": "Leg B guy ground anchor",
+      "anchorType": "guy-ground-anchor",
+      "localPosition": { "space": "local", "x": 4.0, "y": 0, "z": -0.1 },
+      "source": {
+        "originType": "assumed",
+        "verificationState": "unverified",
+        "notes": "Synthetic fixture. Ground-level guy anchor -- where a guy foundation belongs, distinct from the elevated pole-side attachment point (not modelled in this minimal fixture)."
+      },
+      "verificationState": "unverified"
     }
   ],
   "structuralLegs": [

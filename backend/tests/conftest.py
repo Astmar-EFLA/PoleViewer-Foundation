@@ -4,7 +4,13 @@ from pathlib import Path
 import pytest
 
 FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "synthetic"
-FIXTURE_FILES = ["pointcloud-mixed-classification.las", "pointcloud-no-crs.las"]
+FIXTURE_FILES = [
+    "pointcloud-mixed-classification.las",
+    "pointcloud-no-crs.las",
+    "pointcloud-no-ground-classification.las",
+    "pole-model-2leg.pol",
+    "line-centreline.zip",
+]
 
 
 @pytest.fixture()

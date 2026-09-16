@@ -30,6 +30,15 @@ RGB_DIMENSIONS = {"Red", "Green", "Blue"}
 RETURN_INFO_DIMENSIONS = {"ReturnNumber", "NumberOfReturns"}
 GROUND_CLASSIFICATION_CODE = 2
 
+# Operator instruction: real survey files handed to this app sometimes carry
+# no CRS/classification metadata at all (exports from some scan/photogrammetry
+# pipelines drop both). Rather than block on that, assume the values below --
+# always as an explicit, reported assumption (never silently), so an engineer
+# still sees and can correct it, matching this app's general provenance
+# convention (ADR-010/ADR-012: assumed/calculated values are always tagged
+# and warned about, never indistinguishable from a real imported/declared one).
+ASSUMED_CRS_EPSG_CODE = 3057
+
 
 class LasReadError(RuntimeError):
     """Raised when PDAL cannot read the requested file at all."""
@@ -69,33 +78,58 @@ def inspect_las(file_path: Path) -> PointCloudMetadata:
 
     warnings: list[ProcessingWarning] = []
     if isinstance(crs, CrsUnknown):
+        crs = CrsEpsg(epsg_code=ASSUMED_CRS_EPSG_CODE)
         warnings.append(
             ProcessingWarning(
-                code="pointcloud.missing-crs",
-                severity="blocking",
+                code="pointcloud.assumed-crs",
+                severity="warning",
                 message=(
                     "The LAS/LAZ file has no coordinate reference system in its "
-                    "header. Clipping and terrain generation cannot proceed until "
-                    "a CRS is confirmed."
+                    f"header -- assumed EPSG:{ASSUMED_CRS_EPSG_CODE} (ISN93). Verify this "
+                    "matches the file's actual survey CRS before relying on the clipped result."
                 ),
             )
         )
 
-    classification_counts = _classification_histogram(reader)
-    if classification_counts and not any(
-        c.classification_code == GROUND_CLASSIFICATION_CODE for c in classification_counts
-    ):
-        warnings.append(
-            ProcessingWarning(
-                code="pointcloud.no-ground-classification",
-                severity="warning",
-                message=(
-                    "No points are classified as ground (class 2). Terrain "
-                    "generation will require a manual classification selection "
-                    "or an algorithmic ground-filtering fallback."
-                ),
-            )
+    histogram = _classification_histogram(reader)
+    if histogram is None:
+        # No Classification dimension at all (distinct from one that's present
+        # but empty/all-zero) -- assume every point is ground, same reasoning
+        # as the CRS assumption above: explicit and reported, not silent.
+        num_points = qi["num_points"]
+        classification_counts = (
+            [ClassificationCount(classification_code=GROUND_CLASSIFICATION_CODE, point_count=num_points)]
+            if num_points > 0
+            else []
         )
+        if num_points > 0:
+            warnings.append(
+                ProcessingWarning(
+                    code="pointcloud.assumed-ground-classification",
+                    severity="warning",
+                    message=(
+                        "The LAS/LAZ file has no Classification dimension at all -- every "
+                        "point was assumed to be ground (class 2). Verify this against the "
+                        "file's actual source before relying on the clipped result."
+                    ),
+                )
+            )
+    else:
+        classification_counts = histogram
+        if classification_counts and not any(
+            c.classification_code == GROUND_CLASSIFICATION_CODE for c in classification_counts
+        ):
+            warnings.append(
+                ProcessingWarning(
+                    code="pointcloud.no-ground-classification",
+                    severity="warning",
+                    message=(
+                        "No points are classified as ground (class 2). Terrain "
+                        "generation will require a manual classification selection "
+                        "or an algorithmic ground-filtering fallback."
+                    ),
+                )
+            )
 
     return PointCloudMetadata(
         file_path=str(file_path.name),
@@ -119,14 +153,25 @@ def inspect_las(file_path: Path) -> PointCloudMetadata:
     )
 
 
-def _classification_histogram(reader: pdal.Reader) -> list[ClassificationCount]:
+def _classification_histogram(reader: pdal.Reader) -> list[ClassificationCount] | None:
+    """
+    None means the file has no Classification dimension at all -- distinct
+    from an empty list, which means it has the dimension but zero points.
+    Defensive: every standard LAS point format (0-10) reserves a
+    Classification field, and PDAL's LAS reader always exposes it as a
+    dimension even when every point is left at the default 0 (confirmed
+    empirically against every fixture this module's tests use) -- so this
+    branch is not expected to be reachable for a genuine .las/.laz file via
+    this app's own PDAL reader, only kept in case some other file/writer
+    combination ever produces one without it.
+    """
     pipeline = reader.pipeline()
     pipeline.execute()
     if pipeline.arrays[0].size == 0:
         return []
     arr = pipeline.arrays[0]
     if "Classification" not in (arr.dtype.names or ()):
-        return []
+        return None
     unique, counts = np.unique(arr["Classification"], return_counts=True)
     return [
         ClassificationCount(classification_code=int(code), point_count=int(count))

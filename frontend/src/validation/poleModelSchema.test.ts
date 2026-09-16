@@ -8,7 +8,8 @@ describe("parsePoleModel: valid synthetic fixtures", () => {
     const result = parsePoleModel(json);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.anchors).toHaveLength(3);
+      // mast-centre + 2 leg-to-foundation + 2 guy-ground-anchor anchors.
+      expect(result.data.anchors).toHaveLength(5);
       expect(result.data.structuralLegs).toHaveLength(2);
     }
   });
@@ -30,6 +31,56 @@ describe("parsePoleModel: valid synthetic fixtures", () => {
     if (portal.success && lattice.success) {
       expect(portal.data.structuralLegs.length).not.toBe(lattice.data.structuralLegs.length);
     }
+  });
+});
+
+describe("parsePoleModel: visualGeometry", () => {
+  it("accepts a model with no visualGeometry (optional field, absent for authored/synthetic models)", () => {
+    const json = loadSyntheticFixtureJson("pole-portal-2leg.json");
+    const result = parsePoleModel(json);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.visualGeometry).toBeUndefined();
+  });
+
+  it("accepts a model with visualGeometry members (e.g. from a PLS-POLE import)", () => {
+    const base = loadSyntheticFixtureJson("pole-portal-2leg.json") as Record<string, unknown>;
+    const withGeometry = {
+      ...base,
+      visualGeometry: {
+        members: [
+          {
+            a: { space: "local", x: 0, y: 0, z: 0 },
+            b: { space: "local", x: 0, y: 0, z: 10 },
+            category: "structure",
+            component: "Tube 1 · Ø177.8×8.0 mm",
+          },
+        ],
+        source: { originType: "imported", verificationState: "unverified" },
+      },
+    };
+    const result = parsePoleModel(withGeometry);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.visualGeometry?.members).toHaveLength(1);
+  });
+
+  it("rejects a visualGeometry member with an unrecognised category", () => {
+    const base = loadSyntheticFixtureJson("pole-portal-2leg.json") as Record<string, unknown>;
+    const broken = {
+      ...base,
+      visualGeometry: {
+        members: [
+          {
+            a: { space: "local", x: 0, y: 0, z: 0 },
+            b: { space: "local", x: 0, y: 0, z: 10 },
+            category: "conductor",
+            component: "x",
+          },
+        ],
+        source: { originType: "imported", verificationState: "unverified" },
+      },
+    };
+    const result = parsePoleModel(broken);
+    expect(result.success).toBe(false);
   });
 });
 

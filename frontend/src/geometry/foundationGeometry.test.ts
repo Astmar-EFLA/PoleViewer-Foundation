@@ -27,6 +27,7 @@ function instanceFor(
     poleModelId: "synthetic-lattice-4leg-001",
     legId,
     anchorId,
+    displayLabel: legId,
     foundationTypeId:
       parameters.geometryType === "rectangular-pad-pedestal"
         ? "rectangular-pad-pedestal-v1"

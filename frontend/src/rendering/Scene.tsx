@@ -16,6 +16,7 @@ import { GroundPointsCloud } from "./GroundPointsCloud";
 import { GroundwaterSurface } from "./GroundwaterSurface";
 import { MeasurementMarkers } from "./MeasurementMarkers";
 import { PoleAnchors } from "./PoleAnchors";
+import { PoleMembersMesh } from "./PoleMembersMesh";
 import { TerrainMesh } from "./TerrainMesh";
 
 interface SceneProps {
@@ -91,11 +92,9 @@ function HorizontalClipController({ renderOriginLocalZ }: { readonly renderOrigi
 
 export function Scene({ project }: SceneProps) {
   const setHover = useProjectStore((s) => s.setHover);
-  const selectedLegId = useProjectStore((s) => s.selectedLegId);
+  const selectedInstanceId = useProjectStore((s) => s.selectedFoundationInstanceId);
   const pendingMeasurement = useProjectStore((s) => s.pendingMeasurement);
   const pickMeasurementPoint = useProjectStore((s) => s.pickMeasurementPoint);
-  const selectedInstanceId =
-    project.foundationInstances.find((f) => f.legId === selectedLegId)?.instanceId ?? null;
   const terrainSurface = project.terrainSurface;
 
   const viewerFrame: ViewerFrameDefinition = { renderOriginLocal: project.renderOriginLocal };
@@ -170,6 +169,13 @@ export function Scene({ project }: SceneProps) {
         opacity={project.layerStyles.pole.opacity}
       />
 
+      <PoleMembersMesh
+        poleModel={project.poleModel}
+        viewerFrame={viewerFrame}
+        visible={project.layerStyles.pole.visible}
+        opacity={project.layerStyles.pole.opacity}
+      />
+
       <FoundationMeshes
         instances={project.foundationInstances}
         viewerFrame={viewerFrame}
@@ -205,7 +211,7 @@ export function Scene({ project }: SceneProps) {
               foundation={foundation}
               terrainSurface={terrainSurface}
               viewerFrame={viewerFrame}
-              selected={foundation.legId === selectedLegId}
+              selected={foundation.instanceId === selectedInstanceId}
             />
           );
         })}

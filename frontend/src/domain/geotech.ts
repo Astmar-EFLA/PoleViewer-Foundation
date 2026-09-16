@@ -1,15 +1,23 @@
 import type { Provenance } from "./provenance";
 
-export type GeotechCategory =
-  | "topsoil"
-  | "organic"
-  | "fill"
-  | "loose-soil"
-  | "dense-soil"
-  | "competent-bearing"
-  | "weathered-rock"
-  | "bedrock"
-  | "custom";
+/**
+ * Open-ended: a project can have any category label a user chooses (spec
+ * request -- categories must be nameable and extensible, not a fixed
+ * list). `KNOWN_GEOTECH_CATEGORIES` below is only a set of suggested
+ * starting labels for the UI, not a closed set validation enforces.
+ */
+export type GeotechCategory = string;
+
+export const KNOWN_GEOTECH_CATEGORIES: readonly string[] = [
+  "topsoil",
+  "organic",
+  "fill",
+  "loose-soil",
+  "dense-soil",
+  "competent-bearing",
+  "weathered-rock",
+  "bedrock",
+];
 
 /**
  * The boundary follows the terrain surface with a specified vertical

@@ -115,11 +115,31 @@ fixtures are copied into an isolated per-test workspace.
 - `POST /pointcloud/clip` -- rectangular clip (default 40x40 m, centred on
   the mast, optionally rotated/offset), classification selection, and
   point-count decimation. Blocks (422, with structured warnings in the
-  response body) on a missing or mismatched CRS rather than silently
-  clipping against the wrong reference frame.
+  response body) on a CRS *mismatch* between the file and the project
+  rather than silently clipping against the wrong reference frame. A file
+  with **no** CRS of its own is instead assumed to be EPSG:3057 (ISN93) --
+  and a file with no points classified as ground is assumed to be entirely
+  ground -- both explicitly reported via a non-blocking
+  `pointcloud.assumed-crs` / `pointcloud.assumed-ground-for-clip` warning
+  (never silently), since real survey exports handed to this app sometimes
+  omit one or both. See `app/processing/las_inspect.py` and
+  `app/processing/las_clip.py`.
 
 - `POST /workspace/file-status` -- SHA-256 + existence check for any
   workspace-relative file (see Workspace above).
+- `POST /workspace/upload` -- multipart file upload (`file` + `kind`:
+  `"pole-model"` or `"point-cloud"`); lets the frontend use a native
+  file-open dialog instead of requiring the file to already sit in the
+  workspace by filename. Validated with the same extension/size checks as
+  the endpoint the uploaded file is destined for; lands under
+  `workspace/uploads/<uuid>-<original filename>` so two uploads can never
+  collide, and the returned `filePath` is then used unmodified by
+  `/polemodel/import` or `/pointcloud/inspect`.
+- `POST /polemodel/import` -- parses a PLS-POLE geometry export (.pol) into
+  this app's `PoleModel` shape. See
+  [ADR-012](../docs/architecture/ADR-012-pls-pole-import.md) for the
+  anchor-identification heuristic and its limitations; `app/processing/pol_import.py`
+  for the parser itself.
 
 Not yet implemented (deferred, tracked rather than silently dropped):
 circular clip boundaries, and an algorithmic ground-classification fallback

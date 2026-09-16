@@ -49,13 +49,29 @@ def test_inspect_reports_rgb_and_return_info_availability(workspace_with_fixture
     assert metadata.has_return_information is True
 
 
-def test_inspect_flags_missing_crs_as_blocking_never_silently_assumed(workspace_with_fixtures):
+def test_inspect_assumes_isn93_for_a_file_with_no_crs_reported_not_silent(workspace_with_fixtures):
     path = workspace_with_fixtures / "pointcloud-no-crs.las"
     metadata = inspect_las(path)
 
-    assert isinstance(metadata.crs, CrsUnknown)
-    blocking_codes = {w.code for w in metadata.warnings if w.severity == "blocking"}
-    assert "pointcloud.missing-crs" in blocking_codes
+    assert isinstance(metadata.crs, CrsEpsg)
+    assert metadata.crs.epsg_code == 3057
+    warning_codes = {w.code for w in metadata.warnings}
+    assert "pointcloud.assumed-crs" in warning_codes
+    # The assumption is reported, not blocking -- processing can still proceed.
+    assert not any(w.code == "pointcloud.assumed-crs" and w.severity == "blocking" for w in metadata.warnings)
+
+
+def test_inspect_reports_no_ground_classification_when_the_dimension_exists_but_is_all_zero(workspace_with_fixtures):
+    path = workspace_with_fixtures / "pointcloud-no-ground-classification.las"
+    metadata = inspect_las(path)
+
+    # Unlike the no-Classification-dimension case above, this fixture DOES
+    # have real per-point classification data (all zero) -- it's reported
+    # honestly, not overwritten to claim ground that was never observed.
+    counts_by_code = {c.classification_code: c.point_count for c in metadata.classification_counts}
+    assert counts_by_code == {0: metadata.point_count}
+    assert any(w.code == "pointcloud.no-ground-classification" for w in metadata.warnings)
+    assert not any(w.code == "pointcloud.assumed-ground-classification" for w in metadata.warnings)
 
 
 def test_inspect_scale_and_offset_are_scalars_not_las_header_replicated_lists(workspace_with_fixtures):

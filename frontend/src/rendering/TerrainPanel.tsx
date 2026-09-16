@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useProjectStore } from "../state/projectStore";
 
 const SEVERITY_COLOUR: Record<string, string> = {
@@ -6,32 +7,72 @@ const SEVERITY_COLOUR: Record<string, string> = {
   blocking: "#c02020",
 };
 
+function ClipField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginBottom: 4 }}>
+      <span style={{ opacity: 0.8 }}>{label}</span>
+      <input
+        type="number"
+        step={0.5}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width: 70 }}
+      />
+    </label>
+  );
+}
+
+const clipFieldsStyle: CSSProperties = {
+  marginBottom: 8,
+  paddingBottom: 8,
+  borderBottom: "1px solid #ddd",
+};
+
 export function TerrainPanel() {
   const pointCloudSource = useProjectStore((s) => s.project?.pointCloudSource);
+  const clipBoundary = useProjectStore((s) => s.project?.terrainGenerationSettings.clipBoundary);
+  const setClipBoundary = useProjectStore((s) => s.setClipBoundary);
   const regeneration = useProjectStore((s) => s.terrainRegeneration);
   const regenerate = useProjectStore((s) => s.regenerateTerrainFromPointCloud);
   const cancelRegeneration = useProjectStore((s) => s.cancelTerrainRegeneration);
 
-  if (!pointCloudSource) return null;
+  if (!pointCloudSource || !clipBoundary) return null;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 12,
-        right: 12,
-        background: "rgba(255,255,255,0.92)",
-        borderRadius: 6,
-        padding: "10px 12px",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-        width: 260,
-        fontFamily: "system-ui, sans-serif",
-        fontSize: 12,
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Terrain (point cloud)</div>
+    <div>
       <div style={{ opacity: 0.75, marginBottom: 8, wordBreak: "break-all" }}>
         Source: {pointCloudSource.filePath}
+      </div>
+
+      <div style={clipFieldsStyle}>
+        <div style={{ opacity: 0.8, marginBottom: 4 }}>
+          Clip area (centred on the mast centre; takes effect on the next "Regenerate")
+        </div>
+        <ClipField label="Width (m)" value={clipBoundary.widthM} onChange={(v) => setClipBoundary({ widthM: v })} />
+        <ClipField label="Length (m)" value={clipBoundary.lengthM} onChange={(v) => setClipBoundary({ lengthM: v })} />
+        <ClipField
+          label="Offset X (m)"
+          value={clipBoundary.centerOffsetLocal.x}
+          onChange={(v) => setClipBoundary({ centerOffsetLocal: { ...clipBoundary.centerOffsetLocal, x: v } })}
+        />
+        <ClipField
+          label="Offset Y (m)"
+          value={clipBoundary.centerOffsetLocal.y}
+          onChange={(v) => setClipBoundary({ centerOffsetLocal: { ...clipBoundary.centerOffsetLocal, y: v } })}
+        />
+        <ClipField
+          label="Rotation (deg)"
+          value={(clipBoundary.rotationRadians * 180) / Math.PI}
+          onChange={(v) => setClipBoundary({ rotationRadians: (v * Math.PI) / 180 })}
+        />
       </div>
 
       <div style={{ display: "flex", gap: 4 }}>

@@ -46,6 +46,15 @@ and quantities are not an approved design or a certified construction quantity.
   calculation-version constant, and an optional single-process packaged run mode
   (see [ADR-011](docs/architecture/ADR-011-packaging-strategy.md)). Known gaps are
   tracked in [docs/architecture/known-limitations.md](docs/architecture/known-limitations.md).
+- PLS-POLE (.pol) import — done: `POST /polemodel/import` parses a real PLS-POLE
+  geometry export into this app's `PoleModel`, verified against a real 2-pole guyed
+  H-frame export (not committed -- see the synthetic fixture used for automated
+  tests instead). Leg-base anchors are identified from a node-labelling heuristic
+  (`<name>:g`); mast centre is always calculated from those anchors, never read from
+  a label (see [ADR-012](docs/architecture/ADR-012-pls-pole-import.md) for why, and
+  its limitations). The rest of the imported structure renders as coloured line
+  geometry (steel/guys/insulators) via a new "Import pole model" control in the
+  Project panel -- rendering-only, never consulted by any calculation (ADR-005/006).
 
 See [docs/architecture](docs/architecture) for the phase plan and
 [docs/decisions](docs/decisions) for Architecture Decision Records.

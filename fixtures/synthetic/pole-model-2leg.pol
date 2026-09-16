@@ -1,0 +1,24 @@
+TYPE='PLS_POLE INPUT FILE' VERSION='22' UNITS='INTERNAL' SOURCE='synthetic fixture'
+'Guy1' '2x14mm' 1 2 3 ; synthetic guy size property
+'1' 'DropX:DropEnd' 'TipX' '1x12xU160BLP' 0 0.000000 ; synthetic insulator string property
+
+6 5 1 1 0 0 20
+19 ; # shapes for each shape shape index, # points, x,y for each point
+Undeformed Geometry
+1 0 'LA:g' ''
+2 0 'LA:t' ''
+3 0 'LB:g' ''
+4 0 'LB:t' ''
+5 0 '$Gnd1' ''
+6 0 'Misc' ''
+1 2 1 100 'Beam' 0 0 'LA' 1 1 0.114 0.114 0 0 0 0 0 0.006 0.006 'Tube 1' ''
+3 4 2 100 'Beam' 0 0 'LB' 1 1 0.114 0.114 0 0 0 0 0 0.006 0.006 'Tube 1' ''
+2 4 3 100 'Truss' -1 0 'Bridge1' 2 2 0.05 0.05 0 0 0 0 0 '' ''
+2 5 4 100 'Cable' 0 0 'Guy1' 0 0 0 0 0 0 0 0 0 0 0 '' ''
+2 6 5 100 'Suspension' 0 0 '1' 0 0 0 0 0 0 0 0 0 0 0 '' ''
+0.0 -3.0 0.0
+0.0 -3.0 10.0
+0.0 3.0 0.0
+0.0 3.0 10.0
+0.0 -8.0 0.0
+0.0 0.0 5.0

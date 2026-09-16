@@ -20,7 +20,7 @@ import pdal
 
 from app.geometry.clip_boundary import rectangular_clip_polygon_wkt
 from app.geometry.coordinate_transform import project_to_local_array
-from app.processing.las_inspect import inspect_las
+from app.processing.las_inspect import GROUND_CLASSIFICATION_CODE, inspect_las
 from app.schemas.pointcloud import (
     ClassificationCount,
     ClipProcessingMetadata,
@@ -62,13 +62,54 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
         request.local_frame,
     )
 
-    pipeline = pdal.Reader.las(filename=str(file_path)) | pdal.Filter.crop(polygon=wkt)
-    if request.classification_filter:
-        expression = " || ".join(f"Classification == {code}" for code in request.classification_filter)
-        pipeline = pipeline | pdal.Filter.expression(expression=expression)
+    # "Classification" in available_dimensions, and metadata.classification_counts,
+    # are header/full-file facts inspect_las already computed above -- reused
+    # here rather than re-detected. Operator instruction: a requested ground
+    # filter ([2], the default) must never come back empty just because this
+    # particular file has no usable classification data (missing dimension,
+    # or a dimension that exists but has zero points actually classified
+    # ground) -- every point in the clip boundary is assumed ground instead,
+    # explicitly reported via a warning, never silently.
+    has_classification_dimension = "Classification" in metadata.available_dimensions
+    file_has_ground_points = any(
+        c.classification_code == GROUND_CLASSIFICATION_CODE for c in metadata.classification_counts
+    )
+    assume_ground_for_filter = bool(
+        request.classification_filter
+        and GROUND_CLASSIFICATION_CODE in request.classification_filter
+        and not file_has_ground_points
+    )
+    if assume_ground_for_filter:
+        warnings.append(
+            ProcessingWarning(
+                code="pointcloud.assumed-ground-for-clip",
+                severity="warning",
+                message=(
+                    "No points in this file are classified as ground (class 2) -- every "
+                    "point within the clip boundary was assumed to be ground rather than "
+                    "returning an empty result. Verify against the file's actual source "
+                    "before relying on the clipped terrain."
+                ),
+            )
+        )
 
-    clipped_count = pipeline.execute()
-    arr = pipeline.arrays[0] if clipped_count > 0 else None
+    pipeline = pdal.Reader.las(filename=str(file_path)) | pdal.Filter.crop(polygon=wkt)
+    assumed_filter_excludes_everything = False
+    if request.classification_filter and not assume_ground_for_filter:
+        if has_classification_dimension:
+            expression = " || ".join(f"Classification == {code}" for code in request.classification_filter)
+            pipeline = pipeline | pdal.Filter.expression(expression=expression)
+        else:
+            # No Classification dimension, and the filter doesn't include
+            # ground (the one code every point is assumed to be) -- nothing can match.
+            assumed_filter_excludes_everything = True
+
+    if assumed_filter_excludes_everything:
+        clipped_count = 0
+        arr = None
+    else:
+        clipped_count = pipeline.execute()
+        arr = pipeline.arrays[0] if clipped_count > 0 else None
 
     if clipped_count == 0:
         warnings.append(
@@ -84,12 +125,17 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
         )
 
     classification_counts: list[ClassificationCount] = []
-    if arr is not None and "Classification" in (arr.dtype.names or ()):
-        unique, counts = np.unique(arr["Classification"], return_counts=True)
-        classification_counts = [
-            ClassificationCount(classification_code=int(c), point_count=int(n))
-            for c, n in zip(unique.tolist(), counts.tolist())
-        ]
+    if arr is not None:
+        if "Classification" in (arr.dtype.names or ()):
+            unique, counts = np.unique(arr["Classification"], return_counts=True)
+            classification_counts = [
+                ClassificationCount(classification_code=int(c), point_count=int(n))
+                for c, n in zip(unique.tolist(), counts.tolist())
+            ]
+        else:
+            classification_counts = [
+                ClassificationCount(classification_code=GROUND_CLASSIFICATION_CODE, point_count=int(arr.size))
+            ]
 
     step = request.decimation_step or 1
     if step > 1 and arr is not None:
@@ -117,7 +163,11 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
         local_x, local_y, local_z = project_to_local_array(
             arr["X"].astype(np.float64), arr["Y"].astype(np.float64), arr["Z"].astype(np.float64), request.local_frame
         )
-        classifications = arr["Classification"].tolist()
+        classifications = (
+            arr["Classification"].tolist()
+            if "Classification" in (arr.dtype.names or ())
+            else [GROUND_CLASSIFICATION_CODE] * arr.size
+        )
         points = [
             ClipResultPoint(x=float(x), y=float(y), z=float(z), classification=int(c))
             for x, y, z, c in zip(local_x.tolist(), local_y.tolist(), local_z.tolist(), classifications)

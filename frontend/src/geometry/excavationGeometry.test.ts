@@ -37,6 +37,7 @@ function foundation(overrides: Partial<FoundationInstance> = {}): FoundationInst
     poleModelId: "test",
     legId: "leg-a",
     anchorId: "anchor-a",
+    displayLabel: "leg-a",
     foundationTypeId: "rectangular-pad-pedestal-v1",
     parameters: {
       geometryType: "rectangular-pad-pedestal",

@@ -1,4 +1,5 @@
 import type { CoordinateReferenceSystem, ProjectCoordinate } from "../domain/coordinates";
+import type { PoleModel } from "../domain/poleModel";
 import type { ProcessingWarning, RectangularClipBoundarySettings } from "../domain/pointCloud";
 import {
   parseClipResult,
@@ -6,7 +7,14 @@ import {
   type BackendClipResult,
   type BackendPointCloudMetadata,
 } from "../validation/backendPointCloudSchema";
-import { parseFileStatus, type BackendFileStatus } from "../validation/backendWorkspaceSchema";
+import {
+  parseFileStatus,
+  parseUploadResult,
+  type BackendFileStatus,
+  type BackendUploadResult,
+} from "../validation/backendWorkspaceSchema";
+import { parseCentrelineResult, type BackendCentrelineResult } from "../validation/backendLineSchema";
+import { parsePoleModel } from "../validation/poleModelSchema";
 
 /**
  * The local-only FastAPI backend (see backend/README.md). Never a remote
@@ -24,6 +32,26 @@ export class BackendRequestError extends Error {
     super(message);
     this.name = "BackendRequestError";
   }
+}
+
+/**
+ * FastAPI's error bodies are either `{"detail": "some string"}` (most
+ * endpoints) or `{"detail": {"message": "...", "warnings": [...]}}` (the
+ * clip-blocked case). Pulls a human-readable string out of either shape,
+ * so a failure shows its actual reason (e.g. "File not found in workspace:
+ * x.pol") instead of just a bare status code -- the generic message alone
+ * was genuinely undiagnosable from the UI (see the 404 that turned out to
+ * mean "the file isn't in backend/workspace/ (any more)").
+ */
+function extractDetailMessage(json: unknown): string | null {
+  if (typeof json !== "object" || json === null || !("detail" in json)) return null;
+  const detail = (json as { detail: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (typeof detail === "object" && detail !== null && "message" in detail) {
+    const message = (detail as { message: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return null;
 }
 
 /** Thrown (name "AbortError", the standard DOM name) when the caller's AbortSignal was triggered -- callers treat this as a clean cancellation, not a failure to surface as an error. */
@@ -45,13 +73,77 @@ async function postJson(path: string, body: unknown, baseUrl: string, signal?: A
 
   const json = await response.json().catch(() => null);
   if (!response.ok) {
+    const detail = extractDetailMessage(json);
     throw new BackendRequestError(
-      `Backend request to ${path} failed with status ${response.status}.`,
+      detail
+        ? `Backend request to ${path} failed (${response.status}): ${detail}`
+        : `Backend request to ${path} failed with status ${response.status}.`,
       response.status,
       json
     );
   }
   return json;
+}
+
+/**
+ * Sibling to postJson for the one request shape that isn't JSON: a file
+ * upload. No explicit Content-Type header -- the browser sets the
+ * multipart boundary itself when given a FormData body, and setting it
+ * manually would break that.
+ */
+async function postFormData(path: string, formData: FormData, baseUrl: string, signal?: AbortSignal): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      body: formData,
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new BackendRequestError(
+      `Could not reach the local backend at ${baseUrl}${path}. Is it running? (${(error as Error).message})`
+    );
+  }
+
+  const json = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = extractDetailMessage(json);
+    throw new BackendRequestError(
+      detail
+        ? `Backend request to ${path} failed (${response.status}): ${detail}`
+        : `Backend request to ${path} failed with status ${response.status}.`,
+      response.status,
+      json
+    );
+  }
+  return json;
+}
+
+export type UploadKind = "pole-model" | "point-cloud" | "line-centreline";
+
+/**
+ * Uploads a file picked via a native file-open dialog into the backend's
+ * workspace (see backend/app/api/workspace.py's /workspace/upload) and
+ * returns the workspace-relative path it landed at -- callers then pass
+ * that path, unmodified, to requestPoleModelImport/requestInspect exactly
+ * as if it had already been sitting in the workspace.
+ */
+export async function requestUpload(
+  file: File,
+  kind: UploadKind,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
+): Promise<BackendUploadResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("kind", kind);
+  const json = await postFormData("/workspace/upload", formData, baseUrl, signal);
+  const parsed = parseUploadResult(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend upload response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
 }
 
 export interface ClipRequestBody {
@@ -80,13 +172,13 @@ export class BackendClipBlockedError extends BackendRequestError {
   }
 }
 
-function isBlockedErrorBody(body: unknown): body is { message: string; warnings: ProcessingWarning[] } {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    "warnings" in body &&
-    Array.isArray((body as { warnings: unknown }).warnings)
-  );
+/** FastAPI's HTTPException(detail={...}) serialises as {"detail": {...}} -- the structured {message, warnings} body lives one level under `detail`, not at the response body's top level (verified against the real running backend, not just this project's own mocked tests -- see backendClient.test.ts). */
+function blockedWarningsFromResponseBody(body: unknown): ProcessingWarning[] | null {
+  if (typeof body !== "object" || body === null || !("detail" in body)) return null;
+  const detail = (body as { detail: unknown }).detail;
+  if (typeof detail !== "object" || detail === null || !("warnings" in detail)) return null;
+  const warnings = (detail as { warnings: unknown }).warnings;
+  return Array.isArray(warnings) ? (warnings as ProcessingWarning[]) : null;
 }
 
 export async function requestClip(
@@ -98,8 +190,9 @@ export async function requestClip(
   try {
     json = await postJson("/pointcloud/clip", request, baseUrl, signal);
   } catch (error) {
-    if (error instanceof BackendRequestError && error.status === 422 && isBlockedErrorBody(error.body)) {
-      throw new BackendClipBlockedError(error.body.warnings);
+    if (error instanceof BackendRequestError && error.status === 422) {
+      const warnings = blockedWarningsFromResponseBody(error.body);
+      if (warnings) throw new BackendClipBlockedError(warnings);
     }
     throw error;
   }
@@ -137,6 +230,46 @@ export async function requestFileStatus(
   const parsed = parseFileStatus(json);
   if (!parsed.success) {
     throw new BackendRequestError(`Backend file-status response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Imports a PLS-POLE (.pol) file from the backend workspace and returns it
+ * already shaped as this app's own PoleModel (see
+ * backend/app/processing/pol_import.py) -- reuses parsePoleModel, the same
+ * schema-validation gate every other pole model (synthetic fixture,
+ * reopened project) goes through, so an imported model can never bypass it.
+ */
+export async function requestPoleModelImport(
+  filePath: string,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
+): Promise<PoleModel> {
+  const json = await postJson("/polemodel/import", { filePath }, baseUrl, signal);
+  const parsed = parsePoleModel(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend pole-model import response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Extracts a transmission line's centreline from a zipped shapefile already
+ * uploaded to the workspace (see backend/app/processing/shapefile_import.py)
+ * -- vertices come back in project coordinates (easting/northing only,
+ * elevation isn't needed for a bearing calculation).
+ */
+export async function requestCentreline(
+  filePath: string,
+  projectCrs: CoordinateReferenceSystem,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
+): Promise<BackendCentrelineResult> {
+  const json = await postJson("/line/centreline", { filePath, projectCrs }, baseUrl, signal);
+  const parsed = parseCentrelineResult(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend centreline response failed validation: ${parsed.errors.join("; ")}`);
   }
   return parsed.data;
 }

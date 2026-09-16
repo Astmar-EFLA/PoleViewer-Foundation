@@ -69,3 +69,61 @@ def test_file_status_hash_changes_when_file_content_is_modified(workspace_with_f
     ).json()
     assert after["sha256"] != before["sha256"]
     assert after["sizeBytes"] == before["sizeBytes"] + 4
+
+
+def test_upload_pole_model_lands_in_the_workspace_and_can_be_read_back(workspace_with_fixtures):
+    response = client.post(
+        "/workspace/upload",
+        files={"file": ("real-model.pol", b"not a real .pol, just bytes", "application/octet-stream")},
+        data={"kind": "pole-model"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["originalFileName"] == "real-model.pol"
+    assert body["sizeBytes"] > 0
+    assert body["filePath"].startswith("uploads/")
+    assert body["filePath"].endswith("-real-model.pol")
+
+    status = client.post("/workspace/file-status", json={"filePath": body["filePath"]}).json()
+    assert status["exists"] is True
+    assert status["sizeBytes"] == body["sizeBytes"]
+
+
+def test_upload_two_files_with_the_same_name_never_collide(workspace_with_fixtures):
+    first = client.post(
+        "/workspace/upload",
+        files={"file": ("same-name.pol", b"first", "application/octet-stream")},
+        data={"kind": "pole-model"},
+    ).json()
+    second = client.post(
+        "/workspace/upload",
+        files={"file": ("same-name.pol", b"second", "application/octet-stream")},
+        data={"kind": "pole-model"},
+    ).json()
+    assert first["filePath"] != second["filePath"]
+
+    first_status = client.post("/workspace/file-status", json={"filePath": first["filePath"]}).json()
+    second_status = client.post("/workspace/file-status", json={"filePath": second["filePath"]}).json()
+    assert first_status["sha256"] != second_status["sha256"]
+
+
+def test_upload_rejects_an_unrecognised_extension_for_the_requested_kind(workspace_with_fixtures):
+    response = client.post(
+        "/workspace/upload",
+        files={"file": ("notes.txt", b"hello", "text/plain")},
+        data={"kind": "pole-model"},
+    )
+    assert response.status_code == 422
+
+
+def test_upload_rejects_a_file_over_the_configured_size_limit(workspace_with_fixtures, monkeypatch):
+    monkeypatch.setenv("POLE_VIEWER_MAX_FILE_SIZE_MB", "1")
+    oversized = b"x" * (2 * 1024 * 1024)
+    response = client.post(
+        "/workspace/upload",
+        files={"file": ("big.las", oversized, "application/octet-stream")},
+        data={"kind": "point-cloud"},
+    )
+    assert response.status_code == 422
+    # The rejected upload must not be left behind in the workspace.
+    assert list((workspace_with_fixtures / "uploads").glob("*big.las")) == []

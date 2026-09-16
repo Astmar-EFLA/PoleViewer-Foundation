@@ -33,28 +33,27 @@ function solveBaseElevationForConnection(
   return targetTopZ - heightFromBaseToTop;
 }
 
-export function buildFoundationInstanceForLeg(
+function buildFoundationInstance(
   poleModel: PoleModel,
-  legId: string,
+  anchorId: string,
+  legId: string | null,
+  displayLabel: string,
+  instanceIdSuffix: string,
   foundationType: FoundationType,
   nowIso: string,
   parametersOverride?: FoundationParameters
 ): FoundationInstance {
-  const leg = poleModel.structuralLegs.find((l) => l.id === legId);
-  if (!leg) {
-    throw new Error(`Leg "${legId}" not found on pole model "${poleModel.modelId}"`);
-  }
-
   const parameters = parametersOverride ?? foundationType.defaultParameters;
-  const anchorPos = placedAnchorPosition(leg.linkedFoundationAnchorId, poleModel);
+  const anchorPos = placedAnchorPosition(anchorId, poleModel);
   const position = { x: anchorPos.x, y: anchorPos.y };
   const baseElevation = solveBaseElevationForConnection(parameters, position, 0, anchorPos.z);
 
   return {
-    instanceId: `foundation-${leg.id}`,
+    instanceId: `foundation-${instanceIdSuffix}`,
     poleModelId: poleModel.modelId,
-    legId: leg.id,
-    anchorId: leg.linkedFoundationAnchorId,
+    legId,
+    anchorId,
+    displayLabel,
     foundationTypeId: foundationType.foundationTypeId,
     parameters,
     position,
@@ -68,20 +67,82 @@ export function buildFoundationInstanceForLeg(
       verificationState: "unverified",
       modifiedAt: nowIso,
       notes: parametersOverride
-        ? "User-edited foundation dimensions; base elevation calculated to connect to the leg anchor."
-        : "Default foundation dimensions and base elevation calculated to connect to the leg anchor; not a verified design.",
+        ? "User-edited foundation dimensions; base elevation calculated to connect to the anchor."
+        : "Default foundation dimensions and base elevation calculated to connect to the anchor; not a verified design.",
     },
   };
 }
 
+export function buildFoundationInstanceForLeg(
+  poleModel: PoleModel,
+  legId: string,
+  foundationType: FoundationType,
+  nowIso: string,
+  parametersOverride?: FoundationParameters
+): FoundationInstance {
+  const leg = poleModel.structuralLegs.find((l) => l.id === legId);
+  if (!leg) {
+    throw new Error(`Leg "${legId}" not found on pole model "${poleModel.modelId}"`);
+  }
+
+  return buildFoundationInstance(
+    poleModel,
+    leg.linkedFoundationAnchorId,
+    leg.id,
+    leg.name,
+    leg.id,
+    foundationType,
+    nowIso,
+    parametersOverride
+  );
+}
+
+/**
+ * A guy-anchor foundation is not tied to a StructuralLeg (there is no such
+ * thing as a "guy leg") -- it connects to a `guy-ground-anchor` anchor,
+ * NOT the elevated `guy-attachment` anchor (that's where the guy leaves
+ * the pole, still up in the air -- a foundation belongs at the anchor's
+ * own ground-level position, a separate node in the source file). `legId`
+ * is null on the resulting instance; `anchorId` remains the single source
+ * of truth for placement (ADR-005).
+ */
+export function buildFoundationInstanceForGuyAnchor(
+  poleModel: PoleModel,
+  anchorId: string,
+  foundationType: FoundationType,
+  nowIso: string,
+  parametersOverride?: FoundationParameters
+): FoundationInstance {
+  const anchor = poleModel.anchors.find((a) => a.id === anchorId && a.anchorType === "guy-ground-anchor");
+  if (!anchor) {
+    throw new Error(`Guy-ground-anchor "${anchorId}" not found on pole model "${poleModel.modelId}"`);
+  }
+
+  return buildFoundationInstance(
+    poleModel,
+    anchor.id,
+    null,
+    anchor.name,
+    anchor.id,
+    foundationType,
+    nowIso,
+    parametersOverride
+  );
+}
+
 export function buildDefaultFoundationInstances(
   poleModel: PoleModel,
-  foundationType: FoundationType,
+  legFoundationType: FoundationType,
+  guyFoundationType: FoundationType,
   nowIso: string
 ): FoundationInstance[] {
-  return poleModel.structuralLegs.map((leg) =>
-    buildFoundationInstanceForLeg(poleModel, leg.id, foundationType, nowIso)
+  const legInstances = poleModel.structuralLegs.map((leg) =>
+    buildFoundationInstanceForLeg(poleModel, leg.id, legFoundationType, nowIso)
   );
+  const guyInstances = poleModel.anchors
+    .filter((a) => a.anchorType === "guy-ground-anchor")
+    .map((a) => buildFoundationInstanceForGuyAnchor(poleModel, a.id, guyFoundationType, nowIso));
+  return [...legInstances, ...guyInstances];
 }
 
 /**

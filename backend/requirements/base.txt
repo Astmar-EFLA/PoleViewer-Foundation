@@ -7,7 +7,17 @@
 
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30,<1.0
+# Required by FastAPI for any UploadFile/File(...)/Form(...) route (the
+# /workspace/upload endpoint) -- FastAPI raises at request time, not import
+# time, if this is missing, so it's easy to forget.
+python-multipart>=0.0.9,<1.0
 pydantic>=2.9,<3.0
 numpy>=1.26,<3.0
 scipy>=1.13,<2.0
 shapely>=2.0,<3.0
+# Zipped-shapefile centreline import (app/processing/shapefile_import.py).
+pyshp>=2.3,<3.0
+# Used to match a shapefile's .prj (WKT) against the project's declared EPSG
+# code -- CRS-database matching, not string parsing, is why this needs a
+# real library rather than a regex over the WKT text.
+pyproj>=3.6,<4.0

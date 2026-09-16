@@ -19,6 +19,7 @@ const anchorTypeSchema = z.enum([
   "pole-base",
   "pedestal-connection",
   "guy-attachment",
+  "guy-ground-anchor",
   "cross-arm-reference",
   "conductor-attachment",
   "local-alignment-reference",
@@ -43,6 +44,18 @@ const structuralLegSchema = z.object({
   source: provenanceSchema,
 });
 
+const poleMemberSchema = z.object({
+  a: localCoordinateSchema,
+  b: localCoordinateSchema,
+  category: z.enum(["structure", "cable", "insulator"]),
+  component: z.string(),
+});
+
+const poleVisualGeometrySchema = z.object({
+  members: z.array(poleMemberSchema),
+  source: provenanceSchema,
+});
+
 export const poleModelSchema = z.object({
   schemaVersion: z.string().min(1),
   modelId: z.string().min(1),
@@ -61,6 +74,7 @@ export const poleModelSchema = z.object({
     .min(1, "a pole model must declare at least one structural leg"),
   metadata: z.record(z.unknown()).optional(),
   warnings: z.array(z.string()),
+  visualGeometry: poleVisualGeometrySchema.optional(),
 });
 
 /**

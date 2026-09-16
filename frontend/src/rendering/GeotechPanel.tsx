@@ -1,22 +1,9 @@
-import type { CSSProperties } from "react";
 import type { BoundaryDefinition } from "../domain/geotech";
+import { KNOWN_GEOTECH_CATEGORIES } from "../domain/geotech";
 import { useProjectStore } from "../state/projectStore";
 import { validateGeotechLayer, validateGroundwaterFoundationIntersection } from "../validation/geotechValidation";
 
-const panelStyle: CSSProperties = {
-  position: "absolute",
-  bottom: 44,
-  left: 12,
-  background: "rgba(255,255,255,0.94)",
-  borderRadius: 6,
-  padding: "10px 12px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  width: 300,
-  maxHeight: "55vh",
-  overflowY: "auto",
-  fontFamily: "system-ui, sans-serif",
-  fontSize: 12,
-};
+const CATEGORY_SUGGESTIONS_ID = "geotech-category-suggestions";
 
 function BoundaryEditor({
   label,
@@ -72,6 +59,9 @@ export function GeotechPanel() {
   const project = useProjectStore((s) => s.project);
   const setGeotechLayerStyle = useProjectStore((s) => s.setGeotechLayerStyle);
   const setGeotechLayerBoundary = useProjectStore((s) => s.setGeotechLayerBoundary);
+  const setGeotechLayerLabel = useProjectStore((s) => s.setGeotechLayerLabel);
+  const addGeotechLayer = useProjectStore((s) => s.addGeotechLayer);
+  const removeGeotechLayer = useProjectStore((s) => s.removeGeotechLayer);
   const setGroundwaterStyle = useProjectStore((s) => s.setGroundwaterStyle);
   const setGroundwaterBoundary = useProjectStore((s) => s.setGroundwaterBoundary);
 
@@ -79,10 +69,17 @@ export function GeotechPanel() {
 
   const nowIso = project.modifiedAt;
   const mastElevation = project.mastCentreProject.elevation;
+  const categorySuggestions = Array.from(
+    new Set([...KNOWN_GEOTECH_CATEGORIES, ...project.geotechLayers.map((l) => l.category)])
+  );
 
   return (
-    <div style={panelStyle}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Geotechnical / groundwater</div>
+    <div>
+      <datalist id={CATEGORY_SUGGESTIONS_ID}>
+        {categorySuggestions.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
 
       {project.geotechLayers.map((layer) => {
         const results = project.terrainSurface
@@ -90,14 +87,35 @@ export function GeotechPanel() {
           : [];
         return (
           <div key={layer.id} style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid #ddd" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, fontWeight: 600 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <input
                 type="checkbox"
                 checked={layer.visible}
                 onChange={(e) => setGeotechLayerStyle(layer.id, { visible: e.target.checked })}
               />
-              {layer.name} <span style={{ opacity: 0.6, fontWeight: 400 }}>({layer.category})</span>
-            </label>
+              <input
+                type="text"
+                value={layer.name}
+                onChange={(e) => setGeotechLayerLabel(layer.id, { name: e.target.value })}
+                style={{ flex: 1, fontWeight: 600, minWidth: 0 }}
+              />
+              <input
+                type="text"
+                value={layer.category}
+                list={CATEGORY_SUGGESTIONS_ID}
+                onChange={(e) => setGeotechLayerLabel(layer.id, { category: e.target.value })}
+                placeholder="category"
+                style={{ width: 100 }}
+              />
+              <button
+                type="button"
+                title="Remove layer"
+                onClick={() => removeGeotechLayer(layer.id)}
+                style={{ fontSize: 10, padding: "2px 6px", cursor: "pointer" }}
+              >
+                x
+              </button>
+            </div>
             <input
               type="range"
               min={0}
@@ -142,6 +160,14 @@ export function GeotechPanel() {
           </div>
         );
       })}
+
+      <button
+        type="button"
+        onClick={addGeotechLayer}
+        style={{ width: "100%", marginBottom: 12, padding: "4px 8px", cursor: "pointer" }}
+      >
+        + Add layer
+      </button>
 
       {project.groundwater && (
         <div>

@@ -57,6 +57,30 @@ export const FOUNDATION_LIBRARY: readonly FoundationType[] = [
       notes: "Placeholder library dimensions; not a verified design.",
     },
   },
+  {
+    foundationTypeId: "guy-anchor-block-v1",
+    name: "Guy anchor block (buried)",
+    description: "A buried rectangular anchor block for a guy/stay attachment point (reuses the pad-pedestal geometry as a simple placeholder shape).",
+    geometryType: "rectangular-pad-pedestal",
+    units: "m",
+    defaultParameters: {
+      geometryType: "rectangular-pad-pedestal",
+      padWidth: 1.0,
+      padLength: 1.0,
+      padThickness: 0.6,
+      pedestalWidth: 0.4,
+      pedestalLength: 0.4,
+      pedestalHeight: 0.2,
+    },
+    defaultColour: "#7a6a52",
+    defaultOpacity: 1,
+    verificationState: "unverified",
+    provenance: {
+      originType: "library-default",
+      verificationState: "unverified",
+      notes: "Placeholder library dimensions; not a verified design.",
+    },
+  },
 ];
 
 export function getFoundationTypeById(foundationTypeId: string): FoundationType | undefined {

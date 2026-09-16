@@ -104,6 +104,7 @@ function foundation(overrides: Partial<FoundationInstance> = {}): FoundationInst
     poleModelId: "test",
     legId: "leg-a",
     anchorId: "anchor-a",
+    displayLabel: "leg-a",
     foundationTypeId: "rectangular-pad-pedestal-v1",
     parameters: {
       geometryType: "rectangular-pad-pedestal",
@@ -165,6 +166,7 @@ describe("buildSectionPlane", () => {
     const foundationInstances = buildDefaultFoundationInstances(
       poleModel,
       requireFoundationTypeById("rectangular-pad-pedestal-v1"),
+      requireFoundationTypeById("guy-anchor-block-v1"),
       NOW
     );
     return {

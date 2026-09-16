@@ -4,7 +4,7 @@ import type { SectionMode } from "../domain/section";
 import { generateSectionResult } from "../geometry/section";
 import { radiansToDegrees, degreesToRadians } from "../geometry/angles";
 import { measureSync } from "../geometry/perf";
-import { downloadSectionSvg } from "../services/exportImage";
+import { downloadSectionSvg, openSectionInNewWindow } from "../services/exportImage";
 import { useProjectStore } from "../state/projectStore";
 import { SectionView } from "./SectionView";
 
@@ -24,7 +24,7 @@ const panelStyle: CSSProperties = {
   borderRadius: 6,
   padding: "10px 12px",
   boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  width: 460,
+  width: 560,
   overflowY: "auto",
   fontFamily: "system-ui, sans-serif",
   fontSize: 12,
@@ -66,6 +66,19 @@ export function SectionPanel() {
     const svg = sectionContainerRef.current?.querySelector("svg");
     if (!svg || !activeSection) return;
     downloadSectionSvg(svg, activeSection.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  }
+
+  function handleOpenInNewWindow() {
+    const svg = sectionContainerRef.current?.querySelector("svg");
+    if (!svg || !activeSection || !project) return;
+    try {
+      openSectionInNewWindow(svg, `${project.name} -- ${activeSection.name}`);
+    } catch (error) {
+      // window.open can be blocked by the browser's pop-up blocker on first
+      // use -- surface that to the user rather than leaving it as a silent
+      // console-only failure.
+      window.alert((error as Error).message);
+    }
   }
 
   if (!project || !sectionsPanelOpen) return null;
@@ -120,6 +133,9 @@ export function SectionPanel() {
             </label>
             <span style={{ opacity: 0.6 }}>{MODE_LABELS[activeSection.mode]}</span>
             <span style={{ display: "flex", gap: 4 }}>
+              <button style={smallButtonStyle} onClick={handleOpenInNewWindow}>
+                Open in new window
+              </button>
               <button style={smallButtonStyle} onClick={handleExportSectionImage}>
                 Export image
               </button>
@@ -189,7 +205,13 @@ export function SectionPanel() {
 
           {activeSection.visible && result && (
             <div ref={sectionContainerRef}>
-              <SectionView result={result} mastCentreProjectElevation={project.mastCentreProject.elevation} width={432} height={360} />
+              <SectionView
+                result={result}
+                mastCentreProjectElevation={project.mastCentreProject.elevation}
+                width={532}
+                height={440}
+                resetViewKey={activeSection.id}
+              />
               {timedResult && (
                 <div style={{ opacity: 0.5, fontSize: 10, marginTop: 2 }}>
                   computed in {timedResult.durationMs.toFixed(1)} ms

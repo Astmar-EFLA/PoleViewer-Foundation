@@ -57,7 +57,8 @@ export interface FoundationType {
 }
 
 /**
- * One foundation instance per leg (never shared). `baseElevation` is
+ * One foundation instance per foundation-bearing anchor (a structural leg,
+ * or a guy-attachment anchor -- never shared). `baseElevation` is
  * independent per instance -- sloping terrain and unequal leg levels are the
  * normal case, not an edge case (principle: never assume all foundation
  * bases share an elevation).
@@ -65,8 +66,11 @@ export interface FoundationType {
 export interface FoundationInstance {
   readonly instanceId: string;
   readonly poleModelId: string;
-  readonly legId: string;
+  /** The structural leg this foundation connects to, or null for a guy-anchor foundation (there is no StructuralLeg for a guy). `anchorId` is the source of truth either way. */
+  readonly legId: string | null;
   readonly anchorId: string;
+  /** Human-readable label for UI/reports: the leg's name for a leg foundation, the anchor's own name for a guy-anchor foundation. */
+  readonly displayLabel: string;
   readonly foundationTypeId: string;
   /** Defaults merged with any user overrides; kept as one resolved value so geometry generation stays a pure function of the instance alone. */
   readonly parameters: FoundationParameters;

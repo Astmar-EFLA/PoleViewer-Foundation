@@ -216,7 +216,7 @@ export interface SectionAnchorMark {
 
 export interface SectionFoundationOutline {
   readonly instanceId: string;
-  readonly legId: string;
+  readonly legId: string | null;
   readonly colour: string;
   readonly segments: readonly SectionSegment[];
 }

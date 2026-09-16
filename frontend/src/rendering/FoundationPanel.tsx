@@ -1,24 +1,8 @@
-import type { CSSProperties } from "react";
 import type { FoundationParameters, RectangularStep } from "../domain/foundation";
 import { FOUNDATION_LIBRARY } from "../domain/foundationLibrary";
 import { placedAnchorPosition } from "../geometry/polePlacement";
 import { useProjectStore } from "../state/projectStore";
 import { validateFoundationInstance } from "../validation/foundationValidation";
-
-const panelStyle: CSSProperties = {
-  position: "absolute",
-  bottom: 44,
-  right: 12,
-  background: "rgba(255,255,255,0.94)",
-  borderRadius: 6,
-  padding: "10px 12px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  width: 280,
-  maxHeight: "60vh",
-  overflowY: "auto",
-  fontFamily: "system-ui, sans-serif",
-  fontSize: 12,
-};
 
 function NumberField({
   label,
@@ -45,19 +29,16 @@ function NumberField({
 
 export function FoundationPanel() {
   const project = useProjectStore((s) => s.project);
-  const selectedLegId = useProjectStore((s) => s.selectedLegId);
-  const setSelectedLeg = useProjectStore((s) => s.setSelectedLeg);
+  const selectedFoundationInstanceId = useProjectStore((s) => s.selectedFoundationInstanceId);
+  const setSelectedFoundationInstance = useProjectStore((s) => s.setSelectedFoundationInstance);
   const setFoundationType = useProjectStore((s) => s.setFoundationType);
   const setFoundationParameters = useProjectStore((s) => s.setFoundationParameters);
-  const copyFoundationToOtherLegs = useProjectStore((s) => s.copyFoundationToOtherLegs);
+  const copyFoundationToSimilar = useProjectStore((s) => s.copyFoundationToSimilar);
 
   if (!project) return null;
 
-  const legs = project.poleModel.structuralLegs;
-  const selectedLeg = legs.find((l) => l.id === selectedLegId) ?? legs[0] ?? null;
-  const instance = selectedLeg
-    ? project.foundationInstances.find((f) => f.legId === selectedLeg.id)
-    : undefined;
+  const instances = project.foundationInstances;
+  const instance = instances.find((f) => f.instanceId === selectedFoundationInstanceId) ?? instances[0] ?? null;
 
   const validation = instance
     ? validateFoundationInstance(
@@ -68,23 +49,19 @@ export function FoundationPanel() {
     : [];
 
   function updateParameters(next: FoundationParameters) {
-    if (selectedLeg) setFoundationParameters(selectedLeg.id, next);
+    if (instance) setFoundationParameters(instance.instanceId, next);
   }
 
   return (
-    <div style={panelStyle}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Foundations</div>
-
-      {legs.map((leg) => {
-        const legInstance = project.foundationInstances.find((f) => f.legId === leg.id);
-        const typeName =
-          FOUNDATION_LIBRARY.find((t) => t.foundationTypeId === legInstance?.foundationTypeId)?.name ?? "-";
-        const isSelected = leg.id === (selectedLeg?.id ?? null);
+    <div>
+      {instances.map((f) => {
+        const typeName = FOUNDATION_LIBRARY.find((t) => t.foundationTypeId === f.foundationTypeId)?.name ?? "-";
+        const isSelected = f.instanceId === (instance?.instanceId ?? null);
         return (
           <button
-            key={leg.id}
+            key={f.instanceId}
             type="button"
-            onClick={() => setSelectedLeg(leg.id)}
+            onClick={() => setSelectedFoundationInstance(f.instanceId)}
             style={{
               display: "block",
               width: "100%",
@@ -97,18 +74,18 @@ export function FoundationPanel() {
               cursor: "pointer",
             }}
           >
-            {leg.name}: <span style={{ opacity: 0.75 }}>{typeName}</span>
+            {f.displayLabel}: <span style={{ opacity: 0.75 }}>{typeName}</span>
           </button>
         );
       })}
 
-      {selectedLeg && instance && (
+      {instance && (
         <div style={{ marginTop: 10, borderTop: "1px solid #ddd", paddingTop: 8 }}>
           <label style={{ display: "block", marginBottom: 6 }}>
             <span style={{ opacity: 0.8, display: "block", marginBottom: 2 }}>Type</span>
             <select
               value={instance.foundationTypeId}
-              onChange={(e) => setFoundationType(selectedLeg.id, e.target.value)}
+              onChange={(e) => setFoundationType(instance.instanceId, e.target.value)}
               style={{ width: "100%" }}
             >
               {FOUNDATION_LIBRARY.map((t) => (
@@ -205,8 +182,8 @@ export function FoundationPanel() {
             Base elevation (calculated): {instance.baseElevation.toFixed(3)} m
           </div>
 
-          <button type="button" onClick={() => copyFoundationToOtherLegs(selectedLeg.id)} style={{ width: "100%" }}>
-            Copy to other legs
+          <button type="button" onClick={() => copyFoundationToSimilar(instance.instanceId)} style={{ width: "100%" }}>
+            {instance.legId !== null ? "Copy to other legs" : "Copy to other guy anchors"}
           </button>
 
           {validation.length > 0 && (

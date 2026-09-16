@@ -33,8 +33,9 @@ export const foundationParametersSchema = z.discriminatedUnion("geometryType", [
 export const foundationInstanceSchema = z.object({
   instanceId: z.string().min(1),
   poleModelId: z.string().min(1),
-  legId: z.string().min(1),
+  legId: z.string().min(1).nullable(),
   anchorId: z.string().min(1),
+  displayLabel: z.string().min(1),
   foundationTypeId: z.string().min(1),
   parameters: foundationParametersSchema,
   position: z.object({ x: z.number().finite(), y: z.number().finite() }),

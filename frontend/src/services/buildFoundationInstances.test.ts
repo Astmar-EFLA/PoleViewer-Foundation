@@ -7,6 +7,7 @@ import { parsePoleModel } from "../validation/poleModelSchema";
 import { validateFoundationInstance } from "../validation/foundationValidation";
 import {
   buildDefaultFoundationInstances,
+  buildFoundationInstanceForGuyAnchor,
   buildFoundationInstanceForLeg,
   withFoundationType,
 } from "./buildFoundationInstances";
@@ -14,6 +15,7 @@ import {
 const NOW = "2026-09-15T00:00:00.000Z";
 const PAD_PEDESTAL = requireFoundationTypeById("rectangular-pad-pedestal-v1");
 const STEPPED = requireFoundationTypeById("stepped-rectangular-v1");
+const GUY_ANCHOR_BLOCK = requireFoundationTypeById("guy-anchor-block-v1");
 
 describe("buildDefaultFoundationInstances", () => {
   it("produces one foundation per leg, each passing its own connection-mismatch validation, for the 4-leg lattice fixture", () => {
@@ -21,7 +23,8 @@ describe("buildDefaultFoundationInstances", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
 
-    const instances = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, NOW);
+    const instances = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
+    // This fixture has no guy-ground-anchor anchors, so only the 4 legs get a foundation.
     expect(instances).toHaveLength(4);
 
     const legIds = instances.map((i) => i.legId);
@@ -39,7 +42,7 @@ describe("buildDefaultFoundationInstances", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
 
-    const instances = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, NOW);
+    const instances = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
     const baseElevations = instances.map((i) => i.baseElevation);
     expect(new Set(baseElevations).size).toBe(4);
   });
@@ -49,7 +52,7 @@ describe("buildDefaultFoundationInstances", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
 
-    const instances = buildDefaultFoundationInstances(parsed.data, STEPPED, NOW);
+    const instances = buildDefaultFoundationInstances(parsed.data, STEPPED, GUY_ANCHOR_BLOCK, NOW);
     for (const instance of instances) {
       const anchorPos = placedAnchorPosition(instance.anchorId, parsed.data);
       const results = validateFoundationInstance(instance, anchorPos, NOW);
@@ -62,8 +65,55 @@ describe("buildDefaultFoundationInstances", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
 
-    const [instance] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, NOW);
+    const [instance] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
     expect(instance!.provenance.originType).toBe("library-default");
+  });
+
+  it("also builds a foundation for every guy-ground-anchor, with legId null, for the 2-leg portal fixture", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-portal-2leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const instances = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
+    // 2 legs + 2 guy anchors.
+    expect(instances).toHaveLength(4);
+
+    const legInstances = instances.filter((i) => i.legId !== null);
+    const guyInstances = instances.filter((i) => i.legId === null);
+    expect(legInstances).toHaveLength(2);
+    expect(guyInstances).toHaveLength(2);
+    expect(guyInstances.every((i) => i.foundationTypeId === "guy-anchor-block-v1")).toBe(true);
+
+    for (const instance of instances) {
+      const anchorPos = placedAnchorPosition(instance.anchorId, parsed.data);
+      const results = validateFoundationInstance(instance, anchorPos, NOW);
+      expect(results.filter((r) => r.ruleId === "foundation.connection-mismatch")).toHaveLength(0);
+    }
+  });
+});
+
+describe("buildFoundationInstanceForGuyAnchor", () => {
+  it("connects to the guy-ground-anchor's own position, with legId null and displayLabel from the anchor's name", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-portal-2leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const instance = buildFoundationInstanceForGuyAnchor(parsed.data, "anchor-guy-a", GUY_ANCHOR_BLOCK, NOW);
+    expect(instance.legId).toBeNull();
+    expect(instance.anchorId).toBe("anchor-guy-a");
+    expect(instance.displayLabel).toBe("Leg A guy ground anchor");
+
+    const anchorPos = placedAnchorPosition(instance.anchorId, parsed.data);
+    const results = validateFoundationInstance(instance, anchorPos, NOW);
+    expect(results.filter((r) => r.ruleId === "foundation.connection-mismatch")).toHaveLength(0);
+  });
+
+  it("throws for an anchor id that is not a guy-ground-anchor", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-portal-2leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    expect(() => buildFoundationInstanceForGuyAnchor(parsed.data, "anchor-leg-a", GUY_ANCHOR_BLOCK, NOW)).toThrow();
   });
 });
 
@@ -91,7 +141,7 @@ describe("withFoundationType", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
 
-    const [original] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, NOW);
+    const [original] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
     const changed = withFoundationType(original!, parsed.data, STEPPED, NOW);
 
     expect(changed.foundationTypeId).toBe("stepped-rectangular-v1");
@@ -111,7 +161,7 @@ describe("withFoundationType", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
 
-    const [original] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, NOW);
+    const [original] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
     const edited = { ...original!, visible: false, colour: "#123456", opacity: 0.4 };
     const changed = withFoundationType(edited, parsed.data, STEPPED, NOW);
 
@@ -130,6 +180,7 @@ describe("foundation library sanity", () => {
         poleModelId: "sanity",
         legId: "sanity",
         anchorId: "sanity",
+        displayLabel: "sanity",
         foundationTypeId: type.foundationTypeId,
         parameters: type.defaultParameters,
         position: { x: 0, y: 0 },

@@ -90,7 +90,7 @@ export function buildEngineeringSummary(project: Project): EngineeringSummary {
   for (const f of project.foundationInstances) {
     entries.push(
       entryFromProvenance(
-        `Foundation ${f.legId} (${f.foundationTypeId})`,
+        `Foundation ${f.displayLabel} (${f.foundationTypeId})`,
         `base elevation ${f.baseElevation.toFixed(3)} m local`,
         f.provenance
       )

@@ -9,17 +9,15 @@
 import poleLattice4LegJson from "../../../fixtures/synthetic/pole-lattice-4leg.json";
 import terrainSlopeJson from "../../../fixtures/synthetic/terrain-slope.json";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
-import type { ExcavationInstance } from "../domain/excavation";
-import type { FoundationInstance } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
 import type { TerrainPoint } from "../domain/terrain";
-import type { SectionDefinition } from "../domain/section";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
-import { buildFoundationInstanceForLeg } from "./buildFoundationInstances";
+import { buildFoundationInstanceForGuyAnchor, buildFoundationInstanceForLeg } from "./buildFoundationInstances";
+import { buildDefaultExcavationInstances, buildDefaultSections } from "./projectDefaults";
 import { parsePoleModel } from "../validation/poleModelSchema";
 
 const ASSUMED_GEOTECH_PROVENANCE = {
@@ -72,53 +70,6 @@ function buildDemoGeotechLayers(mastElevationM: number): GeotechLayer[] {
   ];
 }
 
-function buildDemoExcavations(foundationInstances: readonly FoundationInstance[]): ExcavationInstance[] {
-  return foundationInstances.map((foundation) => ({
-    id: `excavation-${foundation.legId}`,
-    foundationInstanceId: foundation.instanceId,
-    // Default assumption: dig exactly to the foundation's own base level.
-    bottomElevationM: foundation.baseElevation,
-    workingSpaceOffsetM: 0.5,
-    // 1.5H:1V, matching ADR-009's default convention (unconfirmed against
-    // a real EFLA reference document -- see the ADR).
-    sideSlope: { h: 1.5, v: 1 },
-    colour: "#c9a227",
-    opacity: 0.35,
-    visible: true,
-    wireframe: false,
-    provenance: {
-      originType: "assumed",
-      verificationState: "unverified",
-      notes: "Synthetic demo assumption: bottom elevation set to the foundation base, 0.5m working space, 1.5H:1V slope.",
-    },
-  }));
-}
-
-const DEFAULT_SECTION_POINT_TOLERANCE_M = 1.0;
-
-function buildDemoSections(): SectionDefinition[] {
-  return [
-    {
-      id: "section-longitudinal",
-      name: "Longitudinal (through mast centre)",
-      mode: "longitudinal",
-      legId: null,
-      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
-      pointToleranceM: DEFAULT_SECTION_POINT_TOLERANCE_M,
-      visible: true,
-    },
-    {
-      id: "section-transverse",
-      name: "Transverse (through mast centre)",
-      mode: "transverse",
-      legId: null,
-      plane: { originX: 0, originY: 0, directionRadians: 0 },
-      pointToleranceM: DEFAULT_SECTION_POINT_TOLERANCE_M,
-      visible: true,
-    },
-  ];
-}
-
 function buildDemoGroundwater(): Groundwater {
   return {
     id: "groundwater-1",
@@ -164,9 +115,18 @@ export function buildSyntheticDemoProject(): Project {
     "leg-sw": steppedType,
     "leg-nw": steppedType,
   };
-  const foundationInstances = poleModel.structuralLegs.map((leg) =>
+  const legFoundationInstances = poleModel.structuralLegs.map((leg) =>
     buildFoundationInstanceForLeg(poleModel, leg.id, legFoundationType[leg.id] ?? padPedestalType, nowIso)
   );
+  // The lattice fixture has no guy-ground-anchor anchors today, but this
+  // stays wired up so the demo project exercises the same code path a real
+  // guyed structure would (buildDefaultFoundationInstances does the same,
+  // for the pole-model-import case).
+  const guyAnchorFoundationType = requireFoundationTypeById("guy-anchor-block-v1");
+  const guyFoundationInstances = poleModel.anchors
+    .filter((a) => a.anchorType === "guy-ground-anchor")
+    .map((a) => buildFoundationInstanceForGuyAnchor(poleModel, a.id, guyAnchorFoundationType, nowIso));
+  const foundationInstances = [...legFoundationInstances, ...guyFoundationInstances];
 
   return {
     schemaVersion: "0.1.0",
@@ -187,7 +147,7 @@ export function buildSyntheticDemoProject(): Project {
     renderOriginLocal: localCoordinate(0, 0, 0),
     poleModel,
     foundationInstances,
-    excavationInstances: buildDemoExcavations(foundationInstances),
+    excavationInstances: buildDefaultExcavationInstances(foundationInstances),
     geotechLayers: buildDemoGeotechLayers(mastCentreProject.elevation),
     groundwater: buildDemoGroundwater(),
     // Points at the real synthetic LAS fixture (backend/workspace/, copied
@@ -210,7 +170,7 @@ export function buildSyntheticDemoProject(): Project {
       foundations: { visible: true, opacity: 1 },
       terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false },
     },
-    sections: buildDemoSections(),
+    sections: buildDefaultSections(),
     measurements: [],
     geometryVersion: 1,
     notes: "",

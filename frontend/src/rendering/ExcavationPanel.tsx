@@ -1,23 +1,7 @@
-import type { CSSProperties } from "react";
 import { generateExcavationGeometry } from "../geometry/excavationGeometry";
 import { computeApproximateVolume } from "../geometry/excavationVolume";
 import { useProjectStore } from "../state/projectStore";
 import { hasBlockingExcavationGeometryError, validateExcavationInstance } from "../validation/excavationValidation";
-
-const panelStyle: CSSProperties = {
-  position: "absolute",
-  bottom: 44,
-  left: 328,
-  background: "rgba(255,255,255,0.94)",
-  borderRadius: 6,
-  padding: "10px 12px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  width: 280,
-  maxHeight: "55vh",
-  overflowY: "auto",
-  fontFamily: "system-ui, sans-serif",
-  fontSize: 12,
-};
 
 export function ExcavationPanel() {
   const project = useProjectStore((s) => s.project);
@@ -28,9 +12,7 @@ export function ExcavationPanel() {
   const nowIso = project.modifiedAt;
 
   return (
-    <div style={panelStyle}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Excavations</div>
-
+    <div>
       {project.excavationInstances.map((excavation) => {
         const foundation = project.foundationInstances.find(
           (f) => f.instanceId === excavation.foundationInstanceId
@@ -55,7 +37,7 @@ export function ExcavationPanel() {
                 checked={excavation.visible}
                 onChange={(e) => setExcavationStyle(excavation.id, { visible: e.target.checked })}
               />
-              {foundation.legId}
+              {foundation.displayLabel}
             </label>
             <input
               type="range"

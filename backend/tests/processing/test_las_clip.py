@@ -103,12 +103,51 @@ def test_crs_mismatch_blocks_processing_rather_than_silently_clipping(workspace_
     assert any(w.code == "pointcloud.crs-mismatch" for w in excinfo.value.warnings)
 
 
-def test_missing_file_crs_blocks_processing(workspace_with_fixtures):
+def test_missing_file_crs_is_assumed_isn93_and_clips_successfully_when_it_matches_the_project_crs(
+    workspace_with_fixtures,
+):
+    path = workspace_with_fixtures / "pointcloud-no-crs.las"
+    # base_request()'s default project_crs is already EPSG:3057 -- the same
+    # value assumed for a file with no CRS of its own, so this succeeds.
+    result = clip_las(path, base_request(file_path="pointcloud-no-crs.las"))
+
+    assert result.clipped_point_count == 25  # every point in this fixture is within the default 40x40 clip
+    assert any(w.code == "pointcloud.assumed-crs" for w in result.warnings)
+    assert not any(w.severity == "blocking" for w in result.warnings)
+
+
+def test_missing_file_crs_assumed_isn93_still_blocks_on_a_genuine_mismatch_with_the_project_crs(
+    workspace_with_fixtures,
+):
     path = workspace_with_fixtures / "pointcloud-no-crs.las"
     with pytest.raises(ClipBlockedError) as excinfo:
-        clip_las(path, base_request(file_path="pointcloud-no-crs.las"))
+        clip_las(path, base_request(file_path="pointcloud-no-crs.las", project_crs=CrsEpsg(epsg_code=25832)))
 
-    assert any(w.severity == "blocking" for w in excinfo.value.warnings)
+    # Assuming EPSG:3057 for the file is not the same as ignoring the project's
+    # own declared CRS -- a real conflict between the two must still block.
+    assert any(w.code == "pointcloud.crs-mismatch" for w in excinfo.value.warnings)
+
+
+def test_file_with_no_ground_classification_is_assumed_ground_rather_than_returning_empty(workspace_with_fixtures):
+    path = workspace_with_fixtures / "pointcloud-no-ground-classification.las"
+    result = clip_las(path, base_request(file_path="pointcloud-no-ground-classification.las", classification_filter=[2]))
+
+    assert result.clipped_point_count == 25
+    assert result.returned_point_count == 25
+    assert any(w.code == "pointcloud.assumed-ground-for-clip" for w in result.warnings)
+    # The points' real classification (0) is reported honestly, not rewritten to claim 2.
+    assert {p.classification for p in result.points} == {0}
+
+
+def test_file_with_no_ground_classification_and_a_non_ground_filter_still_reports_empty(workspace_with_fixtures):
+    path = workspace_with_fixtures / "pointcloud-no-ground-classification.las"
+    result = clip_las(path, base_request(file_path="pointcloud-no-ground-classification.las", classification_filter=[5]))
+
+    # The assumption only kicks in for a filter that includes ground -- asking
+    # for vegetation (5) on a file with no ground classification data at all
+    # still correctly comes back empty, not silently reinterpreted as a match.
+    assert result.clipped_point_count == 0
+    assert any(w.code == "pointcloud.clip-empty" for w in result.warnings)
 
 
 def test_rotated_clip_boundary_produces_a_different_point_set_than_axis_aligned(workspace_with_fixtures):
