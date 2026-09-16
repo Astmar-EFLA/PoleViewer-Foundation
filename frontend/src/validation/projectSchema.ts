@@ -20,6 +20,8 @@ const layerStyleSchema = z.object({
 const terrainLayerStyleSchema = layerStyleSchema.extend({
   showPoints: z.boolean(),
   wireframe: z.boolean(),
+  // .default(false) so a project saved before this option existed still opens cleanly.
+  showContours: z.boolean().default(false),
 });
 
 export const projectSchema = z.object({

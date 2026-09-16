@@ -61,17 +61,37 @@ export function nearestPointOnPolyline(
 }
 
 /**
+ * A raw tangent (from a leg-axis pair or a centreline segment) carries no
+ * inherent direction -- it's equally valid read forwards or backwards. This
+ * picks whichever of the two matches "low -> high mast number is forward"
+ * (the user's own stated convention), via a dot-product sign check against
+ * the straight-line direction to/from the neighbouring mast.
+ */
+function orientTangent(tangentRadians: number, forwardReference: number | null): number {
+  if (forwardReference === null) return tangentRadians;
+  const tangent = { e: Math.sin(tangentRadians), n: Math.cos(tangentRadians) };
+  const reference = { e: Math.sin(forwardReference), n: Math.cos(forwardReference) };
+  const dot = tangent.e * reference.e + tangent.n * reference.n;
+  return normalizeRadians(dot >= 0 ? tangentRadians : tangentRadians + Math.PI);
+}
+
+/**
  * The line bearing to use for one mast (row index into `masts`, same order
- * as the CSV = line order low-to-high). With a centreline: projects the
- * mast onto the nearest segment and takes that segment's tangent, oriented
- * to match "low -> high mast number is forward" (the user's own stated
- * convention) via a dot-product sign check against the straight-line
- * direction toward the next mast (or from the previous one, for the last
- * mast) -- the centreline segment itself carries no inherent direction, so
- * this is the only way to know which of its two possible orientations is
- * correct. Without a centreline: falls back to that same straight
- * mast-to-mast bearing directly -- less accurate through a curve or angle
- * tower, but the feature still works without the shapefile.
+ * as the CSV = line order low-to-high), in priority order:
+ *
+ * 1. The mast's own surveyed leg-axis pair (`LineMastRow.legAxis`), when the
+ *    CSV supplies one -- real survey data for this exact tower, so it's the
+ *    most accurate source available and overrides the other two.
+ * 2. A centreline: projects the mast onto the nearest segment and uses that
+ *    segment's tangent -- still an assumption (that the tower is aligned
+ *    with the centreline), but more accurate than a straight mast-to-mast
+ *    line through a curve or angle tower.
+ * 3. The straight mast-to-mast bearing -- the fallback when neither of the
+ *    above is available; the feature still works with just a CSV.
+ *
+ * Both the leg-axis pair and a centreline segment are undirected (see
+ * orientTangent above), so both are oriented against the same
+ * mast-to-mast forward reference before being returned.
  */
 export function bearingForMast(
   masts: readonly LineMastRow[],
@@ -89,15 +109,13 @@ export function bearingForMast(
       ? bearingBetween(previous.position, mast.position)
       : null;
 
+  if (mast.legAxis) {
+    return orientTangent(bearingBetween(mast.legAxis.a, mast.legAxis.b), forwardReference);
+  }
+
   if (centreline && centreline.length >= 2) {
     const nearest = nearestPointOnPolyline(mast.position, centreline);
-    if (nearest) {
-      if (forwardReference === null) return nearest.tangentRadians;
-      const tangent = { e: Math.sin(nearest.tangentRadians), n: Math.cos(nearest.tangentRadians) };
-      const reference = { e: Math.sin(forwardReference), n: Math.cos(forwardReference) };
-      const dot = tangent.e * reference.e + tangent.n * reference.n;
-      return normalizeRadians(dot >= 0 ? nearest.tangentRadians : nearest.tangentRadians + Math.PI);
-    }
+    if (nearest) return orientTangent(nearest.tangentRadians, forwardReference);
   }
 
   return forwardReference ?? 0;

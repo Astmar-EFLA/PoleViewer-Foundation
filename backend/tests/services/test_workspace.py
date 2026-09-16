@@ -19,9 +19,26 @@ def test_resolves_a_nested_relative_path_inside_the_workspace(workspace_root):
     assert resolved == (workspace_root / "uploads" / "2026" / "sample.las").resolve()
 
 
-def test_rejects_an_absolute_path(workspace_root):
+def test_rejects_an_absolute_path_outside_the_workspace(workspace_root):
     with pytest.raises(WorkspacePathError):
         resolve_workspace_path("C:/Windows/System32/config/SAM")
+
+
+def test_accepts_an_absolute_path_that_resolves_inside_the_workspace(workspace_root):
+    # A whole-line CSV exported from a GIS system typically has each mast's
+    # model as an absolute path -- accepted, but only because it already
+    # resolves inside the configured root (the operator pointed
+    # POLE_VIEWER_WORKSPACE_ROOT at that same folder), not as a general
+    # absolute-path allowance.
+    absolute_path = str(workspace_root / "sample.las")
+    resolved = resolve_workspace_path(absolute_path)
+    assert resolved == (workspace_root / "sample.las").resolve()
+
+
+def test_accepts_an_absolute_nested_path_that_resolves_inside_the_workspace(workspace_root):
+    absolute_path = str(workspace_root / "struct" / "All" / "2-BSJ.pol")
+    resolved = resolve_workspace_path(absolute_path)
+    assert resolved == (workspace_root / "struct" / "All" / "2-BSJ.pol").resolve()
 
 
 def test_rejects_dot_dot_traversal_outside_the_workspace(workspace_root):

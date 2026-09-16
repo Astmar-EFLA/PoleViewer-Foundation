@@ -92,6 +92,9 @@ export function TerrainMesh({
         side={THREE.DoubleSide}
         depthWrite={opacity >= 0.999}
         wireframe={wireframe}
+        polygonOffset
+        polygonOffsetFactor={1}
+        polygonOffsetUnits={1}
       />
     </mesh>
   );

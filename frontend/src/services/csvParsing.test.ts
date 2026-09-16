@@ -20,6 +20,7 @@ describe("parseLineMastCsv", () => {
       modelPath: "8-B-BS.pol",
       bearingLayerDepthM: 2.5,
       groundwaterDepthM: 1.8,
+      legAxis: null,
     });
     expect(result.data[1]!.mastName).toBe("9-B-BS");
   });
@@ -62,5 +63,48 @@ describe("parseLineMastCsv", () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data[0]!.mastName).toBe("8-B-BS, revised");
+  });
+
+  it("parses an optional complete leg-axis pair", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,legAEasting,legANorthing,legBEasting,legBNorthing",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,512340.0,487650.0,512350.0,487658.0",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]!.legAxis).toEqual({
+      a: { easting: 512340.0, northing: 487650.0 },
+      b: { easting: 512350.0, northing: 487658.0 },
+    });
+  });
+
+  it("treats leg-axis columns as optional when the header omits them entirely", () => {
+    const result = parseLineMastCsv(VALID_CSV);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]!.legAxis).toBeNull();
+  });
+
+  it("rejects a row with a partial leg-axis set", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,legAEasting,legANorthing,legBEasting,legBNorthing",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,512340.0,487650.0,,",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.errors.some((e) => e.includes("row 2") && e.includes("complete set"))).toBe(true);
+  });
+
+  it("reports a non-numeric leg-axis field, pointing at the exact row", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,legAEasting,legANorthing,legBEasting,legBNorthing",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,not-a-number,487650.0,512350.0,487658.0",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.errors.some((e) => e.includes("row 2") && e.includes("legAEasting"))).toBe(true);
   });
 });

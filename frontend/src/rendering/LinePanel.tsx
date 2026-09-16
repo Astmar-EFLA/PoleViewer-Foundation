@@ -52,7 +52,9 @@ export function LinePanel() {
         <div style={{ opacity: 0.8, marginBottom: 2 }}>Mast list (CSV)</div>
         <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
           One row per mast, in line order (low to high): mastName, easting, northing, elevation, modelPath,
-          bearingLayerDepthM, groundwaterDepthM.
+          bearingLayerDepthM, groundwaterDepthM. Optional: legAEasting, legANorthing, legBEasting, legBNorthing --
+          two surveyed legs along the tower's axis, for exact orientation instead of the centreline/mast-to-mast
+          estimate (leave all four blank to skip; a partial set is rejected).
         </div>
         <button type="button" style={buttonStyle} onClick={() => csvInputRef.current?.click()}>
           Choose line CSV...

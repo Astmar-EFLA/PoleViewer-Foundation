@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+dist-viewer-export/
 build/
 *.tsbuildinfo
 
@@ -31,3 +32,7 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# Local override for start-servers.bat's POLE_VIEWER_WORKSPACE_ROOT --
+# names a real project folder on this machine, never committed.
+workspace-root.local.txt

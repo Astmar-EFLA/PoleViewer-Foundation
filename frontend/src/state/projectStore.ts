@@ -198,6 +198,7 @@ interface ProjectStoreState {
   setLayerOpacity(layer: LayerKey, opacity: number): void;
   setTerrainShowPoints(showPoints: boolean): void;
   setTerrainWireframe(wireframe: boolean): void;
+  setTerrainShowContours(showContours: boolean): void;
   setHover(hover: HoverReadout | null): void;
   regenerateTerrainFromPointCloud(): Promise<void>;
   cancelTerrainRegeneration(): void;
@@ -628,6 +629,19 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           layerStyles: {
             ...state.project.layerStyles,
             terrain: { ...state.project.layerStyles.terrain, wireframe },
+          },
+        },
+      };
+    }),
+  setTerrainShowContours: (showContours) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          layerStyles: {
+            ...state.project.layerStyles,
+            terrain: { ...state.project.layerStyles.terrain, showContours },
           },
         },
       };

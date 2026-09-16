@@ -17,6 +17,7 @@ import { GroundwaterSurface } from "./GroundwaterSurface";
 import { MeasurementMarkers } from "./MeasurementMarkers";
 import { PoleAnchors } from "./PoleAnchors";
 import { PoleMembersMesh } from "./PoleMembersMesh";
+import { TerrainContours } from "./TerrainContours";
 import { TerrainMesh } from "./TerrainMesh";
 
 interface SceneProps {
@@ -158,6 +159,11 @@ export function Scene({ project }: SceneProps) {
             viewerFrame={viewerFrame}
             visible={project.layerStyles.terrain.showPoints}
             opacity={project.layerStyles.terrain.opacity}
+          />
+          <TerrainContours
+            surface={project.terrainSurface}
+            viewerFrame={viewerFrame}
+            visible={project.layerStyles.terrain.showContours}
           />
         </>
       )}

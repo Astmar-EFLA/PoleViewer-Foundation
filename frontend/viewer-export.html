@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pole/Tower Engineering Viewer (exported)</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      body { font-family: system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      Replaced verbatim (this exact tag, by id) with the real project JSON
+      at export time -- see services/exportProjectHtml.ts. Left as `null`
+      here so the *unexported* built template (frontend/public/viewer-export-template.html,
+      produced by `npm run build:viewer-export`) is itself a valid, openable
+      page (empty-state UI) rather than something that only works after
+      string surgery.
+    -->
+    <script id="embedded-project-json" type="application/json">null</script>
+    <script type="module" src="/src/viewer-export/main.tsx"></script>
+  </body>
+</html>

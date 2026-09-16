@@ -13,6 +13,7 @@ function LayerRow({ layerKey, style }: { layerKey: LayerKey; style: ProjectLayer
   const setLayerOpacity = useProjectStore((s) => s.setLayerOpacity);
   const setTerrainShowPoints = useProjectStore((s) => s.setTerrainShowPoints);
   const setTerrainWireframe = useProjectStore((s) => s.setTerrainWireframe);
+  const setTerrainShowContours = useProjectStore((s) => s.setTerrainShowContours);
 
   return (
     <div style={{ marginBottom: 10 }}>
@@ -54,6 +55,14 @@ function LayerRow({ layerKey, style }: { layerKey: LayerKey; style: ProjectLayer
                   onChange={(e) => setTerrainWireframe(e.target.checked)}
                 />
                 Wireframe
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={terrainStyle.showContours}
+                  onChange={(e) => setTerrainShowContours(e.target.checked)}
+                />
+                Contours
               </label>
             </div>
           );

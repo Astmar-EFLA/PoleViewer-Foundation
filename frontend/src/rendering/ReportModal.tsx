@@ -1,10 +1,11 @@
 import type { CSSProperties } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { EngineeringSummary, SummaryBucket } from "../services/engineeringSummary";
 import { buildEngineeringSummary } from "../services/engineeringSummary";
 import type { ExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
 import { computeExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
 import { downloadText } from "../services/browserDownload";
+import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
 import { useProjectStore } from "../state/projectStore";
 import type { ValidationResult, ValidationSeverity } from "../domain/validation";
 import { buildProjectValidationSummary } from "../validation/projectReport";
@@ -128,6 +129,8 @@ export function ReportModal() {
   const project = useProjectStore((s) => s.project);
   const reportOpen = useProjectStore((s) => s.reportOpen);
   const setReportOpen = useProjectStore((s) => s.setReportOpen);
+  const [htmlExportStatus, setHtmlExportStatus] = useState<"idle" | "exporting" | "error">("idle");
+  const [htmlExportError, setHtmlExportError] = useState<string | null>(null);
 
   const nowIso = useMemo(() => new Date().toISOString(), [reportOpen]);
 
@@ -183,7 +186,27 @@ export function ReportModal() {
           >
             Export text
           </button>
+          <button
+            style={buttonStyle}
+            disabled={htmlExportStatus === "exporting"}
+            onClick={async () => {
+              setHtmlExportStatus("exporting");
+              setHtmlExportError(null);
+              try {
+                await exportProjectAsStandaloneHtml(project);
+                setHtmlExportStatus("idle");
+              } catch (error) {
+                setHtmlExportStatus("error");
+                setHtmlExportError((error as Error).message);
+              }
+            }}
+          >
+            {htmlExportStatus === "exporting" ? "Exporting..." : "Export interactive HTML"}
+          </button>
         </div>
+        {htmlExportStatus === "error" && (
+          <div style={{ color: "#c02020", marginTop: -8, marginBottom: 16 }}>{htmlExportError}</div>
+        )}
 
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Material quantities (excavation)</div>
         {materialQuantities.status === "no-terrain-surface" && (

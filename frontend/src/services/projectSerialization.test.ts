@@ -102,7 +102,7 @@ function buildSyntheticProject(): Project {
     layerStyles: {
       pole: { visible: true, opacity: 1 },
       foundations: { visible: true, opacity: 1 },
-      terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false },
+      terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false, showContours: false },
     },
     sections: [
       {

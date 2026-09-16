@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:viewer-export": "vite build --config vite.viewer-export.config.ts && node scripts/copy-viewer-export-template.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --noEmit"
@@ -29,6 +30,7 @@
     "@vitejs/plugin-react": "^4.3.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.9",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^2.1.3"
   }
 }

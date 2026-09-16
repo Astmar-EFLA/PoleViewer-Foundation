@@ -12,12 +12,31 @@ import type { ProjectCoordinate } from "../domain/coordinates";
 import { projectCoordinate } from "../domain/coordinates";
 import type { ParseResult } from "../validation/parseResult";
 
+/** Structurally identical to geometry/centreline.ts's PolylinePoint -- not imported directly to avoid a service->geometry->service cycle. */
+export interface LegAxisPoint {
+  readonly easting: number;
+  readonly northing: number;
+}
+
 export interface LineMastRow {
   readonly mastName: string;
   readonly position: ProjectCoordinate;
   readonly modelPath: string;
   readonly bearingLayerDepthM: number;
   readonly groundwaterDepthM: number;
+  /**
+   * Two surveyed leg coordinates that lie along the tower's longitudinal
+   * axis (any two legs on opposite sides of the mast centre along that
+   * axis -- order doesn't matter, geometry/centreline.ts orients the pair
+   * against the neighbouring mast direction the same way it already
+   * orients a centreline tangent). When present this is the most accurate
+   * source of orientation available -- real survey data, not an assumption
+   * about the tower following the line's centreline or a straight
+   * mast-to-mast bearing -- so it takes priority over both. Null when the
+   * CSV doesn't supply it for this row (all four columns optional; a
+   * partial set is a validation error, not a silent partial guess).
+   */
+  readonly legAxis: { readonly a: LegAxisPoint; readonly b: LegAxisPoint } | null;
 }
 
 const REQUIRED_COLUMNS = [
@@ -29,6 +48,8 @@ const REQUIRED_COLUMNS = [
   "bearingLayerDepthM",
   "groundwaterDepthM",
 ] as const;
+
+const LEG_AXIS_COLUMNS = ["legAEasting", "legANorthing", "legBEasting", "legBNorthing"] as const;
 
 /** Splits one CSV line into fields, honouring double-quoted fields that may contain commas or escaped ("") quotes -- anything beyond that (embedded newlines, alternate delimiters) is out of scope. */
 function splitCsvLine(line: string): string[] {
@@ -67,6 +88,13 @@ function parseRequiredNumber(value: string | undefined, columnName: string, rowN
   return Number.isFinite(parsed) ? parsed : `row ${rowNumber}: "${columnName}" is not a valid number ("${value}")`;
 }
 
+/** Unlike parseRequiredNumber, a blank/missing value is valid here (returns null) -- these columns are optional per row. */
+function parseOptionalNumber(value: string | undefined, columnName: string, rowNumber: number): number | null | string {
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : `row ${rowNumber}: "${columnName}" is not a valid number ("${value}")`;
+}
+
 export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
   const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) {
@@ -91,7 +119,10 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
   for (let i = 1; i < lines.length; i += 1) {
     const rowNumber = i + 1; // 1-based, matching what a spreadsheet would show
     const fields = splitCsvLine(lines[i]!);
-    const get = (column: (typeof REQUIRED_COLUMNS)[number]) => fields[columnIndex.get(column)!];
+    const get = (column: string): string | undefined => {
+      const idx = columnIndex.get(column);
+      return idx === undefined ? undefined : fields[idx];
+    };
 
     const mastName = get("mastName");
     const modelPath = get("modelPath");
@@ -108,6 +139,31 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
       if (typeof v === "string") errors.push(v);
     }
 
+    const legAEasting = parseOptionalNumber(get("legAEasting"), "legAEasting", rowNumber);
+    const legANorthing = parseOptionalNumber(get("legANorthing"), "legANorthing", rowNumber);
+    const legBEasting = parseOptionalNumber(get("legBEasting"), "legBEasting", rowNumber);
+    const legBNorthing = parseOptionalNumber(get("legBNorthing"), "legBNorthing", rowNumber);
+
+    for (const v of [legAEasting, legANorthing, legBEasting, legBNorthing]) {
+      if (typeof v === "string") errors.push(v);
+    }
+
+    const legAxisValues = [legAEasting, legANorthing, legBEasting, legBNorthing];
+    const legAxisProvidedCount = legAxisValues.filter((v) => v !== null).length;
+    let legAxis: LineMastRow["legAxis"] = null;
+    if (legAxisProvidedCount > 0 && legAxisProvidedCount < LEG_AXIS_COLUMNS.length) {
+      errors.push(
+        `row ${rowNumber}: leg axis coordinates (${LEG_AXIS_COLUMNS.join(", ")}) must be given as a complete set or left entirely blank`
+      );
+    } else if (
+      typeof legAEasting === "number" &&
+      typeof legANorthing === "number" &&
+      typeof legBEasting === "number" &&
+      typeof legBNorthing === "number"
+    ) {
+      legAxis = { a: { easting: legAEasting, northing: legANorthing }, b: { easting: legBEasting, northing: legBNorthing } };
+    }
+
     if (
       mastName &&
       modelPath &&
@@ -115,7 +171,8 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
       typeof northing === "number" &&
       typeof elevation === "number" &&
       typeof bearingLayerDepthM === "number" &&
-      typeof groundwaterDepthM === "number"
+      typeof groundwaterDepthM === "number" &&
+      (legAxisProvidedCount === 0 || legAxisProvidedCount === LEG_AXIS_COLUMNS.length)
     ) {
       rows.push({
         mastName,
@@ -123,6 +180,7 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
         modelPath,
         bearingLayerDepthM,
         groundwaterDepthM,
+        legAxis,
       });
     }
   }
