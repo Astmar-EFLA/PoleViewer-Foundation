@@ -75,3 +75,10 @@ ALLOWED_LINE_CENTRELINE_EXTENSIONS = {".zip"}
 
 def check_line_centreline_extension(path: Path) -> None:
     _check_extension(path, ALLOWED_LINE_CENTRELINE_EXTENSIONS, "line-centreline")
+
+
+ALLOWED_ORTHOPHOTO_IMAGE_EXTENSIONS = {".jpg", ".jpeg"}
+
+
+def check_orthophoto_image_extension(path: Path) -> None:
+    _check_extension(path, ALLOWED_ORTHOPHOTO_IMAGE_EXTENSIONS, "orthophoto-image")

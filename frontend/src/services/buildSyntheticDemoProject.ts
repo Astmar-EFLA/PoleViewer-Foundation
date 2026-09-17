@@ -165,10 +165,12 @@ export function buildSyntheticDemoProject(): Project {
     },
     terrainGenerationSettings: DEFAULT_TERRAIN_GENERATION_SETTINGS,
     terrainSurface,
+    orthophoto: null,
     layerStyles: {
       pole: { visible: true, opacity: 1 },
       foundations: { visible: true, opacity: 1 },
       terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false, showContours: false },
+      orthophoto: { visible: false, opacity: 1 },
     },
     sections: buildDefaultSections(),
     measurements: [],

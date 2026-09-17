@@ -128,10 +128,10 @@ fixtures are copied into an isolated per-test workspace.
 - `POST /workspace/file-status` -- SHA-256 + existence check for any
   workspace-relative file (see Workspace above).
 - `POST /workspace/upload` -- multipart file upload (`file` + `kind`:
-  `"pole-model"` or `"point-cloud"`); lets the frontend use a native
-  file-open dialog instead of requiring the file to already sit in the
-  workspace by filename. Validated with the same extension/size checks as
-  the endpoint the uploaded file is destined for; lands under
+  `"pole-model"`, `"point-cloud"`, or `"line-centreline"`); lets the frontend
+  use a native file-open dialog instead of requiring the file to already sit
+  in the workspace by filename. Validated with the same extension/size
+  checks as the endpoint the uploaded file is destined for; lands under
   `workspace/uploads/<uuid>-<original filename>` so two uploads can never
   collide, and the returned `filePath` is then used unmodified by
   `/polemodel/import` or `/pointcloud/inspect`.
@@ -140,6 +140,21 @@ fixtures are copied into an isolated per-test workspace.
   [ADR-012](../docs/architecture/ADR-012-pls-pole-import.md) for the
   anchor-identification heuristic and its limitations; `app/processing/pol_import.py`
   for the parser itself.
+- `POST /line/centreline` -- reads a zipped shapefile bundle
+  (`.shp`/`.shx`/`.dbf`[/`.prj`]) and returns its polyline's vertices in
+  project coordinates. See `app/processing/shapefile_import.py`.
+- `POST /orthophoto/register` -- given a workspace-relative path to a `.jpg`,
+  finds its `.jgw` world file (same basename by default, or an explicit
+  `worldFilePath` when the two don't share a basename, e.g. after a browser
+  upload), and returns the image's pixel dimensions, its raw affine
+  georeferencing coefficients, and a URL for `GET /orthophoto/image`. A
+  world file carries no CRS, so the image is always assumed to already be in
+  the project's CRS -- reported via a non-blocking
+  `orthophoto.assumed-crs-matches-project` warning, never silently. See
+  `app/processing/orthophoto_import.py`.
+- `GET /orthophoto/image?filePath=...` -- streams a registered orthophoto's
+  raw bytes (for use directly as a Three.js texture URL); independently
+  re-validates the path rather than trusting a prior `/register` call.
 
 Not yet implemented (deferred, tracked rather than silently dropped):
 circular clip boundaries, and an algorithmic ground-classification fallback

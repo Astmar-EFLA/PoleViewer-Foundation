@@ -14,6 +14,7 @@ import {
   type BackendUploadResult,
 } from "../validation/backendWorkspaceSchema";
 import { parseCentrelineResult, type BackendCentrelineResult } from "../validation/backendLineSchema";
+import { parseOrthophotoRegisterResult, type BackendOrthophotoRegisterResult } from "../validation/backendOrthophotoSchema";
 import { parsePoleModel } from "../validation/poleModelSchema";
 
 /**
@@ -270,6 +271,32 @@ export async function requestCentreline(
   const parsed = parseCentrelineResult(json);
   if (!parsed.success) {
     throw new BackendRequestError(`Backend centreline response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Registers an orthophoto (.jpg + its .jgw world file, already on the
+ * backend's workspace) for draping onto the terrain TIN. `worldFilePath` is
+ * only needed when the two don't share a basename (e.g. after a browser
+ * upload gave them different uuid-prefixed names) -- otherwise the backend
+ * finds the sidecar itself (see app/api/orthophoto.py).
+ */
+export async function requestOrthophotoRegister(
+  imagePath: string,
+  worldFilePath?: string,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
+): Promise<BackendOrthophotoRegisterResult> {
+  const json = await postJson(
+    "/orthophoto/register",
+    { imagePath, worldFilePath: worldFilePath ?? null },
+    baseUrl,
+    signal
+  );
+  const parsed = parseOrthophotoRegisterResult(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend orthophoto register response failed validation: ${parsed.errors.join("; ")}`);
   }
   return parsed.data;
 }

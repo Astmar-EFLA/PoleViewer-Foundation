@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useState } from "react";
 import { useProjectStore } from "../state/projectStore";
 
 const SEVERITY_COLOUR: Record<string, string> = {
@@ -43,6 +44,10 @@ export function TerrainPanel() {
   const regeneration = useProjectStore((s) => s.terrainRegeneration);
   const regenerate = useProjectStore((s) => s.regenerateTerrainFromPointCloud);
   const cancelRegeneration = useProjectStore((s) => s.cancelTerrainRegeneration);
+  const orthophoto = useProjectStore((s) => s.project?.orthophoto);
+  const orthophotoRegistration = useProjectStore((s) => s.orthophotoRegistration);
+  const registerOrthophoto = useProjectStore((s) => s.registerOrthophoto);
+  const [imagePathInput, setImagePathInput] = useState("");
 
   if (!pointCloudSource || !clipBoundary) return null;
 
@@ -73,6 +78,46 @@ export function TerrainPanel() {
           value={(clipBoundary.rotationRadians * 180) / Math.PI}
           onChange={(v) => setClipBoundary({ rotationRadians: (v * Math.PI) / 180 })}
         />
+      </div>
+
+      <div style={clipFieldsStyle}>
+        <div style={{ opacity: 0.8, marginBottom: 2 }}>Orthophoto (.jpg, with a matching .jgw beside it)</div>
+        <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
+          Workspace-relative or absolute path, same convention as a mast model's path. A world file carries no CRS
+          -- the image is assumed to already be in the project's CRS.
+        </div>
+        {orthophoto && (
+          <div style={{ opacity: 0.75, marginBottom: 4, wordBreak: "break-all" }}>
+            Current: {orthophoto.imagePath} ({orthophoto.imageWidthPx}x{orthophoto.imageHeightPx}px)
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+          <input
+            type="text"
+            value={imagePathInput}
+            onChange={(e) => setImagePathInput(e.target.value)}
+            placeholder="orthophoto.jpg"
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <button
+            type="button"
+            disabled={orthophotoRegistration.status === "loading" || !imagePathInput.trim()}
+            onClick={() => void registerOrthophoto(imagePathInput.trim())}
+            style={{ padding: "4px 8px", cursor: "pointer" }}
+          >
+            {orthophotoRegistration.status === "loading" ? "Registering..." : "Register"}
+          </button>
+        </div>
+        {orthophotoRegistration.status === "error" && (
+          <div style={{ color: "#c02020" }}>{orthophotoRegistration.errorMessage}</div>
+        )}
+        {orthophotoRegistration.warnings.length > 0 && (
+          <ul style={{ margin: "4px 0 0", paddingLeft: 16, color: "#c98a12" }}>
+            {orthophotoRegistration.warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 4 }}>

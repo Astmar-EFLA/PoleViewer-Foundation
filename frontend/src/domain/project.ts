@@ -3,6 +3,7 @@ import type { ExcavationInstance } from "./excavation";
 import type { FoundationInstance } from "./foundation";
 import type { GeotechLayer, Groundwater } from "./geotech";
 import type { Measurement } from "./measurement";
+import type { OrthophotoReference } from "./orthophoto";
 import type { PoleModel } from "./poleModel";
 import type { PointCloudSourceReference, TerrainGenerationSettings } from "./pointCloud";
 import type { SectionDefinition } from "./section";
@@ -40,6 +41,7 @@ export interface ProjectLayerStyles {
   readonly pole: LayerStyle;
   readonly foundations: LayerStyle;
   readonly terrain: TerrainLayerStyle;
+  readonly orthophoto: LayerStyle;
 }
 
 export interface Project {
@@ -66,6 +68,7 @@ export interface Project {
   readonly pointCloudSource: PointCloudSourceReference | null;
   readonly terrainGenerationSettings: TerrainGenerationSettings;
   readonly terrainSurface: TerrainSurface | null;
+  readonly orthophoto: OrthophotoReference | null;
   readonly layerStyles: ProjectLayerStyles;
   readonly sections: readonly SectionDefinition[];
   readonly measurements: readonly Measurement[];

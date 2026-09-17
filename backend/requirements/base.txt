@@ -21,3 +21,6 @@ pyshp>=2.3,<3.0
 # code -- CRS-database matching, not string parsing, is why this needs a
 # real library rather than a regex over the WKT text.
 pyproj>=3.6,<4.0
+# Orthophoto registration (app/processing/orthophoto_import.py) -- reads
+# image dimensions from the JPEG header without decoding the full image.
+Pillow>=10.0,<11.0

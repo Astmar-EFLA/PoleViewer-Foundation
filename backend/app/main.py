@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.line import router as line_router
+from app.api.orthophoto import router as orthophoto_router
 from app.api.pointcloud import router as pointcloud_router
 from app.api.polemodel import router as polemodel_router
 from app.api.workspace import router as workspace_router
@@ -36,6 +37,7 @@ app.include_router(pointcloud_router)
 app.include_router(polemodel_router)
 app.include_router(workspace_router)
 app.include_router(line_router)
+app.include_router(orthophoto_router)
 
 
 @app.get("/health")

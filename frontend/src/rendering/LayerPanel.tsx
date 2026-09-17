@@ -6,6 +6,7 @@ const LAYER_LABELS: Record<LayerKey, string> = {
   pole: "Pole / anchors",
   foundations: "Foundations",
   terrain: "Terrain",
+  orthophoto: "Orthophoto",
 };
 
 function LayerRow({ layerKey, style }: { layerKey: LayerKey; style: ProjectLayerStyles[LayerKey] }) {

@@ -28,6 +28,7 @@ import {
   requestCentreline,
   requestFileStatus,
   requestInspect,
+  requestOrthophotoRegister,
   requestPoleModelImport,
   requestUpload,
 } from "../services/backendClient";
@@ -124,6 +125,14 @@ export interface PointCloudRegistrationState {
 
 const IDLE_POINT_CLOUD_REGISTRATION: PointCloudRegistrationState = { status: "idle", errorMessage: null };
 
+export interface OrthophotoRegistrationState {
+  readonly status: "idle" | "loading" | "success" | "error";
+  readonly warnings: readonly string[];
+  readonly errorMessage: string | null;
+}
+
+const IDLE_ORTHOPHOTO_REGISTRATION: OrthophotoRegistrationState = { status: "idle", warnings: [], errorMessage: null };
+
 /**
  * A whole-line import: the CSV mast list plus (optionally) the centreline
  * shapefile, kept as session-only UI state -- never part of the saved
@@ -175,10 +184,12 @@ interface ProjectStoreState {
   readonly assetStatusController: AbortController | null;
   readonly poleModelImport: PoleModelImportState;
   readonly pointCloudRegistration: PointCloudRegistrationState;
+  readonly orthophotoRegistration: OrthophotoRegistrationState;
   readonly lineImport: LineImportState;
   importPoleModel(filePath: string, baseUrl?: string): Promise<void>;
   importPoleModelFromFile(file: File, baseUrl?: string): Promise<void>;
   registerPointCloudFromFile(file: File, baseUrl?: string): Promise<void>;
+  registerOrthophoto(imagePath: string, worldFilePath?: string, baseUrl?: string): Promise<void>;
   importLineCsv(file: File): Promise<void>;
   importLineCentreline(file: File, baseUrl?: string): Promise<void>;
   selectLineMast(index: number, baseUrl?: string): Promise<void>;
@@ -271,6 +282,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   assetStatusController: null,
   poleModelImport: IDLE_POLE_MODEL_IMPORT,
   pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
+  orthophotoRegistration: IDLE_ORTHOPHOTO_REGISTRATION,
   lineImport: IDLE_LINE_IMPORT,
   importPoleModel: async (filePath, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
     const project = get().project;
@@ -359,6 +371,43 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       const message =
         error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
       set({ pointCloudRegistration: { status: "error", errorMessage: message } });
+    }
+  },
+  registerOrthophoto: async (imagePath, worldFilePath, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    if (!get().project) return;
+    set({ orthophotoRegistration: { status: "loading", warnings: [], errorMessage: null } });
+    try {
+      const result = await requestOrthophotoRegister(imagePath, worldFilePath, baseUrl);
+      const nowIso = new Date().toISOString();
+      set((state) => {
+        if (!state.project) return {};
+        return {
+          project: {
+            ...state.project,
+            orthophoto: {
+              imagePath,
+              imageUrl: result.imageUrl,
+              imageWidthPx: result.imageWidthPx,
+              imageHeightPx: result.imageHeightPx,
+              worldFile: result.worldFile,
+            },
+            layerStyles: {
+              ...state.project.layerStyles,
+              orthophoto: { ...state.project.layerStyles.orthophoto, visible: true },
+            },
+            modifiedAt: nowIso,
+          },
+          orthophotoRegistration: {
+            status: "success",
+            warnings: result.warnings.map((w) => w.message),
+            errorMessage: null,
+          },
+        };
+      });
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ orthophotoRegistration: { status: "error", warnings: [], errorMessage: message } });
     }
   },
   importLineCsv: async (file) => {
@@ -566,6 +615,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       projectFileLoad: IDLE_PROJECT_FILE_LOAD,
       poleModelImport: IDLE_POLE_MODEL_IMPORT,
       pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
+      orthophotoRegistration: IDLE_ORTHOPHOTO_REGISTRATION,
       lineImport: IDLE_LINE_IMPORT,
     });
   },
@@ -579,6 +629,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       projectFileLoad: IDLE_PROJECT_FILE_LOAD,
       poleModelImport: IDLE_POLE_MODEL_IMPORT,
       pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
+      orthophotoRegistration: IDLE_ORTHOPHOTO_REGISTRATION,
       lineImport: IDLE_LINE_IMPORT,
     }),
   setLayerVisible: (layer, visible) =>

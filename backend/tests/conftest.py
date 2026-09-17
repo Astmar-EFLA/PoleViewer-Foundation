@@ -10,6 +10,8 @@ FIXTURE_FILES = [
     "pointcloud-no-ground-classification.las",
     "pole-model-2leg.pol",
     "line-centreline.zip",
+    "orthophoto.jpg",
+    "orthophoto.jgw",
 ]
 
 

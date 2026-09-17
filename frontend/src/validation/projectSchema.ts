@@ -24,6 +24,23 @@ const terrainLayerStyleSchema = layerStyleSchema.extend({
   showContours: z.boolean().default(false),
 });
 
+const orthophotoWorldFileSchema = z.object({
+  pixelSizeX: z.number().finite(),
+  rotationY: z.number().finite(),
+  rotationX: z.number().finite(),
+  pixelSizeY: z.number().finite(),
+  upperLeftX: z.number().finite(),
+  upperLeftY: z.number().finite(),
+});
+
+const orthophotoReferenceSchema = z.object({
+  imagePath: z.string().min(1),
+  imageUrl: z.string().min(1),
+  imageWidthPx: z.number().int().positive(),
+  imageHeightPx: z.number().int().positive(),
+  worldFile: orthophotoWorldFileSchema,
+});
+
 export const projectSchema = z.object({
   schemaVersion: z.string().min(1),
   appVersion: z.string().min(1),
@@ -46,10 +63,14 @@ export const projectSchema = z.object({
   pointCloudSource: pointCloudSourceReferenceSchema.nullable(),
   terrainGenerationSettings: terrainGenerationSettingsSchema,
   terrainSurface: terrainSurfaceSchema.nullable(),
+  // .nullable().default(null) so a project saved before this feature existed still opens cleanly.
+  orthophoto: orthophotoReferenceSchema.nullable().default(null),
   layerStyles: z.object({
     pole: layerStyleSchema,
     foundations: layerStyleSchema,
     terrain: terrainLayerStyleSchema,
+    // .default(...) so a project saved before this option existed still opens cleanly.
+    orthophoto: layerStyleSchema.default({ visible: false, opacity: 1 }),
   }),
   sections: z.array(sectionDefinitionSchema),
   measurements: z.array(measurementSchema),

@@ -147,9 +147,12 @@ export function Scene({ project }: SceneProps) {
           <TerrainMesh
             surface={project.terrainSurface}
             viewerFrame={viewerFrame}
+            localFrame={localFrame}
             visible={project.layerStyles.terrain.visible}
             opacity={project.layerStyles.terrain.opacity}
             wireframe={project.layerStyles.terrain.wireframe}
+            orthophoto={project.orthophoto}
+            showOrthophoto={project.layerStyles.orthophoto.visible}
             onHoverLocalXY={handleTerrainHover}
             onHoverEnd={() => setHover(null)}
             onPickLocalXY={handleTerrainPick}
