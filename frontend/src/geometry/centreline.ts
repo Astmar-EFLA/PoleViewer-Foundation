@@ -60,19 +60,20 @@ export function nearestPointOnPolyline(
   return best;
 }
 
+function dot(a: number, b: number): number {
+  return Math.sin(a) * Math.sin(b) + Math.cos(a) * Math.cos(b);
+}
+
 /**
- * A raw tangent (from a leg-axis pair or a centreline segment) carries no
- * inherent direction -- it's equally valid read forwards or backwards. This
- * picks whichever of the two matches "low -> high mast number is forward"
- * (the user's own stated convention), via a dot-product sign check against
- * the straight-line direction to/from the neighbouring mast.
+ * A raw tangent from a centreline segment carries no inherent direction --
+ * it's equally valid read forwards or backwards. This picks whichever of
+ * the two matches "low -> high mast number is forward" (the user's own
+ * stated convention), via a dot-product sign check against the
+ * straight-line direction to/from the neighbouring mast.
  */
 function orientTangent(tangentRadians: number, forwardReference: number | null): number {
   if (forwardReference === null) return tangentRadians;
-  const tangent = { e: Math.sin(tangentRadians), n: Math.cos(tangentRadians) };
-  const reference = { e: Math.sin(forwardReference), n: Math.cos(forwardReference) };
-  const dot = tangent.e * reference.e + tangent.n * reference.n;
-  return normalizeRadians(dot >= 0 ? tangentRadians : tangentRadians + Math.PI);
+  return normalizeRadians(dot(tangentRadians, forwardReference) >= 0 ? tangentRadians : tangentRadians + Math.PI);
 }
 
 /**
@@ -81,17 +82,32 @@ function orientTangent(tangentRadians: number, forwardReference: number | null):
  *
  * 1. The mast's own surveyed leg-axis pair (`LineMastRow.legAxis`), when the
  *    CSV supplies one -- real survey data for this exact tower, so it's the
- *    most accurate source available and overrides the other two.
+ *    most accurate source available and overrides the other two. Used
+ *    *directly*, with no forwards/backwards disambiguation at all: unlike a
+ *    centreline tangent, `legAxis.a -> legAxis.b`'s bearing is not
+ *    ambiguous, because legA/legB order is a required, meaningful
+ *    convention (see LineMastRow.legAxis's own docstring) tied to the
+ *    imported pole model's own local frame -- confirmed against 6 real,
+ *    geographically-spread mast models on this line, every one placing its
+ *    "LP" leg at local (0, -y) and "RP" at local (0, +y), i.e. exactly
+ *    local +Y (== modelOrientationRadians away from "no rotation") points
+ *    from LP to RP. With modelOrientationRadians at its default (0) for
+ *    every one of those imports, world bearing(LP -> RP) *is*
+ *    lineBearingRadians, exactly, with nothing left to resolve. (An earlier
+ *    version of this function tried to orient the raw leg-axis tangent
+ *    against the straight mast-to-mast bearing, on the mistaken assumption
+ *    that the leg pair was longitudinal, not transverse -- that produced a
+ *    consistent 90-degree error against this real dataset, since "closest
+ *    to mast-to-mast" is the wrong criterion entirely once the pair is
+ *    known to be transverse and the order is known to be meaningful.)
  * 2. A centreline: projects the mast onto the nearest segment and uses that
  *    segment's tangent -- still an assumption (that the tower is aligned
  *    with the centreline), but more accurate than a straight mast-to-mast
- *    line through a curve or angle tower.
+ *    line through a curve or angle tower. Oriented via orientTangent
+ *    (forwards/backwards only -- a centreline segment's direction is
+ *    genuinely undirected, unlike a leg-axis pair's).
  * 3. The straight mast-to-mast bearing -- the fallback when neither of the
  *    above is available; the feature still works with just a CSV.
- *
- * Both the leg-axis pair and a centreline segment are undirected (see
- * orientTangent above), so both are oriented against the same
- * mast-to-mast forward reference before being returned.
  */
 export function bearingForMast(
   masts: readonly LineMastRow[],
@@ -101,6 +117,10 @@ export function bearingForMast(
   const mast = masts[index];
   if (!mast) return 0;
 
+  if (mast.legAxis) {
+    return bearingBetween(mast.legAxis.a, mast.legAxis.b);
+  }
+
   const next = masts[index + 1] ?? null;
   const previous = masts[index - 1] ?? null;
   const forwardReference = next
@@ -108,10 +128,6 @@ export function bearingForMast(
     : previous
       ? bearingBetween(previous.position, mast.position)
       : null;
-
-  if (mast.legAxis) {
-    return orientTangent(bearingBetween(mast.legAxis.a, mast.legAxis.b), forwardReference);
-  }
 
   if (centreline && centreline.length >= 2) {
     const nearest = nearestPointOnPolyline(mast.position, centreline);

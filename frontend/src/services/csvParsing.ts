@@ -25,16 +25,26 @@ export interface LineMastRow {
   readonly bearingLayerDepthM: number;
   readonly groundwaterDepthM: number;
   /**
-   * Two surveyed leg coordinates that lie along the tower's longitudinal
-   * axis (any two legs on opposite sides of the mast centre along that
-   * axis -- order doesn't matter, geometry/centreline.ts orients the pair
-   * against the neighbouring mast direction the same way it already
-   * orients a centreline tangent). When present this is the most accurate
-   * source of orientation available -- real survey data, not an assumption
-   * about the tower following the line's centreline or a straight
-   * mast-to-mast bearing -- so it takes priority over both. Null when the
-   * CSV doesn't supply it for this row (all four columns optional; a
-   * partial set is a validation error, not a silent partial guess).
+   * Two surveyed leg coordinates used directly as the tower's orientation
+   * (geometry/centreline.ts's bearingForMast: bearing = bearingBetween(a,
+   * b), no further disambiguation). Order is a REQUIRED, meaningful
+   * convention, not an arbitrary pair: `a` must be the world position of
+   * the leg the imported pole model places at local (0, negative-Y) --
+   * "LP" for this line's guyed H-frame structures -- and `b` the leg at
+   * local (0, positive-Y) -- "RP". Confirmed against 6 real,
+   * geographically-spread mast models: every one places LP/RP exactly on
+   * local +/-Y with modelOrientationRadians at its default (0), so world
+   * bearing(a -> b) *is* the correct lineBearingRadians with nothing left
+   * to resolve. Getting a/b backwards introduces an exact 180-degree
+   * error; supplying legs that *aren't* the model's own local Y pair (e.g.
+   * a transverse pair on a differently-labelled structure) will silently
+   * produce a wrong bearing, since there is no way to detect that from the
+   * coordinates alone. When present this is the most accurate source of
+   * orientation available -- real survey data, not an assumption about
+   * the tower following the line's centreline or a straight mast-to-mast
+   * bearing -- so it takes priority over both. Null when the CSV doesn't
+   * supply it for this row (all four columns optional; a partial set is a
+   * validation error, not a silent partial guess).
    */
   readonly legAxis: { readonly a: LegAxisPoint; readonly b: LegAxisPoint } | null;
 }

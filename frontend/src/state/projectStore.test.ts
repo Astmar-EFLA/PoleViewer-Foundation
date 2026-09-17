@@ -196,6 +196,31 @@ describe("excavation bottom / foundation base elevation stay locked together", (
   });
 });
 
+describe("setPoleModelHeightOffset", () => {
+  it("moves the pole model and re-solves every foundation's base elevation (and its excavation's bottom) to follow the raised/lowered anchors", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const before = useProjectStore.getState().project!;
+    const foundationsBefore = before.foundationInstances;
+    const newZ = before.poleModel.localOrigin.z + 2.5;
+
+    useProjectStore.getState().setPoleModelHeightOffset(newZ);
+
+    const after = useProjectStore.getState().project!;
+    expect(after.poleModel.localOrigin.z).toBe(newZ);
+
+    for (const foundationBefore of foundationsBefore) {
+      const foundationAfter = after.foundationInstances.find((f) => f.instanceId === foundationBefore.instanceId)!;
+      expect(foundationAfter.baseElevation).toBeCloseTo(foundationBefore.baseElevation + 2.5, 9);
+      // Horizontal placement and type/parameters are untouched -- only the anchor's own vertical move.
+      expect(foundationAfter.position).toEqual(foundationBefore.position);
+      expect(foundationAfter.foundationTypeId).toBe(foundationBefore.foundationTypeId);
+
+      const excavationAfter = after.excavationInstances.find((e) => e.foundationInstanceId === foundationAfter.instanceId);
+      if (excavationAfter) expect(excavationAfter.bottomElevationM).toBe(foundationAfter.baseElevation);
+    }
+  });
+});
+
 describe("whole-line import", () => {
   const CSV = [
     "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM",

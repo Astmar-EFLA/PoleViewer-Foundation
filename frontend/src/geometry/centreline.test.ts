@@ -87,11 +87,14 @@ describe("bearingForMast", () => {
     expect(bearingForMast(masts, centreline, 1)).toBeCloseTo(0, 9); // still resolves to "forward" (north)
   });
 
-  it("prefers a mast's own leg-axis pair over a centreline", () => {
-    // Legs sit east-west (perpendicular to the line) in this synthetic case
-    // purely to prove leg-axis wins over the centreline below, not to model
-    // a realistic tower -- the centreline here points due north (matching
-    // mast order) while the leg axis points due east/west.
+  it("prefers a mast's own leg-axis pair over a centreline, using it directly with no disambiguation", () => {
+    // Legs sit east-west here, deliberately *not* matching the north-pointing
+    // centreline/mast order below -- proving legAxis wins outright, not
+    // "wins after being reconciled with the other sources." (Real leg pairs
+    // for this line's structures are transverse to the true line direction,
+    // which is exactly why no attempt is made to reconcile the two: see
+    // bearingForMast's docstring for the real-world bug an earlier,
+    // reconciling version of this had.)
     const legAxisMasts = [
       mast("A", 0, 0),
       mast("B", 0, 10, { a: { easting: -5, northing: 10 }, b: { easting: 5, northing: 10 } }),
@@ -101,19 +104,21 @@ describe("bearingForMast", () => {
       { easting: 0, northing: -5 },
       { easting: 0, northing: 25 },
     ];
-    // Leg axis A->B runs due east (pi/2) or due west (3pi/2); oriented
-    // against the mast-to-mast forward reference (due north, ambiguous re:
-    // east/west) picks whichever has a non-negative dot product -- east.
-    expect(bearingForMast(legAxisMasts, centreline, 1)).toBeCloseTo(Math.PI / 2, 9);
+    expect(bearingForMast(legAxisMasts, centreline, 1)).toBeCloseTo(Math.PI / 2, 9); // due east, straight from a -> b
   });
 
-  it("orients a leg-axis pair regardless of which leg is listed first", () => {
+  it("a leg-axis pair's bearing depends on a/b order -- reversed gives the opposite (180-degree-wrong) direction", () => {
+    // legA/legB order is a required convention (a = "LP", b = "RP"), not an
+    // arbitrary pair -- getting it backwards must actually change the
+    // result, not self-correct, so a swapped CSV is caught by inspection
+    // (e.g. comparing against the straight mast-to-mast bearing) rather
+    // than silently producing the same answer either way.
     const forward = mast("B", 0, 10, { a: { easting: -5, northing: 10 }, b: { easting: 5, northing: 12 } });
     const reversed = mast("B", 0, 10, { a: { easting: 5, northing: 12 }, b: { easting: -5, northing: 10 } });
     const others = [mast("A", 0, 0), mast("C", 0, 20)];
 
     const forwardBearing = bearingForMast([others[0]!, forward, others[1]!], null, 1);
     const reversedBearing = bearingForMast([others[0]!, reversed, others[1]!], null, 1);
-    expect(reversedBearing).toBeCloseTo(forwardBearing, 9);
+    expect(reversedBearing).toBeCloseTo(forwardBearing + Math.PI, 9);
   });
 });

@@ -1,0 +1,73 @@
+[
+  {
+    "foundationTypeId": "rectangular-pad-pedestal-v1",
+    "name": "Rectangular pad with pedestal",
+    "description": "A rectangular spread footing with a rectangular pedestal rising to the leg connection.",
+    "geometryType": "rectangular-pad-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-pedestal",
+      "padWidth": 1.8,
+      "padLength": 1.8,
+      "padThickness": 0.5,
+      "pedestalWidth": 0.5,
+      "pedestalLength": 0.5,
+      "pedestalHeight": 0.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "library-default",
+      "verificationState": "unverified",
+      "notes": "Placeholder library dimensions; not a verified design."
+    }
+  },
+  {
+    "foundationTypeId": "stepped-rectangular-v1",
+    "name": "Stepped rectangular foundation",
+    "description": "A rectangular footing built from successively narrower stacked tiers.",
+    "geometryType": "stepped-rectangular",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "stepped-rectangular",
+      "steps": [
+        { "width": 2.2, "length": 2.2, "height": 0.4 },
+        { "width": 1.4, "length": 1.4, "height": 0.4 },
+        { "width": 0.6, "length": 0.6, "height": 0.6 }
+      ]
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "library-default",
+      "verificationState": "unverified",
+      "notes": "Placeholder library dimensions; not a verified design."
+    }
+  },
+  {
+    "foundationTypeId": "guy-anchor-block-v1",
+    "name": "Guy anchor block (buried)",
+    "description": "A buried rectangular anchor block for a guy/stay attachment point (reuses the pad-pedestal geometry as a simple placeholder shape).",
+    "geometryType": "rectangular-pad-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-pedestal",
+      "padWidth": 1.0,
+      "padLength": 1.0,
+      "padThickness": 0.6,
+      "pedestalWidth": 0.4,
+      "pedestalLength": 0.4,
+      "pedestalHeight": 0.2
+    },
+    "defaultColour": "#7a6a52",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "library-default",
+      "verificationState": "unverified",
+      "notes": "Placeholder library dimensions; not a verified design."
+    }
+  }
+]

@@ -195,7 +195,7 @@ describe("buildSectionPlane", () => {
       layerStyles: {
         pole: { visible: true, opacity: 1 },
         foundations: { visible: true, opacity: 1 },
-        terrain: { visible: true, opacity: 1, showPoints: false, wireframe: false, showContours: false },
+        terrain: { visible: true, opacity: 1, showPoints: false, wireframe: false, showContours: false, contourIntervalM: null },
         orthophoto: { visible: false, opacity: 1 },
       },
       sections: [],
@@ -264,7 +264,7 @@ describe("generateSectionResult", () => {
       layerStyles: {
         pole: { visible: true, opacity: 1 },
         foundations: { visible: true, opacity: 1 },
-        terrain: { visible: true, opacity: 1, showPoints: false, wireframe: false, showContours: false },
+        terrain: { visible: true, opacity: 1, showPoints: false, wireframe: false, showContours: false, contourIntervalM: null },
         orthophoto: { visible: false, opacity: 1 },
       },
       sections: [],

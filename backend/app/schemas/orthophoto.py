@@ -1,10 +1,13 @@
 """
 Request/response schemas for orthophoto registration
-(app/processing/orthophoto_import.py, POST /orthophoto/register).
+(app/processing/orthophoto_import.py, POST /orthophoto/register) and for
+fetching a world-imagery-backed one (app/processing/world_imagery.py,
+POST /orthophoto/world-imagery).
 """
 
 from __future__ import annotations
 
+from app.domain.coordinates import CoordinateReferenceSystem
 from app.schemas.camel_model import CamelModel
 from app.schemas.pointcloud import ProcessingWarning
 
@@ -16,6 +19,15 @@ class OrthophotoRegisterRequest(CamelModel):
     # convention) -- an explicit path is only needed when that convention
     # doesn't hold (e.g. mismatched names after a browser upload).
     world_file_path: str | None = None
+
+
+class WorldImageryRequest(CamelModel):
+    centre_easting: float
+    centre_northing: float
+    project_crs: CoordinateReferenceSystem
+    width_m: float = 400.0
+    height_m: float = 400.0
+    zoom: int = 18
 
 
 class OrthophotoWorldFile(CamelModel):

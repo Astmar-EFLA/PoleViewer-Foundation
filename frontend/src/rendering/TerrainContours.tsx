@@ -12,6 +12,8 @@ interface TerrainContoursProps {
   readonly surface: TerrainSurface;
   readonly viewerFrame: ViewerFrameDefinition;
   readonly visible: boolean;
+  /** null (or omitted) picks a round interval automatically from the surface's elevation range (see geometry/contours.ts's chooseContourInterval); a positive number overrides it, e.g. the user asking for exactly 0.5m or 1m lines. */
+  readonly intervalM?: number | null;
   readonly color?: string;
   readonly indexColor?: string;
 }
@@ -53,10 +55,14 @@ export function TerrainContours({
   surface,
   viewerFrame,
   visible,
+  intervalM = null,
   color = "#4a3b1f",
   indexColor = "#2a2210",
 }: TerrainContoursProps) {
-  const contours = useMemo(() => generateContours(surface), [surface]);
+  const contours = useMemo(
+    () => generateContours(surface, intervalM ?? undefined),
+    [surface, intervalM]
+  );
   const minorSegments = useMemo(() => contours.segments.filter((s) => !s.isIndex), [contours]);
   const indexSegments = useMemo(() => contours.segments.filter((s) => s.isIndex), [contours]);
 

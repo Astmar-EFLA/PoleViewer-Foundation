@@ -15,6 +15,7 @@ function LayerRow({ layerKey, style }: { layerKey: LayerKey; style: ProjectLayer
   const setTerrainShowPoints = useProjectStore((s) => s.setTerrainShowPoints);
   const setTerrainWireframe = useProjectStore((s) => s.setTerrainWireframe);
   const setTerrainShowContours = useProjectStore((s) => s.setTerrainShowContours);
+  const setTerrainContourInterval = useProjectStore((s) => s.setTerrainContourInterval);
 
   return (
     <div style={{ marginBottom: 10 }}>
@@ -40,7 +41,7 @@ function LayerRow({ layerKey, style }: { layerKey: LayerKey; style: ProjectLayer
         (() => {
           const terrainStyle = style as TerrainLayerStyle;
           return (
-            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
                 <input
                   type="checkbox"
@@ -65,6 +66,24 @@ function LayerRow({ layerKey, style }: { layerKey: LayerKey; style: ProjectLayer
                 />
                 Contours
               </label>
+              {terrainStyle.showContours && (
+                <select
+                  value={terrainStyle.contourIntervalM ?? "auto"}
+                  onChange={(e) =>
+                    setTerrainContourInterval(e.target.value === "auto" ? null : Number(e.target.value))
+                  }
+                  style={{ fontSize: 12 }}
+                >
+                  <option value="auto">Auto interval</option>
+                  <option value="0.1">0.1 m</option>
+                  <option value="0.25">0.25 m</option>
+                  <option value="0.5">0.5 m</option>
+                  <option value="1">1 m</option>
+                  <option value="2">2 m</option>
+                  <option value="5">5 m</option>
+                  <option value="10">10 m</option>
+                </select>
+              )}
             </div>
           );
         })()}

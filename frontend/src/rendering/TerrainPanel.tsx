@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useProjectStore } from "../state/projectStore";
 
 const SEVERITY_COLOUR: Record<string, string> = {
@@ -46,10 +46,29 @@ export function TerrainPanel() {
   const cancelRegeneration = useProjectStore((s) => s.cancelTerrainRegeneration);
   const orthophoto = useProjectStore((s) => s.project?.orthophoto);
   const orthophotoRegistration = useProjectStore((s) => s.orthophotoRegistration);
-  const registerOrthophoto = useProjectStore((s) => s.registerOrthophoto);
-  const [imagePathInput, setImagePathInput] = useState("");
+  const registerOrthophotoFromFiles = useProjectStore((s) => s.registerOrthophotoFromFiles);
+  const fetchWorldImageryOrthophoto = useProjectStore((s) => s.fetchWorldImageryOrthophoto);
+  const [orthophotoSelectionError, setOrthophotoSelectionError] = useState<string | null>(null);
+  const orthophotoFileInputRef = useRef<HTMLInputElement>(null);
+  const [worldImageryWidthM, setWorldImageryWidthM] = useState(400);
+  const [worldImageryHeightM, setWorldImageryHeightM] = useState(400);
 
   if (!pointCloudSource || !clipBoundary) return null;
+
+  async function handleOrthophotoFilesChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    const imageFile = files.find((f) => /\.jpe?g$/i.test(f.name));
+    const worldFile = files.find((f) => /\.jgw$/i.test(f.name));
+    if (files.length !== 2 || !imageFile || !worldFile) {
+      setOrthophotoSelectionError("Select exactly one .jpg (or .jpeg) and its matching .jgw world file together.");
+      return;
+    }
+    setOrthophotoSelectionError(null);
+    await registerOrthophotoFromFiles(imageFile, worldFile);
+  }
 
   return (
     <div>
@@ -81,35 +100,36 @@ export function TerrainPanel() {
       </div>
 
       <div style={clipFieldsStyle}>
-        <div style={{ opacity: 0.8, marginBottom: 2 }}>Orthophoto (.jpg, with a matching .jgw beside it)</div>
+        <div style={{ opacity: 0.8, marginBottom: 2 }}>Orthophoto</div>
         <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
-          Workspace-relative or absolute path, same convention as a mast model's path. A world file carries no CRS
-          -- the image is assumed to already be in the project's CRS.
+          Pick a .jpg and its matching .jgw world file together (ctrl/shift-click both in the file dialog). Uploaded
+          into the backend's workspace, so it works regardless of which folder is currently configured as the
+          workspace root. A world file carries no CRS -- the image is assumed to already be in the project's CRS.
         </div>
         {orthophoto && (
           <div style={{ opacity: 0.75, marginBottom: 4, wordBreak: "break-all" }}>
             Current: {orthophoto.imagePath} ({orthophoto.imageWidthPx}x{orthophoto.imageHeightPx}px)
           </div>
         )}
-        <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-          <input
-            type="text"
-            value={imagePathInput}
-            onChange={(e) => setImagePathInput(e.target.value)}
-            placeholder="orthophoto.jpg"
-            style={{ flex: 1, minWidth: 0 }}
-          />
-          <button
-            type="button"
-            disabled={orthophotoRegistration.status === "loading" || !imagePathInput.trim()}
-            onClick={() => void registerOrthophoto(imagePathInput.trim())}
-            style={{ padding: "4px 8px", cursor: "pointer" }}
-          >
-            {orthophotoRegistration.status === "loading" ? "Registering..." : "Register"}
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={orthophotoRegistration.status === "loading"}
+          onClick={() => orthophotoFileInputRef.current?.click()}
+          style={{ padding: "4px 8px", cursor: "pointer" }}
+        >
+          {orthophotoRegistration.status === "loading" ? "Uploading..." : "Choose orthophoto files (.jpg + .jgw)..."}
+        </button>
+        <input
+          ref={orthophotoFileInputRef}
+          type="file"
+          multiple
+          accept=".jpg,.jpeg,.jgw"
+          style={{ display: "none" }}
+          onChange={(e) => void handleOrthophotoFilesChosen(e)}
+        />
+        {orthophotoSelectionError && <div style={{ color: "#c02020", marginTop: 4 }}>{orthophotoSelectionError}</div>}
         {orthophotoRegistration.status === "error" && (
-          <div style={{ color: "#c02020" }}>{orthophotoRegistration.errorMessage}</div>
+          <div style={{ color: "#c02020", marginTop: 4 }}>{orthophotoRegistration.errorMessage}</div>
         )}
         {orthophotoRegistration.warnings.length > 0 && (
           <ul style={{ margin: "4px 0 0", paddingLeft: 16, color: "#c98a12" }}>
@@ -118,6 +138,47 @@ export function TerrainPanel() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div style={clipFieldsStyle}>
+        <div style={{ opacity: 0.8, marginBottom: 2 }}>Esri World Imagery</div>
+        <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
+          Fetches satellite imagery centred on the mast, reprojected into the project's CRS. Requires internet
+          access -- the only feature in this app that reaches an external server. Imagery: {"©"} Esri, Maxar,
+          Earthstar Geographics, and the GIS User Community.
+        </div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ opacity: 0.8 }}>Width (m)</span>
+            <input
+              type="number"
+              step={50}
+              min={1}
+              value={worldImageryWidthM}
+              onChange={(e) => setWorldImageryWidthM(Number(e.target.value))}
+              style={{ width: 60 }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ opacity: 0.8 }}>Height (m)</span>
+            <input
+              type="number"
+              step={50}
+              min={1}
+              value={worldImageryHeightM}
+              onChange={(e) => setWorldImageryHeightM(Number(e.target.value))}
+              style={{ width: 60 }}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={orthophotoRegistration.status === "loading"}
+          onClick={() => void fetchWorldImageryOrthophoto(worldImageryWidthM, worldImageryHeightM)}
+          style={{ padding: "4px 8px", cursor: "pointer" }}
+        >
+          {orthophotoRegistration.status === "loading" ? "Fetching..." : "Fetch World Imagery"}
+        </button>
       </div>
 
       <div style={{ display: "flex", gap: 4 }}>

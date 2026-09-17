@@ -121,7 +121,7 @@ async function postFormData(path: string, formData: FormData, baseUrl: string, s
   return json;
 }
 
-export type UploadKind = "pole-model" | "point-cloud" | "line-centreline";
+export type UploadKind = "pole-model" | "point-cloud" | "line-centreline" | "orthophoto-image" | "orthophoto-world-file";
 
 /**
  * Uploads a file picked via a native file-open dialog into the backend's
@@ -297,6 +297,36 @@ export async function requestOrthophotoRegister(
   const parsed = parseOrthophotoRegisterResult(json);
   if (!parsed.success) {
     throw new BackendRequestError(`Backend orthophoto register response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Fetches and reprojects Esri World Imagery tiles for a square area around
+ * a project coordinate (backend: app/processing/world_imagery.py), caches
+ * the result under the workspace, and returns it in the exact same shape as
+ * requestOrthophotoRegister -- the only network-dependent request this app
+ * makes (everything else is local-only, ADR-001), and only ever sent when
+ * the user explicitly asks for it.
+ */
+export async function requestWorldImageryOrthophoto(
+  centreEasting: number,
+  centreNorthing: number,
+  projectCrs: CoordinateReferenceSystem,
+  widthM: number,
+  heightM: number,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
+): Promise<BackendOrthophotoRegisterResult> {
+  const json = await postJson(
+    "/orthophoto/world-imagery",
+    { centreEasting, centreNorthing, projectCrs, widthM, heightM },
+    baseUrl,
+    signal
+  );
+  const parsed = parseOrthophotoRegisterResult(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend world-imagery response failed validation: ${parsed.errors.join("; ")}`);
   }
   return parsed.data;
 }

@@ -31,8 +31,10 @@ import {
   requestOrthophotoRegister,
   requestPoleModelImport,
   requestUpload,
+  requestWorldImageryOrthophoto,
 } from "../services/backendClient";
-import { buildDefaultFoundationInstances, withFoundationType } from "../services/buildFoundationInstances";
+import type { BackendOrthophotoRegisterResult } from "../validation/backendOrthophotoSchema";
+import { buildDefaultFoundationInstances, resyncFoundationToAnchor, withFoundationType } from "../services/buildFoundationInstances";
 import { syncExcavationBottomsToFoundations, syncFoundationBaseToExcavation } from "../services/excavationFoundationSync";
 import type { LineMastRow } from "../services/csvParsing";
 import { parseLineMastCsv } from "../services/csvParsing";
@@ -190,6 +192,8 @@ interface ProjectStoreState {
   importPoleModelFromFile(file: File, baseUrl?: string): Promise<void>;
   registerPointCloudFromFile(file: File, baseUrl?: string): Promise<void>;
   registerOrthophoto(imagePath: string, worldFilePath?: string, baseUrl?: string): Promise<void>;
+  registerOrthophotoFromFiles(imageFile: File, worldFile: File, baseUrl?: string): Promise<void>;
+  fetchWorldImageryOrthophoto(widthM?: number, heightM?: number, baseUrl?: string): Promise<void>;
   importLineCsv(file: File): Promise<void>;
   importLineCentreline(file: File, baseUrl?: string): Promise<void>;
   selectLineMast(index: number, baseUrl?: string): Promise<void>;
@@ -200,6 +204,7 @@ interface ProjectStoreState {
   setProjectNotes(notes: string): void;
   setMastCentreProject(mastCentreProject: ProjectCoordinate): void;
   setLineBearingRadians(lineBearingRadians: number): void;
+  setPoleModelHeightOffset(localOriginZ: number): void;
   checkPointCloudAssetStatus(baseUrl?: string): Promise<void>;
   cancelAssetStatusCheck(): void;
   openProjectFromFile(file: File): Promise<void>;
@@ -210,6 +215,7 @@ interface ProjectStoreState {
   setTerrainShowPoints(showPoints: boolean): void;
   setTerrainWireframe(wireframe: boolean): void;
   setTerrainShowContours(showContours: boolean): void;
+  setTerrainContourInterval(contourIntervalM: number | null): void;
   setHover(hover: HoverReadout | null): void;
   regenerateTerrainFromPointCloud(): Promise<void>;
   cancelTerrainRegeneration(): void;
@@ -254,6 +260,42 @@ interface ProjectStoreState {
   ): void;
   removeMeasurement(measurementId: string): void;
   recalculateMeasurement(measurementId: string): void;
+}
+
+/**
+ * Shared "apply a successful orthophoto registration" state update, used by
+ * both a manually-registered orthophoto (registerOrthophoto) and a fetched
+ * Esri World Imagery tile (fetchWorldImageryOrthophoto) -- the backend
+ * response shape is identical either way (see requestWorldImageryOrthophoto's
+ * doc comment in services/backendClient.ts).
+ */
+function applyOrthophotoResult(imagePath: string, result: BackendOrthophotoRegisterResult) {
+  return (state: ProjectStoreState) => {
+    if (!state.project) return {};
+    const nowIso = new Date().toISOString();
+    return {
+      project: {
+        ...state.project,
+        orthophoto: {
+          imagePath,
+          imageUrl: result.imageUrl,
+          imageWidthPx: result.imageWidthPx,
+          imageHeightPx: result.imageHeightPx,
+          worldFile: result.worldFile,
+        },
+        layerStyles: {
+          ...state.project.layerStyles,
+          orthophoto: { ...state.project.layerStyles.orthophoto, visible: true },
+        },
+        modifiedAt: nowIso,
+      },
+      orthophotoRegistration: {
+        status: "success" as const,
+        warnings: result.warnings.map((w) => w.message),
+        errorMessage: null,
+      },
+    };
+  };
 }
 
 /**
@@ -378,32 +420,44 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({ orthophotoRegistration: { status: "loading", warnings: [], errorMessage: null } });
     try {
       const result = await requestOrthophotoRegister(imagePath, worldFilePath, baseUrl);
-      const nowIso = new Date().toISOString();
-      set((state) => {
-        if (!state.project) return {};
-        return {
-          project: {
-            ...state.project,
-            orthophoto: {
-              imagePath,
-              imageUrl: result.imageUrl,
-              imageWidthPx: result.imageWidthPx,
-              imageHeightPx: result.imageHeightPx,
-              worldFile: result.worldFile,
-            },
-            layerStyles: {
-              ...state.project.layerStyles,
-              orthophoto: { ...state.project.layerStyles.orthophoto, visible: true },
-            },
-            modifiedAt: nowIso,
-          },
-          orthophotoRegistration: {
-            status: "success",
-            warnings: result.warnings.map((w) => w.message),
-            errorMessage: null,
-          },
-        };
-      });
+      set(applyOrthophotoResult(imagePath, result));
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ orthophotoRegistration: { status: "error", warnings: [], errorMessage: message } });
+    }
+  },
+  fetchWorldImageryOrthophoto: async (widthM = 400, heightM = 400, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    const project = get().project;
+    if (!project) return;
+    set({ orthophotoRegistration: { status: "loading", warnings: [], errorMessage: null } });
+    try {
+      const result = await requestWorldImageryOrthophoto(
+        project.mastCentreProject.easting,
+        project.mastCentreProject.northing,
+        project.crs,
+        widthM,
+        heightM,
+        baseUrl
+      );
+      set(applyOrthophotoResult(`Esri World Imagery (${widthM}m x ${heightM}m)`, result));
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ orthophotoRegistration: { status: "error", warnings: [], errorMessage: message } });
+    }
+  },
+  registerOrthophotoFromFiles: async (imageFile, worldFile, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    if (!get().project) return;
+    set({ orthophotoRegistration: { status: "loading", warnings: [], errorMessage: null } });
+    try {
+      // Uploading (rather than requiring the file to already sit under the
+      // configured workspace root) is exactly what fixes the case that
+      // prompted this: an orthophoto living outside whatever folder
+      // POLE_VIEWER_WORKSPACE_ROOT happens to point at right now.
+      const uploadedImage = await requestUpload(imageFile, "orthophoto-image", baseUrl);
+      const uploadedWorldFile = await requestUpload(worldFile, "orthophoto-world-file", baseUrl);
+      await get().registerOrthophoto(uploadedImage.filePath, uploadedWorldFile.filePath, baseUrl);
     } catch (error) {
       const message =
         error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
@@ -556,6 +610,33 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         project: { ...state.project, lineBearingRadians, geometryVersion: state.project.geometryVersion + 1, modifiedAt: nowIso },
       };
     }),
+  setPoleModelHeightOffset: (localOriginZ) =>
+    set((state) => {
+      if (!state.project) return {};
+      const nowIso = new Date().toISOString();
+      const poleModel = { ...state.project.poleModel, localOrigin: { ...state.project.poleModel.localOrigin, z: localOriginZ } };
+      // Every anchor (hence every foundation) is placed live from
+      // poleModel.localOrigin (geometry/polePlacement.ts), so the pole
+      // model and its anchors already move as soon as localOrigin.z
+      // changes -- but a FoundationInstance's position/baseElevation are a
+      // *stored* snapshot, solved once at creation (services/
+      // buildFoundationInstances.ts), and would otherwise be left behind
+      // at the old height instead of following the leg anchor they connect
+      // to. Re-solving each one against the pole model's new position is
+      // what makes "raise/lower the mast" actually move the foundations
+      // with it, not just the visible structure.
+      const foundationInstances = state.project.foundationInstances.map((f) => resyncFoundationToAnchor(f, poleModel, nowIso));
+      return {
+        project: {
+          ...state.project,
+          poleModel,
+          foundationInstances,
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: nowIso,
+        },
+      };
+    }),
   checkPointCloudAssetStatus: async (baseUrl = DEFAULT_BACKEND_BASE_URL) => {
     const project = get().project;
     if (!project?.pointCloudSource) return;
@@ -693,6 +774,19 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           layerStyles: {
             ...state.project.layerStyles,
             terrain: { ...state.project.layerStyles.terrain, showContours },
+          },
+        },
+      };
+    }),
+  setTerrainContourInterval: (contourIntervalM) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          layerStyles: {
+            ...state.project.layerStyles,
+            terrain: { ...state.project.layerStyles.terrain, contourIntervalM },
           },
         },
       };

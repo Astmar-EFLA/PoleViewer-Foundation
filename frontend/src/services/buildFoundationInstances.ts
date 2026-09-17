@@ -146,6 +146,35 @@ export function buildDefaultFoundationInstances(
 }
 
 /**
+ * Re-solves one instance's position and base elevation against its anchor's
+ * *current* placed position, keeping its foundation type/parameters exactly
+ * as they are -- used when the pole model itself moves (e.g. a mast-height
+ * adjustment shifting `poleModel.localOrigin.z`), so every foundation stays
+ * connected to its own leg/guy anchor instead of being left behind at a
+ * stale, pre-move position (the same "solve for connection" math
+ * withFoundationType already uses for a type/parameter change, just without
+ * changing the type/parameters here).
+ */
+export function resyncFoundationToAnchor(
+  instance: FoundationInstance,
+  poleModel: PoleModel,
+  nowIso: string
+): FoundationInstance {
+  const anchorPos = placedAnchorPosition(instance.anchorId, poleModel);
+  const position = { x: anchorPos.x, y: anchorPos.y };
+  const baseElevation = solveBaseElevationForConnection(instance.parameters, position, instance.orientationRadians, anchorPos.z);
+  if (position.x === instance.position.x && position.y === instance.position.y && baseElevation === instance.baseElevation) {
+    return instance;
+  }
+  return {
+    ...instance,
+    position,
+    baseElevation,
+    provenance: { ...instance.provenance, modifiedAt: nowIso },
+  };
+}
+
+/**
  * Rebuilds one instance's geometry-affecting fields (type, parameters,
  * base elevation) while preserving everything else about it (visibility,
  * colour override, opacity, notes) -- used by "change this leg's

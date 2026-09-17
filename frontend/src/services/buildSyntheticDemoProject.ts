@@ -169,7 +169,7 @@ export function buildSyntheticDemoProject(): Project {
     layerStyles: {
       pole: { visible: true, opacity: 1 },
       foundations: { visible: true, opacity: 1 },
-      terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false, showContours: false },
+      terrain: { visible: true, opacity: 0.85, showPoints: false, wireframe: false, showContours: false, contourIntervalM: null },
       orthophoto: { visible: false, opacity: 1 },
     },
     sections: buildDefaultSections(),

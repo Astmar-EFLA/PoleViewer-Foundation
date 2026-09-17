@@ -50,7 +50,7 @@ export function Toolbar() {
 
   return (
     <div style={toolbarStyle}>
-      <DropdownButton label="Layers" width={220}>
+      <DropdownButton label="Layers" width={260}>
         <ErrorBoundary label="Layers panel">
           <LayerPanel />
         </ErrorBoundary>

@@ -128,13 +128,16 @@ fixtures are copied into an isolated per-test workspace.
 - `POST /workspace/file-status` -- SHA-256 + existence check for any
   workspace-relative file (see Workspace above).
 - `POST /workspace/upload` -- multipart file upload (`file` + `kind`:
-  `"pole-model"`, `"point-cloud"`, or `"line-centreline"`); lets the frontend
-  use a native file-open dialog instead of requiring the file to already sit
-  in the workspace by filename. Validated with the same extension/size
-  checks as the endpoint the uploaded file is destined for; lands under
+  `"pole-model"`, `"point-cloud"`, `"line-centreline"`, `"orthophoto-image"`,
+  or `"orthophoto-world-file"`); lets the frontend use a native file-open
+  dialog instead of requiring the file to already sit in the workspace by
+  filename -- the orthophoto kinds exist specifically so an image outside
+  whatever folder is currently configured as the workspace root can still be
+  registered. Validated with the same extension/size checks as the endpoint
+  the uploaded file is destined for; lands under
   `workspace/uploads/<uuid>-<original filename>` so two uploads can never
   collide, and the returned `filePath` is then used unmodified by
-  `/polemodel/import` or `/pointcloud/inspect`.
+  `/polemodel/import`, `/pointcloud/inspect`, or `/orthophoto/register`.
 - `POST /polemodel/import` -- parses a PLS-POLE geometry export (.pol) into
   this app's `PoleModel` shape. See
   [ADR-012](../docs/architecture/ADR-012-pls-pole-import.md) for the

@@ -38,6 +38,18 @@ def max_returned_point_count() -> int:
     return _env_int("POLE_VIEWER_MAX_RETURNED_POINTS", 2_000_000)
 
 
+def max_orthophoto_texture_dimension_px() -> int:
+    """
+    WebGL enforces a hard per-texture size limit (commonly 4096-16384px,
+    lower on older/integrated GPUs) -- a real orthophoto's *source* file is
+    routinely far larger than any of those. 4096 is the conservative,
+    broadly-supported default; see app/processing/orthophoto_import.py's
+    render_display_jpeg, which the served (not the source) image is
+    downscaled to fit.
+    """
+    return _env_int("POLE_VIEWER_MAX_ORTHOPHOTO_TEXTURE_PX", 4096)
+
+
 def check_file_size(path: Path) -> None:
     size = path.stat().st_size
     limit = max_file_size_bytes()
@@ -82,3 +94,39 @@ ALLOWED_ORTHOPHOTO_IMAGE_EXTENSIONS = {".jpg", ".jpeg"}
 
 def check_orthophoto_image_extension(path: Path) -> None:
     _check_extension(path, ALLOWED_ORTHOPHOTO_IMAGE_EXTENSIONS, "orthophoto-image")
+
+
+ALLOWED_ORTHOPHOTO_WORLD_FILE_EXTENSIONS = {".jgw"}
+
+
+def check_orthophoto_world_file_extension(path: Path) -> None:
+    _check_extension(path, ALLOWED_ORTHOPHOTO_WORLD_FILE_EXTENSIONS, "orthophoto-world-file")
+
+
+def max_world_imagery_extent_m() -> float:
+    """
+    Bounds a single world-imagery fetch's request area -- without this, an
+    arbitrarily large width/height would fetch (and this backend would then
+    have to hold in memory) an unbounded number of tiles. 3000m is generous
+    for a single mast/tower's surroundings while still bounding the request.
+    """
+    return float(_env_int("POLE_VIEWER_MAX_WORLD_IMAGERY_EXTENT_M", 3000))
+
+
+MIN_WORLD_IMAGERY_EXTENT_M = 10.0
+MIN_WORLD_IMAGERY_ZOOM = 10
+MAX_WORLD_IMAGERY_ZOOM = 20
+
+
+def check_world_imagery_request(width_m: float, height_m: float, zoom: int) -> None:
+    limit = max_world_imagery_extent_m()
+    for label, value in (("width", width_m), ("height", height_m)):
+        if not (MIN_WORLD_IMAGERY_EXTENT_M <= value <= limit):
+            raise ProcessingLimitError(
+                f"{label} must be between {MIN_WORLD_IMAGERY_EXTENT_M:.0f}m and {limit:.0f}m "
+                f"(POLE_VIEWER_MAX_WORLD_IMAGERY_EXTENT_M), got {value}m."
+            )
+    if not (MIN_WORLD_IMAGERY_ZOOM <= zoom <= MAX_WORLD_IMAGERY_ZOOM):
+        raise ProcessingLimitError(
+            f"zoom must be between {MIN_WORLD_IMAGERY_ZOOM} and {MAX_WORLD_IMAGERY_ZOOM}, got {zoom}."
+        )

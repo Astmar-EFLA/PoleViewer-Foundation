@@ -11,6 +11,8 @@ from app.services.limits import (
     ProcessingLimitError,
     check_file_size,
     check_line_centreline_extension,
+    check_orthophoto_image_extension,
+    check_orthophoto_world_file_extension,
     check_point_cloud_extension,
     check_pole_model_extension,
 )
@@ -43,11 +45,21 @@ def file_status(request: FileStatusRequest) -> FileStatusResult:
 
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
 
+_EXTENSION_CHECK_BY_KIND = {
+    "pole-model": check_pole_model_extension,
+    "point-cloud": check_point_cloud_extension,
+    "line-centreline": check_line_centreline_extension,
+    "orthophoto-image": check_orthophoto_image_extension,
+    "orthophoto-world-file": check_orthophoto_world_file_extension,
+}
+
 
 @router.post("/upload", response_model=UploadResult)
 async def upload(
     file: UploadFile = File(...),
-    kind: Literal["pole-model", "point-cloud", "line-centreline"] = Form(...),
+    kind: Literal[
+        "pole-model", "point-cloud", "line-centreline", "orthophoto-image", "orthophoto-world-file"
+    ] = Form(...),
 ) -> UploadResult:
     """
     Lets the frontend hand over a file picked via a native file-open dialog
@@ -68,12 +80,7 @@ async def upload(
             out.write(chunk)
 
     try:
-        if kind == "pole-model":
-            check_pole_model_extension(target_path)
-        elif kind == "point-cloud":
-            check_point_cloud_extension(target_path)
-        else:
-            check_line_centreline_extension(target_path)
+        _EXTENSION_CHECK_BY_KIND[kind](target_path)
         check_file_size(target_path)
     except ProcessingLimitError as exc:
         target_path.unlink(missing_ok=True)

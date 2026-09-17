@@ -9,6 +9,7 @@ import {
   buildDefaultFoundationInstances,
   buildFoundationInstanceForGuyAnchor,
   buildFoundationInstanceForLeg,
+  resyncFoundationToAnchor,
   withFoundationType,
 } from "./buildFoundationInstances";
 
@@ -169,6 +170,42 @@ describe("withFoundationType", () => {
     expect(changed.visible).toBe(false);
     expect(changed.colour).toBe("#123456");
     expect(changed.opacity).toBe(0.4);
+  });
+});
+
+describe("resyncFoundationToAnchor", () => {
+  it("follows the anchor when the pole model moves (e.g. a mast-height adjustment)", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const [original] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
+    const raisedModel = { ...parsed.data, localOrigin: { ...parsed.data.localOrigin, z: parsed.data.localOrigin.z + 3 } };
+    const resynced = resyncFoundationToAnchor(original!, raisedModel, NOW);
+
+    // The anchor moved up by 3m with the model -- the foundation's base
+    // must follow by exactly the same amount, not stay behind.
+    expect(resynced.baseElevation).toBeCloseTo(original!.baseElevation + 3, 9);
+    // Horizontal position, type, parameters and style are untouched -- only
+    // what the anchor's own movement actually changed.
+    expect(resynced.position).toEqual(original!.position);
+    expect(resynced.foundationTypeId).toBe(original!.foundationTypeId);
+    expect(resynced.parameters).toEqual(original!.parameters);
+    expect(resynced.colour).toBe(original!.colour);
+
+    const anchorPos = placedAnchorPosition(resynced.anchorId, raisedModel);
+    const results = validateFoundationInstance(resynced, anchorPos, NOW);
+    expect(results.filter((r) => r.ruleId === "foundation.connection-mismatch")).toHaveLength(0);
+  });
+
+  it("is a no-op (same object identity) when the anchor hasn't actually moved", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const [original] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
+    const resynced = resyncFoundationToAnchor(original!, parsed.data, NOW);
+    expect(resynced).toBe(original);
   });
 });
 

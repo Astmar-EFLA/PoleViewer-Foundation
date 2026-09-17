@@ -53,8 +53,9 @@ export function LinePanel() {
         <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
           One row per mast, in line order (low to high): mastName, easting, northing, elevation, modelPath,
           bearingLayerDepthM, groundwaterDepthM. Optional: legAEasting, legANorthing, legBEasting, legBNorthing --
-          two surveyed legs along the tower's axis, for exact orientation instead of the centreline/mast-to-mast
-          estimate (leave all four blank to skip; a partial set is rejected).
+          for exact orientation instead of the centreline/mast-to-mast estimate (leave all four blank to skip; a
+          partial set is rejected). Order matters: legA must be "LP", legB must be "RP" (the same convention the
+          imported pole model itself uses) -- reversed, this gives an exactly-180-degree-wrong orientation.
         </div>
         <button type="button" style={buttonStyle} onClick={() => csvInputRef.current?.click()}>
           Choose line CSV...

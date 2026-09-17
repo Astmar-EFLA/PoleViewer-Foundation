@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { FoundationInstance } from "../domain/foundation";
+import type { FoundationType } from "../domain/foundation";
 import type { ParseResult } from "./parseResult";
 import { fromZodSafeParse } from "./parseResult";
 import { provenanceSchema } from "./sharedSchemas";
@@ -49,4 +50,41 @@ export const foundationInstanceSchema = z.object({
 
 export function parseFoundationInstance(input: unknown): ParseResult<FoundationInstance> {
   return fromZodSafeParse(foundationInstanceSchema.safeParse(input)) as ParseResult<FoundationInstance>;
+}
+
+/**
+ * A library entry's `geometryType` (used to pick which fields the editor
+ * shows) must actually agree with `defaultParameters.geometryType` (used to
+ * generate its geometry) -- the two are only allowed to drift for a
+ * hand-edited JSON file, so this is checked here rather than trusted.
+ */
+export const foundationTypeSchema = z
+  .object({
+    foundationTypeId: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().optional(),
+    geometryType: z.enum(["rectangular-pad-pedestal", "stepped-rectangular"]),
+    units: z.literal("m"),
+    defaultParameters: foundationParametersSchema,
+    defaultColour: z.string().min(1),
+    defaultOpacity: z.number().min(0).max(1),
+    verificationState: z.enum(["unverified", "verified", "rejected"]),
+    provenance: provenanceSchema,
+  })
+  .refine((t) => t.geometryType === t.defaultParameters.geometryType, {
+    message: "geometryType must match defaultParameters.geometryType",
+    path: ["geometryType"],
+  });
+
+export const foundationLibrarySchema = z.array(foundationTypeSchema);
+
+/**
+ * Validates the whole library at once, so a typo anywhere in the
+ * hand-editable domain/foundationLibrary.json fails loudly at load time
+ * (domain/foundationLibrary.ts throws on an invalid result) -- never a
+ * partially-loaded library silently missing an entry, and never a broken
+ * entry discovered only when someone happens to select it.
+ */
+export function parseFoundationLibrary(input: unknown): ParseResult<FoundationType[]> {
+  return fromZodSafeParse(foundationLibrarySchema.safeParse(input)) as ParseResult<FoundationType[]>;
 }

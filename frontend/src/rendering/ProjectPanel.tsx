@@ -63,6 +63,7 @@ export function ProjectPanel() {
   const setProjectNotes = useProjectStore((s) => s.setProjectNotes);
   const setMastCentreProject = useProjectStore((s) => s.setMastCentreProject);
   const setLineBearingRadians = useProjectStore((s) => s.setLineBearingRadians);
+  const setPoleModelHeightOffset = useProjectStore((s) => s.setPoleModelHeightOffset);
   const importPoleModelFromFile = useProjectStore((s) => s.importPoleModelFromFile);
   const poleModelImport = useProjectStore((s) => s.poleModelImport);
   const registerPointCloudFromFile = useProjectStore((s) => s.registerPointCloudFromFile);
@@ -146,10 +147,27 @@ export function ProjectPanel() {
           value={project.mastCentreProject.elevation}
           onChange={(v) => setMastCentreProject({ ...project.mastCentreProject, elevation: v })}
         />
+        <div style={{ opacity: 0.5, fontSize: 10, marginTop: -2, marginBottom: 4 }}>
+          The surveyed elevation datum -- doesn't move the model in the 3D view. Use "Mast height
+          adjustment" below to actually raise/lower the structure.
+        </div>
         <CoordinateField
           label="Line bearing (deg)"
           value={(project.lineBearingRadians * 180) / Math.PI}
           onChange={(v) => setLineBearingRadians((v * Math.PI) / 180)}
+        />
+      </div>
+
+      <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #ddd" }}>
+        <div style={{ opacity: 0.8, marginBottom: 4 }}>Mast height adjustment</div>
+        <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
+          Raises or lowers the whole pole model and its anchors within the local scene; foundations are
+          re-solved to stay connected to their own leg/guy anchor as this changes.
+        </div>
+        <CoordinateField
+          label="Height offset (m)"
+          value={project.poleModel.localOrigin.z}
+          onChange={(v) => setPoleModelHeightOffset(v)}
         />
       </div>
 

@@ -167,6 +167,7 @@ export function Scene({ project }: SceneProps) {
             surface={project.terrainSurface}
             viewerFrame={viewerFrame}
             visible={project.layerStyles.terrain.showContours}
+            intervalM={project.layerStyles.terrain.contourIntervalM}
           />
         </>
       )}

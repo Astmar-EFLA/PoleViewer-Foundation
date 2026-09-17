@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Foundation Library Editor</title>
+<style>
+  :root {
+    --red: #FA0000;
+    --black: #000;
+    --grey: #707070;
+    --border: #ddd;
+    --bg: #f7f7f7;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    color: var(--black);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--black);
+    color: #fff;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+  }
+  header .accent { color: var(--red); }
+  button {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: #fff;
+    cursor: pointer;
+  }
+  button.primary {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+    font-weight: 600;
+  }
+  button.primary:disabled {
+    background: #e0a0a0;
+    border-color: #e0a0a0;
+    cursor: not-allowed;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.danger { color: var(--red); border-color: var(--red); }
+
+  #toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    align-items: center;
+  }
+  #toolbar .spacer { flex: 1; }
+  #status {
+    font-size: 12px;
+    color: var(--grey);
+  }
+  #status.dirty { color: var(--red); font-weight: 600; }
+
+  #app {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  #list-panel {
+    width: 260px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 8px;
+  }
+  #type-list { list-style: none; margin: 0; padding: 0; }
+  #type-list li {
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  #type-list li:hover { background: #f0f0f0; }
+  #type-list li.selected {
+    background: #fdeaea;
+    border-color: var(--red);
+  }
+  #type-list li .id {
+    display: block;
+    font-size: 11px;
+    color: var(--grey);
+  }
+  #list-empty { color: var(--grey); padding: 12px; font-size: 12px; }
+
+  #form-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 28px;
+  }
+  #empty-hint {
+    color: var(--grey);
+    max-width: 480px;
+    line-height: 1.5;
+  }
+  fieldset {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 0 0 16px;
+    padding: 12px 16px 16px;
+  }
+  legend {
+    font-weight: 600;
+    padding: 0 6px;
+    font-size: 12px;
+    color: var(--grey);
+  }
+  .field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .field label {
+    width: 190px;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+  .field input[type=text], .field input[type=number], .field select, .field textarea {
+    flex: 1;
+    max-width: 320px;
+    padding: 5px 7px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .field textarea { resize: vertical; min-height: 40px; }
+  .field input[type=color] { width: 48px; height: 28px; padding: 2px; }
+  .field input[type=range] { flex: 1; max-width: 200px; }
+  .field .hint { font-size: 11px; color: var(--grey); }
+  .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+
+  #steps-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  #steps-table th { text-align: left; font-size: 11px; color: var(--grey); font-weight: 600; padding: 4px 6px; }
+  #steps-table td { padding: 3px 6px; }
+  #steps-table input[type=number] { width: 90px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; }
+  #steps-table button { padding: 3px 8px; }
+
+  #errors {
+    background: #fdeaea;
+    border: 1px solid #e0a0a0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    color: #a02020;
+  }
+  #errors ul { margin: 4px 0 0; padding-left: 18px; }
+  #note {
+    background: #fff8e0;
+    border: 1px solid #e0cf90;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  #note[hidden], #errors[hidden] { display: none; }
+
+  #form-actions { display: flex; gap: 8px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Foundation <span class="accent">Library</span> Editor</h1>
+  <span id="file-name" style="font-size:12px; opacity:0.8;"></span>
+</header>
+
+<div id="toolbar">
+  <button id="open-btn">Open foundationLibrary.json…</button>
+  <button id="save-btn" class="primary" disabled>Save</button>
+  <span class="spacer"></span>
+  <span id="status"></span>
+</div>
+
+<div id="app">
+  <aside id="list-panel">
+    <div style="display:flex; gap:6px; margin-bottom:8px;">
+      <button id="add-btn" disabled style="flex:1;">+ New type</button>
+      <button id="duplicate-btn" disabled title="Duplicate selected">⎘</button>
+      <button id="delete-btn" class="danger" disabled title="Delete selected">✕</button>
+    </div>
+    <ul id="type-list"></ul>
+    <div id="list-empty">No file open yet.</div>
+  </aside>
+
+  <main id="form-panel">
+    <p id="empty-hint">
+      This edits <code>frontend/src/domain/foundationLibrary.json</code> directly — the file the
+      app's "Foundations → Type" dropdown loads its list from.<br /><br />
+      Click <strong>"Open foundationLibrary.json…"</strong> above and pick the file (normally at
+      <code>frontend/src/domain/foundationLibrary.json</code> in this repo).<br /><br />
+      <span id="fsa-note"></span>
+    </p>
+    <form id="entry-form" hidden onsubmit="return false;"></form>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+const GEOMETRY_TYPES = ["rectangular-pad-pedestal", "stepped-rectangular"];
+const VERIFICATION_STATES = ["unverified", "verified", "rejected"];
+const ORIGIN_TYPES = ["imported", "user-entered", "assumed", "transformed", "interpolated", "calculated", "library-default"];
+
+const RECT_FIELDS = [
+  ["padWidth", "Pad width (m)"],
+  ["padLength", "Pad length (m)"],
+  ["padThickness", "Pad thickness (m)"],
+  ["pedestalWidth", "Pedestal width (m)"],
+  ["pedestalLength", "Pedestal length (m)"],
+  ["pedestalHeight", "Pedestal height (m)"],
+];
+
+let fileHandle = null;   // FileSystemFileHandle, when the File System Access API is available
+let library = [];        // the array of foundation-type entries, live-edited in place
+let selectedIndex = -1;
+let dirty = false;
+
+const supportsFSAccess = "showOpenFilePicker" in window;
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") node.textContent = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  }
+  for (const child of children) node.appendChild(child);
+  return node;
+}
+
+function defaultRectParams() {
+  return {
+    geometryType: "rectangular-pad-pedestal",
+    padWidth: 1.0, padLength: 1.0, padThickness: 0.5,
+    pedestalWidth: 0.4, pedestalLength: 0.4, pedestalHeight: 0.5,
+  };
+}
+function defaultSteppedParams() {
+  return { geometryType: "stepped-rectangular", steps: [{ width: 1.0, length: 1.0, height: 0.4 }] };
+}
+function defaultEntry() {
+  return {
+    foundationTypeId: "",
+    name: "",
+    description: "",
+    geometryType: "rectangular-pad-pedestal",
+    units: "m",
+    defaultParameters: defaultRectParams(),
+    defaultColour: "#9aa5b1",
+    defaultOpacity: 1,
+    verificationState: "unverified",
+    provenance: { originType: "library-default", verificationState: "unverified", notes: "" },
+  };
+}
+
+function setDirty(value) {
+  dirty = value;
+  const status = document.getElementById("status");
+  status.textContent = value ? "Unsaved changes" : (library.length ? "Saved" : "");
+  status.className = value ? "dirty" : "";
+}
+
+function setStatus(message) {
+  document.getElementById("status").textContent = message;
+  document.getElementById("status").className = "";
+}
+
+// ---- File open / save -----------------------------------------------
+
+document.getElementById("fsa-note").textContent = supportsFSAccess
+  ? "This browser can save directly back to the same file."
+  : "This browser can't write files directly -- Save will download an edited copy; replace the original with it.";
+
+document.getElementById("open-btn").addEventListener("click", async () => {
+  try {
+    let text, name;
+    if (supportsFSAccess) {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: "JSON", accept: { "application/json": [".json"] } }],
+      });
+      fileHandle = handle;
+      const file = await handle.getFile();
+      text = await file.text();
+      name = file.name;
+    } else {
+      const picked = await new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.onchange = () => resolve(input.files[0] || null);
+        input.click();
+      });
+      if (!picked) return;
+      fileHandle = null;
+      text = await picked.text();
+      name = picked.name;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      alert("That file isn't valid JSON:\n" + err.message);
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      alert("Expected the file to contain a JSON array of foundation types at the top level.");
+      return;
+    }
+
+    library = parsed;
+    selectedIndex = library.length ? 0 : -1;
+    document.getElementById("file-name").textContent = name;
+    document.getElementById("empty-hint").style.display = "none";
+    document.getElementById("save-btn").disabled = false;
+    document.getElementById("add-btn").disabled = false;
+    renderList();
+    renderForm();
+    setDirty(false);
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // user cancelled the picker
+    alert("Could not open the file:\n" + err.message);
+  }
+});
+
+document.getElementById("save-btn").addEventListener("click", async () => {
+  const errors = validateLibrary();
+  const errorsBox = document.getElementById("errors");
+  if (errors.length > 0) {
+    if (errorsBox) {
+      errorsBox.hidden = false;
+      errorsBox.innerHTML = "<strong>Fix these before saving:</strong><ul>" +
+        errors.map((e) => `<li>${escapeHtml(e)}</li>`).join("") + "</ul>";
+      errorsBox.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      alert("Fix these before saving:\n\n" + errors.join("\n"));
+    }
+    return;
+  }
+
+  const json = JSON.stringify(library, null, 2) + "\n";
+
+  if (fileHandle) {
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      setDirty(false);
+      setStatus("Saved to " + (document.getElementById("file-name").textContent || "file") + " at " + new Date().toLocaleTimeString());
+    } catch (err) {
+      alert("Could not save the file:\n" + err.message);
+    }
+  } else {
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "foundationLibrary.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setDirty(false);
+    setStatus("Downloaded -- replace frontend/src/domain/foundationLibrary.json with this file.");
+  }
+});
+
+window.addEventListener("beforeunload", (e) => {
+  if (dirty) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+
+// ---- List panel -------------------------------------------------------
+
+function renderList() {
+  const listEl = document.getElementById("type-list");
+  const emptyEl = document.getElementById("list-empty");
+  listEl.innerHTML = "";
+  emptyEl.style.display = library.length ? "none" : "block";
+
+  library.forEach((entry, i) => {
+    const li = el("li", {
+      class: i === selectedIndex ? "selected" : "",
+      onclick: () => { selectedIndex = i; renderList(); renderForm(); },
+    }, [
+      el("span", { text: entry.name || "(untitled)" }),
+      el("span", { class: "id", text: entry.foundationTypeId || "(no id)" }),
+    ]);
+    listEl.appendChild(li);
+  });
+
+  const hasSelection = selectedIndex >= 0 && selectedIndex < library.length;
+  document.getElementById("duplicate-btn").disabled = !hasSelection;
+  document.getElementById("delete-btn").disabled = !hasSelection;
+}
+
+document.getElementById("add-btn").addEventListener("click", () => {
+  library.push(defaultEntry());
+  selectedIndex = library.length - 1;
+  renderList();
+  renderForm();
+  setDirty(true);
+});
+
+document.getElementById("duplicate-btn").addEventListener("click", () => {
+  if (selectedIndex < 0) return;
+  const copy = JSON.parse(JSON.stringify(library[selectedIndex]));
+  copy.foundationTypeId = copy.foundationTypeId ? copy.foundationTypeId + "-copy" : "";
+  copy.name = copy.name ? copy.name + " (copy)" : "";
+  library.splice(selectedIndex + 1, 0, copy);
+  selectedIndex += 1;
+  renderList();
+  renderForm();
+  setDirty(true);
+});
+
+document.getElementById("delete-btn").addEventListener("click", () => {
+  if (selectedIndex < 0) return;
+  const entry = library[selectedIndex];
+  if (!confirm(`Delete "${entry.name || entry.foundationTypeId || "this type"}"? This can't be undone (until you re-open the file without saving).`)) return;
+  library.splice(selectedIndex, 1);
+  selectedIndex = Math.min(selectedIndex, library.length - 1);
+  renderList();
+  renderForm();
+  setDirty(true);
+});
+
+// ---- Form panel ---------------------------------------------------------
+
+function field(labelText, inputEl, hint) {
+  const wrap = el("div", { class: "field" }, [el("label", { text: labelText }), inputEl]);
+  if (hint) wrap.appendChild(el("span", { class: "hint", text: hint }));
+  return wrap;
+}
+
+function textInput(value, onChange, type = "text") {
+  const input = el("input", { type });
+  input.value = value ?? "";
+  input.addEventListener("input", () => { onChange(input.value); setDirty(true); });
+  return input;
+}
+
+function numberInput(value, onChange, opts = {}) {
+  const input = el("input", { type: "number" });
+  if (opts.step !== undefined) input.step = opts.step;
+  if (opts.min !== undefined) input.min = opts.min;
+  if (opts.max !== undefined) input.max = opts.max;
+  input.value = value ?? "";
+  input.addEventListener("input", () => { onChange(input.value === "" ? NaN : Number(input.value)); setDirty(true); });
+  return input;
+}
+
+function selectInput(options, value, onChange) {
+  const select = el("select", {});
+  for (const opt of options) {
+    const optionEl = el("option", { value: opt, text: opt });
+    if (opt === value) optionEl.selected = true;
+    select.appendChild(optionEl);
+  }
+  select.addEventListener("change", () => { onChange(select.value); setDirty(true); });
+  return select;
+}
+
+function renderForm() {
+  const formEl = document.getElementById("entry-form");
+  const hintEl = document.getElementById("empty-hint");
+  const entry = selectedIndex >= 0 ? library[selectedIndex] : null;
+
+  if (!entry) {
+    formEl.hidden = true;
+    hintEl.style.display = library.length === 0 && fileHandle === null && document.getElementById("file-name").textContent === "" ? "block" : "none";
+    formEl.innerHTML = "";
+    return;
+  }
+
+  hintEl.style.display = "none";
+  formEl.hidden = false;
+  formEl.innerHTML = "";
+
+  const errorsBox = el("div", { id: "errors", hidden: "hidden" });
+  formEl.appendChild(errorsBox);
+
+  // --- Identity ---
+  const identity = el("fieldset", {}, [el("legend", { text: "Identity" })]);
+  identity.appendChild(field("Foundation type ID", textInput(entry.foundationTypeId, (v) => entry.foundationTypeId = v),
+    "Must be unique across the library, e.g. \"rectangular-pad-pedestal-v2\"."));
+  identity.appendChild(field("Name", textInput(entry.name, (v) => entry.name = v)));
+  const descArea = el("textarea", {});
+  descArea.value = entry.description ?? "";
+  descArea.addEventListener("input", () => { entry.description = descArea.value; setDirty(true); });
+  identity.appendChild(field("Description", descArea, "Optional."));
+  formEl.appendChild(identity);
+
+  // --- Geometry ---
+  const geometry = el("fieldset", {}, [el("legend", { text: "Geometry" })]);
+  geometry.appendChild(field("Geometry type", selectInput(GEOMETRY_TYPES, entry.geometryType, (v) => {
+    entry.geometryType = v;
+    entry.defaultParameters = v === "rectangular-pad-pedestal" ? defaultRectParams() : defaultSteppedParams();
+    renderForm();
+  })));
+  formEl.appendChild(geometry);
+
+  const params = el("fieldset", {}, [el("legend", { text: "Default parameters" })]);
+  if (entry.geometryType === "rectangular-pad-pedestal") {
+    const grid = el("div", { class: "row-2col" });
+    for (const [key, label] of RECT_FIELDS) {
+      grid.appendChild(field(label, numberInput(entry.defaultParameters[key], (v) => entry.defaultParameters[key] = v, { step: "0.05", min: "0" })));
+    }
+    params.appendChild(grid);
+  } else {
+    params.appendChild(renderStepsTable(entry));
+  }
+  formEl.appendChild(params);
+
+  // --- Appearance ---
+  const appearance = el("fieldset", {}, [el("legend", { text: "Appearance" })]);
+  const colourInput = el("input", { type: "color" });
+  colourInput.value = /^#[0-9a-fA-F]{6}$/.test(entry.defaultColour) ? entry.defaultColour : "#9aa5b1";
+  colourInput.addEventListener("input", () => { entry.defaultColour = colourInput.value; setDirty(true); });
+  appearance.appendChild(field("Default colour", colourInput));
+
+  const opacityWrap = el("div", { class: "field" });
+  const opacityLabel = el("label", { text: "Default opacity" });
+  const opacityInput = el("input", { type: "range", min: "0", max: "1", step: "0.05" });
+  opacityInput.value = entry.defaultOpacity ?? 1;
+  const opacityReadout = el("span", { class: "hint", text: String(entry.defaultOpacity ?? 1) });
+  opacityInput.addEventListener("input", () => {
+    entry.defaultOpacity = Number(opacityInput.value);
+    opacityReadout.textContent = opacityInput.value;
+    setDirty(true);
+  });
+  opacityWrap.appendChild(opacityLabel);
+  opacityWrap.appendChild(opacityInput);
+  opacityWrap.appendChild(opacityReadout);
+  appearance.appendChild(opacityWrap);
+  formEl.appendChild(appearance);
+
+  // --- Provenance ---
+  const provenance = entry.provenance || (entry.provenance = { originType: "library-default", verificationState: "unverified", notes: "" });
+  const prov = el("fieldset", {}, [el("legend", { text: "Provenance" })]);
+  prov.appendChild(field("Verification state", selectInput(VERIFICATION_STATES, entry.verificationState, (v) => entry.verificationState = v)));
+  prov.appendChild(field("Provenance origin", selectInput(ORIGIN_TYPES, provenance.originType, (v) => provenance.originType = v)));
+  prov.appendChild(field("Provenance verification", selectInput(VERIFICATION_STATES, provenance.verificationState, (v) => provenance.verificationState = v)));
+  const notesArea = el("textarea", {});
+  notesArea.value = provenance.notes ?? "";
+  notesArea.addEventListener("input", () => { provenance.notes = notesArea.value; setDirty(true); });
+  prov.appendChild(field("Notes", notesArea, "e.g. \"Placeholder library dimensions; not a verified design.\""));
+  formEl.appendChild(prov);
+
+  renderList(); // keep the list's displayed name/id in sync as they're edited
+}
+
+function renderStepsTable(entry) {
+  const wrap = document.createDocumentFragment();
+  const table = el("table", { id: "steps-table" });
+  const thead = el("tr", {}, [
+    el("th", { text: "Width (m)" }), el("th", { text: "Length (m)" }), el("th", { text: "Height (m)" }), el("th", {}),
+  ]);
+  table.appendChild(el("thead", {}, [thead]));
+  const tbody = el("tbody", {});
+
+  entry.defaultParameters.steps.forEach((step, i) => {
+    const row = el("tr", {}, [
+      el("td", {}, [numberInput(step.width, (v) => step.width = v, { step: "0.05", min: "0" })]),
+      el("td", {}, [numberInput(step.length, (v) => step.length = v, { step: "0.05", min: "0" })]),
+      el("td", {}, [numberInput(step.height, (v) => step.height = v, { step: "0.05", min: "0" })]),
+      el("td", {}, [el("button", {
+        text: "Remove",
+        onclick: () => {
+          entry.defaultParameters.steps.splice(i, 1);
+          setDirty(true);
+          renderForm();
+        },
+      })]),
+    ]);
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  wrap.appendChild(el("div", {}, [
+    el("span", { class: "hint", text: "Ordered bottom to top. " }),
+    el("button", {
+      text: "+ Add step",
+      onclick: () => {
+        entry.defaultParameters.steps.push({ width: 0.5, length: 0.5, height: 0.3 });
+        setDirty(true);
+        renderForm();
+      },
+    }),
+  ]));
+  return wrap;
+}
+
+// ---- Validation (mirrors validation/foundationSchema.ts's foundationTypeSchema) ----
+
+function validateLibrary() {
+  const errors = [];
+  const seenIds = new Set();
+
+  library.forEach((entry, i) => {
+    const label = entry.name || entry.foundationTypeId || `entry ${i + 1}`;
+
+    if (!entry.foundationTypeId || !entry.foundationTypeId.trim()) {
+      errors.push(`"${label}": foundation type ID is required.`);
+    } else if (seenIds.has(entry.foundationTypeId)) {
+      errors.push(`"${label}": foundation type ID "${entry.foundationTypeId}" is used more than once.`);
+    } else {
+      seenIds.add(entry.foundationTypeId);
+    }
+
+    if (!entry.name || !entry.name.trim()) {
+      errors.push(`"${label}": name is required.`);
+    }
+
+    if (!GEOMETRY_TYPES.includes(entry.geometryType)) {
+      errors.push(`"${label}": unrecognised geometry type.`);
+    } else if (entry.defaultParameters.geometryType !== entry.geometryType) {
+      // Shouldn't happen via this UI (the two are always set together), but
+      // checked anyway since it's exactly the invariant the app's own
+      // schema enforces (validation/foundationSchema.ts).
+      errors.push(`"${label}": geometry type doesn't match its default parameters.`);
+    }
+
+    if (entry.geometryType === "rectangular-pad-pedestal") {
+      for (const [key, fieldLabel] of RECT_FIELDS) {
+        const v = entry.defaultParameters[key];
+        if (typeof v !== "number" || !Number.isFinite(v)) {
+          errors.push(`"${label}": ${fieldLabel} must be a number.`);
+        }
+      }
+    } else if (entry.geometryType === "stepped-rectangular") {
+      const steps = entry.defaultParameters.steps || [];
+      if (steps.length === 0) {
+        errors.push(`"${label}": needs at least one step.`);
+      }
+      steps.forEach((step, si) => {
+        for (const key of ["width", "length", "height"]) {
+          if (typeof step[key] !== "number" || !Number.isFinite(step[key])) {
+            errors.push(`"${label}": step ${si + 1}'s ${key} must be a number.`);
+          }
+        }
+      });
+    }
+
+    if (!/^#[0-9a-fA-F]{6}$/.test(entry.defaultColour || "")) {
+      errors.push(`"${label}": default colour must be a hex colour like #9aa5b1.`);
+    }
+
+    if (typeof entry.defaultOpacity !== "number" || entry.defaultOpacity < 0 || entry.defaultOpacity > 1) {
+      errors.push(`"${label}": default opacity must be between 0 and 1.`);
+    }
+
+    if (!VERIFICATION_STATES.includes(entry.verificationState)) {
+      errors.push(`"${label}": unrecognised verification state.`);
+    }
+
+    const provenance = entry.provenance;
+    if (!provenance || !ORIGIN_TYPES.includes(provenance.originType) || !VERIFICATION_STATES.includes(provenance.verificationState)) {
+      errors.push(`"${label}": provenance is missing or has an unrecognised origin/verification state.`);
+    }
+  });
+
+  return errors;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+</script>
+</body>
+</html>

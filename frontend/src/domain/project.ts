@@ -25,8 +25,10 @@ export interface TerrainLayerStyle extends LayerStyle {
   /** "visible" above means "show the TIN surface"; this is the independent points-cloud toggle, so points-only / surface-only / both / wireframe are all just combinations of these two plus `wireframe`. */
   readonly showPoints: boolean;
   readonly wireframe: boolean;
-  /** Independent overlay: elevation contour lines traced across the TIN, interval chosen automatically from the surface's elevation range. */
+  /** Independent overlay: elevation contour lines traced across the TIN. */
   readonly showContours: boolean;
+  /** null picks a round interval automatically from the surface's elevation range (geometry/contours.ts's chooseContourInterval); a positive number (e.g. 0.5 or 1) overrides it with an exact, user-chosen interval. */
+  readonly contourIntervalM: number | null;
 }
 
 /**
