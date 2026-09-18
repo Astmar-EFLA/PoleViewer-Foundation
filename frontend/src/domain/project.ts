@@ -1,5 +1,6 @@
 import type { CoordinateReferenceSystem, LocalCoordinate, ProjectCoordinate } from "./coordinates";
 import type { ExcavationInstance } from "./excavation";
+import type { FillInstance } from "./fill";
 import type { FoundationInstance } from "./foundation";
 import type { GeotechLayer, Groundwater } from "./geotech";
 import type { Measurement } from "./measurement";
@@ -65,6 +66,10 @@ export interface Project {
   readonly poleModel: PoleModel;
   readonly foundationInstances: readonly FoundationInstance[];
   readonly excavationInstances: readonly ExcavationInstance[];
+  /** The vertical mirror of excavationInstances -- for a foundation whose base sits above existing terrain (see domain/fill.ts). */
+  readonly fillInstances: readonly FillInstance[];
+  /** A second, independent fill layer covering the whole foundation body (pad + pedestal/column) for uplift resistance -- same FillInstance shape, different default top elevation (see services/projectDefaults.ts's buildDefaultUpliftFillInstances). */
+  readonly upliftFillInstances: readonly FillInstance[];
   readonly geotechLayers: readonly GeotechLayer[];
   readonly groundwater: Groundwater | null;
   readonly pointCloudSource: PointCloudSourceReference | null;
@@ -76,8 +81,9 @@ export interface Project {
   readonly measurements: readonly Measurement[];
   /**
    * Incremented on every change to geometry-affecting engineering data
-   * (foundation type/parameters, excavation parameters, geotech/groundwater
-   * boundaries, terrain regeneration) -- never on style-only changes
+   * (foundation type/parameters, excavation/fill parameters,
+   * geotech/groundwater boundaries, terrain regeneration) -- never on
+   * style-only changes
    * (visibility, colour, opacity, wireframe). Sections and measurements
    * reference the version they were computed against so a stale one is
    * detectable (spec section 15) rather than silently kept.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { localCoordinate, projectCoordinate } from "../domain/coordinates";
 import type { Project } from "../domain/project";
 import type { ExcavationInstance } from "../domain/excavation";
+import type { FillInstance } from "../domain/fill";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { GeotechLayer, Groundwater } from "../domain/geotech";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
@@ -64,6 +65,34 @@ function buildSyntheticProject(): Project {
         colour: "#c9a227",
         opacity: 0.35,
         visible: true,
+        wireframe: false,
+        provenance: { originType: "assumed", verificationState: "unverified" },
+      })
+    ),
+    fillInstances: foundationInstances.map(
+      (f): FillInstance => ({
+        id: `fill-${f.instanceId}`,
+        foundationInstanceId: f.instanceId,
+        topElevationM: f.baseElevation,
+        workingSpaceOffsetM: 0.5,
+        sideSlope: { h: 2, v: 1 },
+        colour: "#8a6d3b",
+        opacity: 0.35,
+        visible: false,
+        wireframe: false,
+        provenance: { originType: "assumed", verificationState: "unverified" },
+      })
+    ),
+    upliftFillInstances: foundationInstances.map(
+      (f): FillInstance => ({
+        id: `uplift-fill-${f.instanceId}`,
+        foundationInstanceId: f.instanceId,
+        topElevationM: f.baseElevation,
+        workingSpaceOffsetM: 0.5,
+        sideSlope: { h: 2, v: 1 },
+        colour: "#6b5a8a",
+        opacity: 0.35,
+        visible: false,
         wireframe: false,
         provenance: { originType: "assumed", verificationState: "unverified" },
       })

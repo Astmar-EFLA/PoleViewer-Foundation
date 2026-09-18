@@ -1,6 +1,8 @@
 import type { ExcavationInstance } from "../domain/excavation";
+import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import type { SectionDefinition } from "../domain/section";
+import { generateFoundationGeometry } from "../geometry/foundationGeometry";
 
 const DEFAULT_SECTION_POINT_TOLERANCE_M = 1.0;
 
@@ -60,6 +62,68 @@ export function buildDefaultExcavationInstances(
       originType: "assumed",
       verificationState: "unverified",
       notes: "Default assumption: bottom elevation set to the foundation base, 0.5m working space, 1.5H:1V slope.",
+    },
+  }));
+}
+
+/**
+ * One fill per foundation, the vertical mirror of
+ * buildDefaultExcavationInstances -- for a foundation whose base sits above
+ * existing terrain and needs material added to reach it, instead of ground
+ * dug away. Visible by default, same as excavation -- the geometry always
+ * degrades gracefully (near-zero height/volume) for a leg where it isn't
+ * the relevant case, so there's no reason to hide it and make a user find
+ * the toggle first.
+ */
+export function buildDefaultFillInstances(foundationInstances: readonly FoundationInstance[]): FillInstance[] {
+  return foundationInstances.map((foundation) => ({
+    id: `fill-${foundation.instanceId}`,
+    foundationInstanceId: foundation.instanceId,
+    topElevationM: foundation.baseElevation,
+    workingSpaceOffsetM: 0.5,
+    // 2H:1V, a common fill/embankment default -- unconfirmed against a real
+    // EFLA reference document, same caveat as excavation's own ADR-009 note.
+    sideSlope: { h: 2, v: 1 },
+    colour: "#8a6d3b",
+    opacity: 0.35,
+    visible: true,
+    wireframe: false,
+    provenance: {
+      originType: "assumed",
+      verificationState: "unverified",
+      notes: "Default assumption: top elevation set to the foundation base, 0.5m working space, 2H:1V slope.",
+    },
+  }));
+}
+
+/**
+ * A second, independent fill layer per foundation: instead of reaching up
+ * to the foundation's base (buildDefaultFillInstances), this one covers the
+ * *whole* foundation body -- pad and pedestal/column both -- up to
+ * `topConnectionPoint.z` (geometry/foundationGeometry.ts), for backfill
+ * whose weight a geotechnician relies on for uplift resistance. Reuses the
+ * exact same `FillInstance` shape, geometry, and volume math as the base
+ * fill (its footprint -- the foundation's bottom/widest part -- already
+ * contains the narrower column above it, so a constant-footprint prism up
+ * to the top covers both without any new footprint logic); only the
+ * default top elevation differs. Visible by default, same reasoning as
+ * buildDefaultFillInstances.
+ */
+export function buildDefaultUpliftFillInstances(foundationInstances: readonly FoundationInstance[]): FillInstance[] {
+  return foundationInstances.map((foundation) => ({
+    id: `uplift-fill-${foundation.instanceId}`,
+    foundationInstanceId: foundation.instanceId,
+    topElevationM: generateFoundationGeometry(foundation).topConnectionPoint.z,
+    workingSpaceOffsetM: 0.5,
+    sideSlope: { h: 2, v: 1 },
+    colour: "#6b5a8a",
+    opacity: 0.35,
+    visible: true,
+    wireframe: false,
+    provenance: {
+      originType: "assumed",
+      verificationState: "unverified",
+      notes: "Default assumption: top elevation set to the top of the foundation (pad + pedestal/column), 0.5m working space, 2H:1V slope.",
     },
   }));
 }

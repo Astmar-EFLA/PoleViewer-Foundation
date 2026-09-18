@@ -44,7 +44,7 @@ export function excavationBottomFootprint(
   };
 }
 
-interface PerimeterSample {
+export interface PerimeterSample {
   readonly x0: number;
   readonly y0: number;
   /** Whether this sample's local X grows outward with height (true for east/west edge points and all corners). */
@@ -93,14 +93,14 @@ export function rectanglePerimeterSamples(
   return samples;
 }
 
-function perimeterPointAtOffset(sample: PerimeterSample, offset: number): { x: number; y: number } {
+export function perimeterPointAtOffset(sample: PerimeterSample, offset: number): { x: number; y: number } {
   return {
     x: sample.growX ? sample.x0 + Math.sign(sample.x0) * offset : sample.x0,
     y: sample.growY ? sample.y0 + Math.sign(sample.y0) * offset : sample.y0,
   };
 }
 
-function toWorldXY(
+export function toWorldXY(
   localUnrotated: { x: number; y: number },
   footprint: RectangularFootprint
 ): { x: number; y: number } {

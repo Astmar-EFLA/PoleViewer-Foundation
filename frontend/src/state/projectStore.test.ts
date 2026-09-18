@@ -106,6 +106,10 @@ describe("importPoleModel", () => {
         expect(project.foundationInstances.filter((f) => f.legId === null)).toHaveLength(2);
         expect(project.excavationInstances).toHaveLength(4);
         expect(project.excavationInstances.every((e) => project.foundationInstances.some((f) => f.instanceId === e.foundationInstanceId))).toBe(true);
+        expect(project.fillInstances).toHaveLength(4);
+        expect(project.fillInstances.every((fl) => project.foundationInstances.some((f) => f.instanceId === fl.foundationInstanceId))).toBe(true);
+        expect(project.upliftFillInstances).toHaveLength(4);
+        expect(project.upliftFillInstances.every((fl) => project.foundationInstances.some((f) => f.instanceId === fl.foundationInstanceId))).toBe(true);
         expect(project.sections.map((s) => s.id)).toEqual(["section-longitudinal", "section-transverse"]);
         expect(project.measurements).toEqual([]);
         expect(project.geometryVersion).toBe(originalGeometryVersion + 1);
@@ -196,6 +200,131 @@ describe("excavation bottom / foundation base elevation stay locked together", (
   });
 });
 
+describe("fill top / foundation base elevation stay locked together", () => {
+  it("editing a fill's top elevation pulls its own foundation's base to match", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const fill = useProjectStore.getState().project!.fillInstances[0]!;
+    const newTop = fill.topElevationM + 1.1;
+
+    useProjectStore.getState().setFillParameters(fill.id, { topElevationM: newTop });
+
+    const project = useProjectStore.getState().project!;
+    const updatedFill = project.fillInstances.find((f) => f.id === fill.id)!;
+    const updatedFoundation = project.foundationInstances.find(
+      (f) => f.instanceId === updatedFill.foundationInstanceId
+    )!;
+    expect(updatedFill.topElevationM).toBe(newTop);
+    expect(updatedFoundation.baseElevation).toBe(newTop);
+  });
+
+  it("editing a fill's working space (not top elevation) leaves the foundation's base untouched", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const fill = useProjectStore.getState().project!.fillInstances[0]!;
+    const foundationBefore = useProjectStore
+      .getState()
+      .project!.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId)!;
+
+    useProjectStore.getState().setFillParameters(fill.id, { workingSpaceOffsetM: 1.2 });
+
+    const foundationAfter = useProjectStore
+      .getState()
+      .project!.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId)!;
+    expect(foundationAfter.baseElevation).toBe(foundationBefore.baseElevation);
+  });
+
+  it("setFillStyle only changes style fields, never geometryVersion", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const before = useProjectStore.getState().project!;
+    const fill = before.fillInstances[0]!;
+
+    useProjectStore.getState().setFillStyle(fill.id, { visible: true, opacity: 0.6 });
+
+    const after = useProjectStore.getState().project!;
+    const updatedFill = after.fillInstances.find((f) => f.id === fill.id)!;
+    expect(updatedFill.visible).toBe(true);
+    expect(updatedFill.opacity).toBe(0.6);
+    expect(after.geometryVersion).toBe(before.geometryVersion);
+  });
+
+  it("changing a foundation's type (re-solving its base elevation) pulls its own fill's top to match", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const foundation = useProjectStore.getState().project!.foundationInstances[0]!;
+    const otherTypeId =
+      foundation.foundationTypeId === "rectangular-pad-pedestal-v1"
+        ? "stepped-rectangular-v1"
+        : "rectangular-pad-pedestal-v1";
+
+    useProjectStore.getState().setFoundationType(foundation.instanceId, otherTypeId);
+
+    const project = useProjectStore.getState().project!;
+    const updatedFoundation = project.foundationInstances.find((f) => f.instanceId === foundation.instanceId)!;
+    const updatedFill = project.fillInstances.find((f) => f.foundationInstanceId === foundation.instanceId)!;
+    expect(updatedFoundation.baseElevation).not.toBe(foundation.baseElevation);
+    expect(updatedFill.topElevationM).toBe(updatedFoundation.baseElevation);
+  });
+});
+
+describe("uplift-fill top follows the foundation's own top, one-directionally", () => {
+  it("defaults to the foundation's top (pad + pedestal/column), not its base", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const project = useProjectStore.getState().project!;
+    const upliftFill = project.upliftFillInstances[0]!;
+    const foundation = project.foundationInstances.find((f) => f.instanceId === upliftFill.foundationInstanceId)!;
+
+    expect(upliftFill.topElevationM).not.toBe(foundation.baseElevation);
+    expect(upliftFill.topElevationM).toBeGreaterThan(foundation.baseElevation);
+  });
+
+  it("editing an uplift-fill's top elevation does NOT change its foundation's base (unlike the base fill)", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const upliftFill = useProjectStore.getState().project!.upliftFillInstances[0]!;
+    const foundationBefore = useProjectStore
+      .getState()
+      .project!.foundationInstances.find((f) => f.instanceId === upliftFill.foundationInstanceId)!;
+    const newTop = upliftFill.topElevationM + 2.0;
+
+    useProjectStore.getState().setUpliftFillParameters(upliftFill.id, { topElevationM: newTop });
+
+    const project = useProjectStore.getState().project!;
+    const updatedUpliftFill = project.upliftFillInstances.find((f) => f.id === upliftFill.id)!;
+    const foundationAfter = project.foundationInstances.find((f) => f.instanceId === upliftFill.foundationInstanceId)!;
+    expect(updatedUpliftFill.topElevationM).toBe(newTop);
+    expect(foundationAfter.baseElevation).toBe(foundationBefore.baseElevation);
+  });
+
+  it("setUpliftFillStyle only changes style fields, never geometryVersion", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const before = useProjectStore.getState().project!;
+    const upliftFill = before.upliftFillInstances[0]!;
+
+    useProjectStore.getState().setUpliftFillStyle(upliftFill.id, { visible: true, opacity: 0.6 });
+
+    const after = useProjectStore.getState().project!;
+    const updated = after.upliftFillInstances.find((f) => f.id === upliftFill.id)!;
+    expect(updated.visible).toBe(true);
+    expect(updated.opacity).toBe(0.6);
+    expect(after.geometryVersion).toBe(before.geometryVersion);
+  });
+
+  it("changing a foundation's type (re-solving its geometry) pulls its own uplift-fill's top to match the new top-of-foundation", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const foundation = useProjectStore.getState().project!.foundationInstances[0]!;
+    const otherTypeId =
+      foundation.foundationTypeId === "rectangular-pad-pedestal-v1"
+        ? "stepped-rectangular-v1"
+        : "rectangular-pad-pedestal-v1";
+
+    useProjectStore.getState().setFoundationType(foundation.instanceId, otherTypeId);
+
+    const project = useProjectStore.getState().project!;
+    const updatedFoundation = project.foundationInstances.find((f) => f.instanceId === foundation.instanceId)!;
+    const updatedUpliftFill = project.upliftFillInstances.find(
+      (f) => f.foundationInstanceId === foundation.instanceId
+    )!;
+    expect(updatedUpliftFill.topElevationM).toBeGreaterThan(updatedFoundation.baseElevation);
+  });
+});
+
 describe("setPoleModelHeightOffset", () => {
   it("moves the pole model and re-solves every foundation's base elevation (and its excavation's bottom) to follow the raised/lowered anchors", () => {
     useProjectStore.getState().setProject(buildSyntheticDemoProject());
@@ -217,6 +346,19 @@ describe("setPoleModelHeightOffset", () => {
 
       const excavationAfter = after.excavationInstances.find((e) => e.foundationInstanceId === foundationAfter.instanceId);
       if (excavationAfter) expect(excavationAfter.bottomElevationM).toBe(foundationAfter.baseElevation);
+
+      const fillAfter = after.fillInstances.find((fl) => fl.foundationInstanceId === foundationAfter.instanceId);
+      if (fillAfter) expect(fillAfter.topElevationM).toBe(foundationAfter.baseElevation);
+
+      const upliftFillBefore = before.upliftFillInstances.find(
+        (fl) => fl.foundationInstanceId === foundationBefore.instanceId
+      );
+      const upliftFillAfter = after.upliftFillInstances.find(
+        (fl) => fl.foundationInstanceId === foundationAfter.instanceId
+      );
+      if (upliftFillBefore && upliftFillAfter) {
+        expect(upliftFillAfter.topElevationM).toBeCloseTo(upliftFillBefore.topElevationM + 2.5, 9);
+      }
     }
   });
 });

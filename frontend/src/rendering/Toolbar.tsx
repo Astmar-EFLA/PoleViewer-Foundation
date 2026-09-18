@@ -3,7 +3,9 @@ import { useProjectStore } from "../state/projectStore";
 import { DropdownButton } from "./DropdownButton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ExcavationPanel } from "./ExcavationPanel";
+import { FillPanel } from "./FillPanel";
 import { FoundationPanel } from "./FoundationPanel";
+import { UpliftFillPanel } from "./UpliftFillPanel";
 import { GeotechPanel } from "./GeotechPanel";
 import { LayerPanel } from "./LayerPanel";
 import { LinePanel } from "./LinePanel";
@@ -90,6 +92,16 @@ export function Toolbar() {
       <DropdownButton label="Excavations" width={300} maxHeight="55vh">
         <ErrorBoundary label="Excavation panel">
           <ExcavationPanel />
+        </ErrorBoundary>
+      </DropdownButton>
+      <DropdownButton label="Fill" width={300} maxHeight="55vh">
+        <ErrorBoundary label="Fill panel">
+          <FillPanel />
+        </ErrorBoundary>
+      </DropdownButton>
+      <DropdownButton label="Uplift fill" width={300} maxHeight="55vh">
+        <ErrorBoundary label="Uplift fill panel">
+          <UpliftFillPanel />
         </ErrorBoundary>
       </DropdownButton>
       <DropdownButton label="Measurements" width={320} maxHeight="50vh">

@@ -12,11 +12,13 @@
 
 import type { LocalCoordinate } from "../domain/coordinates";
 import type { ExcavationInstance } from "../domain/excavation";
+import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import type { Project } from "../domain/project";
 import type { SectionDefinition, SectionPlane } from "../domain/section";
 import type { IndexedTriangle, XYZ } from "./barycentric";
 import { generateExcavationGeometry, type ExcavationGeometry } from "./excavationGeometry";
+import { generateFillGeometry, type FillGeometry } from "./fillGeometry";
 import { generateFoundationGeometry, type OrientedBox } from "./foundationGeometry";
 import { generateBoundarySurface } from "./geotechBoundary";
 import { placePoleModelPoint } from "./polePlacement";
@@ -182,6 +184,26 @@ export function excavationGeometryTriangles(geometry: ExcavationGeometry): Trian
   return triangles;
 }
 
+/** Mirrors FillMesh.tsx's own triangulation (top quad + skirt ring quads, terrain-following ring at the bottom) -- the vertical mirror of excavationGeometryTriangles, so the section is guaranteed to match the rendered fill. Shared by both fill layers (fillInstances/upliftFillInstances), which use the identical FillGeometry shape. */
+export function fillGeometryTriangles(geometry: FillGeometry): Triangle3[] {
+  const triangles: Triangle3[] = [];
+  const [c0, c1, c2, c3] = geometry.topCorners;
+  if (c0 && c1 && c2 && c3) {
+    triangles.push({ a: c0, b: c1, c: c2 }, { a: c0, b: c2, c: c3 });
+  }
+
+  const n = geometry.topRing.length;
+  for (let i = 0; i < n; i += 1) {
+    const next = (i + 1) % n;
+    const t0 = geometry.topRing[i]!;
+    const t1 = geometry.topRing[next]!;
+    const b0 = geometry.bottomRing[i]!.point;
+    const b1 = geometry.bottomRing[next]!.point;
+    triangles.push({ a: t0, b: t1, c: b1 }, { a: t0, b: b1, c: b0 });
+  }
+  return triangles;
+}
+
 export function buildSectionPlane(
   project: Project,
   mode: SectionDefinition["mode"],
@@ -229,6 +251,15 @@ export interface SectionExcavationOutline {
   readonly segments: readonly SectionSegment[];
 }
 
+/** Shared by both fill layers (fillInstances/upliftFillInstances) -- same FillInstance shape either way, so one outline type and one builder function serve both. */
+export interface SectionFillOutline {
+  readonly fillId: string;
+  readonly colour: string;
+  readonly truncated: boolean;
+  readonly topElevationM: number;
+  readonly segments: readonly SectionSegment[];
+}
+
 export interface SectionBoundaryLine {
   readonly id: string;
   readonly name: string;
@@ -245,6 +276,8 @@ export interface SectionResult {
   readonly anchors: readonly SectionAnchorMark[];
   readonly foundations: readonly SectionFoundationOutline[];
   readonly excavations: readonly SectionExcavationOutline[];
+  readonly fillOutlines: readonly SectionFillOutline[];
+  readonly upliftFillOutlines: readonly SectionFillOutline[];
   readonly geotechBoundaries: readonly SectionBoundaryLine[];
   readonly groundwater: SectionBoundaryLine | null;
 }
@@ -278,6 +311,25 @@ function excavationOutline(
     colour: excavation.colour,
     truncated: geometry.truncated,
     bottomElevationM: excavation.bottomElevationM,
+    segments: intersectTrianglesWithPlane(triangles, plane),
+  };
+}
+
+/** Mirrors excavationOutline -- the vertical mirror, built from FillGeometry instead of ExcavationGeometry. Shared by both fill layers; the caller passes fillInstances or upliftFillInstances. */
+function fillOutline(
+  fill: FillInstance,
+  foundation: FoundationInstance,
+  terrainSurface: Project["terrainSurface"],
+  plane: SectionPlane
+): SectionFillOutline | null {
+  if (!terrainSurface) return null;
+  const geometry = generateFillGeometry(fill, foundation, terrainSurface);
+  const triangles = fillGeometryTriangles(geometry);
+  return {
+    fillId: fill.id,
+    colour: fill.colour,
+    truncated: geometry.truncated,
+    topElevationM: fill.topElevationM,
     segments: intersectTrianglesWithPlane(triangles, plane),
   };
 }
@@ -335,6 +387,22 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
     })
     .filter((e): e is SectionExcavationOutline => e !== null);
 
+  const fillOutlines = project.fillInstances
+    .map((fill) => {
+      const foundation = project.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
+      if (!foundation) return null;
+      return fillOutline(fill, foundation, terrainSurface, plane);
+    })
+    .filter((f): f is SectionFillOutline => f !== null);
+
+  const upliftFillOutlines = project.upliftFillInstances
+    .map((fill) => {
+      const foundation = project.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
+      if (!foundation) return null;
+      return fillOutline(fill, foundation, terrainSurface, plane);
+    })
+    .filter((f): f is SectionFillOutline => f !== null);
+
   const geotechBoundaries: SectionBoundaryLine[] = [];
   if (terrainSurface) {
     for (const layer of project.geotechLayers) {
@@ -387,6 +455,8 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
     anchors,
     foundations,
     excavations,
+    fillOutlines,
+    upliftFillOutlines,
     geotechBoundaries,
     groundwater,
   };

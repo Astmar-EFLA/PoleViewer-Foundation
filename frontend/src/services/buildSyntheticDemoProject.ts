@@ -17,7 +17,12 @@ import type { TerrainPoint } from "../domain/terrain";
 import { degreesToRadians } from "../geometry/angles";
 import { generateTin } from "../geometry/terrain";
 import { buildFoundationInstanceForGuyAnchor, buildFoundationInstanceForLeg } from "./buildFoundationInstances";
-import { buildDefaultExcavationInstances, buildDefaultSections } from "./projectDefaults";
+import {
+  buildDefaultExcavationInstances,
+  buildDefaultFillInstances,
+  buildDefaultSections,
+  buildDefaultUpliftFillInstances,
+} from "./projectDefaults";
 import { parsePoleModel } from "../validation/poleModelSchema";
 
 const ASSUMED_GEOTECH_PROVENANCE = {
@@ -148,6 +153,8 @@ export function buildSyntheticDemoProject(): Project {
     poleModel,
     foundationInstances,
     excavationInstances: buildDefaultExcavationInstances(foundationInstances),
+    fillInstances: buildDefaultFillInstances(foundationInstances),
+    upliftFillInstances: buildDefaultUpliftFillInstances(foundationInstances),
     geotechLayers: buildDemoGeotechLayers(mastCentreProject.elevation),
     groundwater: buildDemoGroundwater(),
     // Points at the real synthetic LAS fixture (backend/workspace/, copied

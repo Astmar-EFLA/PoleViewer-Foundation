@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Project } from "../domain/project";
 import { excavationInstanceSchema } from "./excavationSchema";
+import { fillInstanceSchema } from "./fillSchema";
 import { foundationInstanceSchema } from "./foundationSchema";
 import { geotechLayerSchema, groundwaterSchema } from "./geotechSchema";
 import { measurementSchema } from "./measurementSchema";
@@ -59,6 +60,9 @@ export const projectSchema = z.object({
   poleModel: poleModelSchema,
   foundationInstances: z.array(foundationInstanceSchema),
   excavationInstances: z.array(excavationInstanceSchema),
+  // .default([]) so a project saved before this feature existed still opens cleanly.
+  fillInstances: z.array(fillInstanceSchema).default([]),
+  upliftFillInstances: z.array(fillInstanceSchema).default([]),
   geotechLayers: z.array(geotechLayerSchema),
   groundwater: groundwaterSchema.nullable(),
   pointCloudSource: pointCloudSourceReferenceSchema.nullable(),

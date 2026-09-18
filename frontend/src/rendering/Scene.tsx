@@ -10,6 +10,7 @@ import { queryElevation } from "../geometry/terrain";
 import type { FixedViewPreset } from "../state/projectStore";
 import { useProjectStore } from "../state/projectStore";
 import { ExcavationMesh } from "./ExcavationMesh";
+import { FillMesh } from "./FillMesh";
 import { FoundationMeshes } from "./FoundationMeshes";
 import { GeotechLayers } from "./GeotechLayers";
 import { GroundPointsCloud } from "./GroundPointsCloud";
@@ -218,6 +219,38 @@ export function Scene({ project }: SceneProps) {
             <ExcavationMesh
               key={excavation.id}
               excavation={excavation}
+              foundation={foundation}
+              terrainSurface={terrainSurface}
+              viewerFrame={viewerFrame}
+              selected={foundation.instanceId === selectedInstanceId}
+            />
+          );
+        })}
+
+      {terrainSurface &&
+        project.fillInstances.map((fill) => {
+          const foundation = project.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
+          if (!foundation) return null;
+          return (
+            <FillMesh
+              key={fill.id}
+              fill={fill}
+              foundation={foundation}
+              terrainSurface={terrainSurface}
+              viewerFrame={viewerFrame}
+              selected={foundation.instanceId === selectedInstanceId}
+            />
+          );
+        })}
+
+      {terrainSurface &&
+        project.upliftFillInstances.map((fill) => {
+          const foundation = project.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
+          if (!foundation) return null;
+          return (
+            <FillMesh
+              key={fill.id}
+              fill={fill}
               foundation={foundation}
               terrainSurface={terrainSurface}
               viewerFrame={viewerFrame}

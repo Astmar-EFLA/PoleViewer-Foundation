@@ -155,6 +155,8 @@ export function SectionView({
   }
   for (const f of result.foundations) collect(f.segments);
   for (const e of result.excavations) collect(e.segments);
+  for (const fl of result.fillOutlines) collect(fl.segments);
+  for (const fl of result.upliftFillOutlines) collect(fl.segments);
   for (const b of result.geotechBoundaries) collect(b.segments);
   if (result.groundwater) collect(result.groundwater.segments);
 
@@ -405,6 +407,16 @@ export function SectionView({
           {result.excavations.map((e) => (
             <g key={e.excavationId}>
               {renderSegments(e.segments, e.truncated ? ACCENT : e.colour, e.excavationId, 1)}
+            </g>
+          ))}
+          {result.fillOutlines.map((fl) => (
+            <g key={fl.fillId}>
+              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, 1, true)}
+            </g>
+          ))}
+          {result.upliftFillOutlines.map((fl) => (
+            <g key={fl.fillId}>
+              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, 1, true)}
             </g>
           ))}
 

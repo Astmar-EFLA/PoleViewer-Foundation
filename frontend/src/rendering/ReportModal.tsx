@@ -4,6 +4,9 @@ import type { EngineeringSummary, SummaryBucket } from "../services/engineeringS
 import { buildEngineeringSummary } from "../services/engineeringSummary";
 import type { ExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
 import { computeExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
+import type { FillMaterialQuantities } from "../services/fillMaterialQuantities";
+import { computeFillMaterialQuantities } from "../services/fillMaterialQuantities";
+import { validateUpliftFillInstance } from "../validation/fillValidation";
 import { downloadText } from "../services/browserDownload";
 import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
 import { useProjectStore } from "../state/projectStore";
@@ -51,10 +54,31 @@ function formatMaterialQuantitiesAsText(quantities: ExcavationMaterialQuantities
   return lines;
 }
 
+function formatFillQuantitiesAsText(quantities: FillMaterialQuantities, title: string): string[] {
+  const lines: string[] = [`## Material quantities (${title})`];
+  if (quantities.status === "no-terrain-surface") {
+    lines.push("Not calculated -- no terrain surface.");
+  } else if (quantities.status === "no-fills") {
+    lines.push("Not calculated -- no fills.");
+  } else {
+    lines.push(`Total fill: ${quantities.totalVolumeM3?.toFixed(1) ?? "-"} m3`);
+    if (quantities.fillsBlocked > 0) {
+      lines.push(
+        `${quantities.fillsBlocked} of ${quantities.fillsCalculated + quantities.fillsBlocked} fill(s) could not be calculated and are excluded from this total.`
+      );
+    }
+    for (const l of quantities.limitations) lines.push(`(${l})`);
+  }
+  lines.push("");
+  return lines;
+}
+
 function formatSummaryAsText(
   summary: EngineeringSummary,
   validation: ValidationResult[],
   materialQuantities: ExcavationMaterialQuantities,
+  fillQuantities: FillMaterialQuantities,
+  upliftFillQuantities: FillMaterialQuantities,
   nowIso: string
 ): string {
   const lines: string[] = [];
@@ -63,6 +87,8 @@ function formatSummaryAsText(
   lines.push("");
 
   lines.push(...formatMaterialQuantitiesAsText(materialQuantities));
+  lines.push(...formatFillQuantitiesAsText(fillQuantities, "fill"));
+  lines.push(...formatFillQuantitiesAsText(upliftFillQuantities, "uplift fill"));
 
   (["imported", "user-entered", "assumed", "calculated"] as SummaryBucket[]).forEach((bucket) => {
     const bucketEntries = summary.entries.filter((e) => e.bucket === bucket);
@@ -93,6 +119,38 @@ function formatSummaryAsText(
   }
 
   return lines.join("\n");
+}
+
+function FillQuantitiesSection({ title, quantities }: { title: string; quantities: FillMaterialQuantities }) {
+  return (
+    <>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Material quantities ({title})</div>
+      {quantities.status === "no-terrain-surface" && (
+        <div style={{ opacity: 0.7, marginBottom: 16 }}>Not calculated -- no terrain surface.</div>
+      )}
+      {quantities.status === "no-fills" && (
+        <div style={{ opacity: 0.7, marginBottom: 16 }}>Not calculated -- no fills.</div>
+      )}
+      {quantities.status === "calculated" && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 4 }}>
+            Total {title}: <strong>{quantities.totalVolumeM3?.toFixed(1) ?? "-"} m³</strong>
+          </div>
+          {quantities.fillsBlocked > 0 && (
+            <div style={{ color: "#c98a12", marginTop: 4 }}>
+              {quantities.fillsBlocked} of {quantities.fillsCalculated + quantities.fillsBlocked} fill(s) could not be
+              calculated and are excluded from this total.
+            </div>
+          )}
+          {quantities.limitations.map((l, i) => (
+            <div key={i} style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
+              {l}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
 }
 
 const overlayStyle: CSSProperties = {
@@ -143,8 +201,17 @@ export function ReportModal() {
     () => (project ? computeExcavationMaterialQuantities(project) : null),
     [project]
   );
+  const fillQuantities = useMemo(() => (project ? computeFillMaterialQuantities(project) : null), [project]);
+  const upliftFillQuantities = useMemo(
+    () =>
+      project
+        ? computeFillMaterialQuantities(project, project.upliftFillInstances, validateUpliftFillInstance)
+        : null,
+    [project]
+  );
 
-  if (!reportOpen || !project || !summary || !materialQuantities) return null;
+  if (!reportOpen || !project || !summary || !materialQuantities || !fillQuantities || !upliftFillQuantities)
+    return null;
 
   const buckets: SummaryBucket[] = ["imported", "user-entered", "assumed", "calculated"];
 
@@ -166,7 +233,11 @@ export function ReportModal() {
             style={buttonStyle}
             onClick={() =>
               downloadText(
-                JSON.stringify({ generatedAt: nowIso, summary, materialQuantities, validation }, null, 2),
+                JSON.stringify(
+                  { generatedAt: nowIso, summary, materialQuantities, fillQuantities, upliftFillQuantities, validation },
+                  null,
+                  2
+                ),
                 `${project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-report.json`,
                 "application/json"
               )
@@ -178,7 +249,7 @@ export function ReportModal() {
             style={buttonStyle}
             onClick={() =>
               downloadText(
-                formatSummaryAsText(summary, validation, materialQuantities, nowIso),
+                formatSummaryAsText(summary, validation, materialQuantities, fillQuantities, upliftFillQuantities, nowIso),
                 `${project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-report.txt`,
                 "text/plain"
               )
@@ -241,6 +312,9 @@ export function ReportModal() {
             ))}
           </div>
         )}
+
+        <FillQuantitiesSection title="fill" quantities={fillQuantities} />
+        <FillQuantitiesSection title="uplift fill" quantities={upliftFillQuantities} />
 
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Engineering parameters</div>
         {buckets.map((bucket) => {

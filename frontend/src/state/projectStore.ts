@@ -36,10 +36,16 @@ import {
 import type { BackendOrthophotoRegisterResult } from "../validation/backendOrthophotoSchema";
 import { buildDefaultFoundationInstances, resyncFoundationToAnchor, withFoundationType } from "../services/buildFoundationInstances";
 import { syncExcavationBottomsToFoundations, syncFoundationBaseToExcavation } from "../services/excavationFoundationSync";
+import { syncFillTopsToFoundations, syncFoundationBaseToFill, syncUpliftFillTopsToFoundations } from "../services/fillFoundationSync";
 import type { LineMastRow } from "../services/csvParsing";
 import { parseLineMastCsv } from "../services/csvParsing";
 import { readProjectJsonFile } from "../services/projectFile";
-import { buildDefaultExcavationInstances, buildDefaultSections } from "../services/projectDefaults";
+import {
+  buildDefaultExcavationInstances,
+  buildDefaultFillInstances,
+  buildDefaultSections,
+  buildDefaultUpliftFillInstances,
+} from "../services/projectDefaults";
 import { generateTerrainFromPointCloud } from "../services/terrainGeneration";
 import type { PolylinePoint } from "../geometry/centreline";
 import { bearingForMast } from "../geometry/centreline";
@@ -242,6 +248,16 @@ interface ProjectStoreState {
     excavationId: string,
     params: Partial<{ bottomElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope }>
   ): void;
+  setFillStyle(fillId: string, style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
+  setFillParameters(
+    fillId: string,
+    params: Partial<{ topElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope }>
+  ): void;
+  setUpliftFillStyle(fillId: string, style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
+  setUpliftFillParameters(
+    fillId: string,
+    params: Partial<{ topElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope }>
+  ): void;
   setActiveSectionId(sectionId: string | null): void;
   addSection(mode: SectionMode, legId: string | null): void;
   updateSectionPlane(sectionId: string, plane: SectionPlane): void;
@@ -343,6 +359,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         nowIso
       );
       const excavationInstances = buildDefaultExcavationInstances(foundationInstances);
+      const fillInstances = buildDefaultFillInstances(foundationInstances);
+      const upliftFillInstances = buildDefaultUpliftFillInstances(foundationInstances);
       const sections = buildDefaultSections();
 
       set((state) => {
@@ -353,6 +371,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
             poleModel,
             foundationInstances,
             excavationInstances,
+            fillInstances,
+            upliftFillInstances,
             // A pole-model import replaces the legs and foundations
             // wholesale, so anything that referenced the old ones by id
             // (a "selected leg" section, a measurement tied to an old
@@ -531,6 +551,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         nowIso
       );
       const excavationInstances = buildDefaultExcavationInstances(foundationInstances);
+      const fillInstances = buildDefaultFillInstances(foundationInstances);
+      const upliftFillInstances = buildDefaultUpliftFillInstances(foundationInstances);
       const sections = buildDefaultSections();
       const lineBearingRadians = bearingForMast(get().lineImport.masts, get().lineImport.centreline, index);
 
@@ -542,6 +564,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
             poleModel,
             foundationInstances,
             excavationInstances,
+            fillInstances,
+            upliftFillInstances,
             sections,
             measurements: [],
             mastCentreProject: row.position,
@@ -632,6 +656,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           poleModel,
           foundationInstances,
           excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
+          upliftFillInstances: syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
@@ -901,9 +927,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ...state.project,
           foundationInstances,
           // The foundation's base just moved (new type -> new solved
-          // elevation) -- its excavation's floor must always sit at the
-          // same elevation as the foundation's own base, never drift.
+          // elevation) -- its excavation's floor, its fill's top plate, and
+          // its uplift-fill's top (which also follows the foundation's own
+          // top, not just its base) must always stay in sync, never drift.
           excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
+          upliftFillInstances: syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
@@ -933,6 +962,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ...state.project,
           foundationInstances,
           excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
+          upliftFillInstances: syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
@@ -966,6 +997,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ...project,
           foundationInstances,
           excavationInstances: syncExcavationBottomsToFoundations(project.excavationInstances, foundationInstances),
+          fillInstances: syncFillTopsToFoundations(project.fillInstances, foundationInstances),
+          upliftFillInstances: syncUpliftFillTopsToFoundations(project.upliftFillInstances, foundationInstances),
           geometryVersion: project.geometryVersion + 1,
           modifiedAt: nowIso,
         },
@@ -1105,6 +1138,68 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ...state.project,
           excavationInstances,
           foundationInstances,
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  setFillStyle: (fillId, style) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          fillInstances: state.project.fillInstances.map((f) => (f.id === fillId ? { ...f, ...style } : f)),
+        },
+      };
+    }),
+  setFillParameters: (fillId, params) =>
+    set((state) => {
+      if (!state.project) return {};
+      const fillInstances = state.project.fillInstances.map((f) => (f.id === fillId ? { ...f, ...params } : f));
+      // Mirrors setExcavationParameters: a directly-edited top elevation is
+      // the user explicitly choosing a fill-top level -- the foundation's
+      // own base must always follow it (see fillFoundationSync.ts), never
+      // sit at a stale, independently-solved elevation.
+      const updatedFill = fillInstances.find((f) => f.id === fillId);
+      const foundationInstances =
+        params.topElevationM !== undefined && updatedFill
+          ? syncFoundationBaseToFill(state.project.foundationInstances, updatedFill)
+          : state.project.foundationInstances;
+      return {
+        project: {
+          ...state.project,
+          fillInstances,
+          foundationInstances,
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  setUpliftFillStyle: (fillId, style) =>
+    set((state) => {
+      if (!state.project) return {};
+      return {
+        project: {
+          ...state.project,
+          upliftFillInstances: state.project.upliftFillInstances.map((f) => (f.id === fillId ? { ...f, ...style } : f)),
+        },
+      };
+    }),
+  setUpliftFillParameters: (fillId, params) =>
+    set((state) => {
+      if (!state.project) return {};
+      // Unlike setFillParameters, this never pushes into the foundation --
+      // an uplift-fill's top elevation is a free value with no foundation
+      // field it corresponds to (see fillFoundationSync.ts's
+      // syncUpliftFillTopsToFoundations doc comment).
+      const upliftFillInstances = state.project.upliftFillInstances.map((f) =>
+        f.id === fillId ? { ...f, ...params } : f
+      );
+      return {
+        project: {
+          ...state.project,
+          upliftFillInstances,
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: new Date().toISOString(),
         },

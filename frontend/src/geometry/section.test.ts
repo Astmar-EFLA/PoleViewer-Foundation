@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { localCoordinate } from "../domain/coordinates";
 import type { ExcavationInstance } from "../domain/excavation";
+import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
@@ -14,6 +15,7 @@ import { generateFoundationGeometry } from "./foundationGeometry";
 import {
   buildSectionPlane,
   excavationGeometryTriangles,
+  fillGeometryTriangles,
   generateSectionResult,
   intersectTriangleWithPlane,
   orientedBoxTriangles,
@@ -21,6 +23,7 @@ import {
   type Triangle3,
 } from "./section";
 import { generateExcavationGeometry } from "./excavationGeometry";
+import { generateFillGeometry } from "./fillGeometry";
 import { generateTin } from "./terrain";
 
 const NOW = "2026-09-15T00:00:00.000Z";
@@ -158,6 +161,39 @@ describe("excavationGeometryTriangles", () => {
   });
 });
 
+function fill(overrides: Partial<FillInstance> = {}): FillInstance {
+  return {
+    id: "fill-1",
+    foundationInstanceId: "foundation-1",
+    topElevationM: 2.0,
+    workingSpaceOffsetM: 0.5,
+    sideSlope: { h: 2, v: 1 },
+    colour: "#8a6d3b",
+    opacity: 0.5,
+    visible: true,
+    wireframe: false,
+    provenance: PROVENANCE,
+    ...overrides,
+  };
+}
+
+describe("fillGeometryTriangles", () => {
+  it("produces a top face at the fill's top elevation (the vertical mirror of excavationGeometryTriangles)", () => {
+    const terrain = generateTin(loadTerrainFixturePoints("terrain-flat.json"), {
+      maxEdgeLengthM: 8.0,
+      terrainVersion: "flat-v1",
+      generatedAtIso: NOW,
+    });
+    // baseElevation above terrain (z=0) -- the fill case.
+    const geometry = generateFillGeometry(fill(), foundation({ baseElevation: 2.0 }), terrain);
+    const triangles = fillGeometryTriangles(geometry);
+    // First two triangles are the top quad.
+    expect(triangles[0]!.a.z).toBeCloseTo(2.0, 9);
+    expect(triangles[0]!.b.z).toBeCloseTo(2.0, 9);
+    expect(triangles[0]!.c.z).toBeCloseTo(2.0, 9);
+  });
+});
+
 describe("buildSectionPlane", () => {
   function minimalProject(): Project {
     const poleModelParsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
@@ -186,6 +222,8 @@ describe("buildSectionPlane", () => {
       poleModel,
       foundationInstances,
       excavationInstances: [],
+      fillInstances: [],
+      upliftFillInstances: [],
       geotechLayers: [],
       groundwater: null,
       pointCloudSource: null,
@@ -255,6 +293,8 @@ describe("generateSectionResult", () => {
       poleModel,
       foundationInstances,
       excavationInstances: [],
+      fillInstances: [],
+      upliftFillInstances: [],
       geotechLayers: [],
       groundwater: null,
       pointCloudSource: null,
@@ -295,6 +335,34 @@ describe("generateSectionResult", () => {
 
     expect(result.foundations).toHaveLength(1);
     expect(result.foundations[0]!.segments.length).toBeGreaterThan(0);
+  });
+
+  it("includes fill and uplift-fill outlines for a foundation above terrain", () => {
+    const base = projectWithFoundationAtOrigin();
+    const raisedFoundation = { ...base.foundationInstances[0]!, baseElevation: 2.0 };
+    const project: Project = {
+      ...base,
+      foundationInstances: [raisedFoundation],
+      fillInstances: [fill({ foundationInstanceId: raisedFoundation.instanceId, topElevationM: 2.0 })],
+      upliftFillInstances: [
+        fill({ id: "uplift-fill-1", foundationInstanceId: raisedFoundation.instanceId, topElevationM: 3.3 }),
+      ],
+    };
+    const section: SectionDefinition = {
+      id: "s1b",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: 0 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+
+    expect(result.fillOutlines).toHaveLength(1);
+    expect(result.fillOutlines[0]!.segments.length).toBeGreaterThan(0);
+    expect(result.upliftFillOutlines).toHaveLength(1);
+    expect(result.upliftFillOutlines[0]!.segments.length).toBeGreaterThan(0);
   });
 
   it("a plane far from every object produces empty content", () => {
