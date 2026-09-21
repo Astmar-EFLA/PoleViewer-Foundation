@@ -11,6 +11,8 @@ function mast(mastName: string, easting: number, northing: number, legAxis: Line
     bearingLayerDepthM: 2.5,
     groundwaterDepthM: 1.8,
     legAxis,
+    pointCloudPath: null,
+    foundationTypeId: null,
   };
 }
 

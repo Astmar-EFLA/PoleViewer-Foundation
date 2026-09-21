@@ -26,9 +26,21 @@ export const steppedRectangularParametersSchema = z.object({
   steps: z.array(rectangularStepSchema),
 });
 
+export const rectangularPadTaperedPedestalParametersSchema = z.object({
+  geometryType: z.literal("rectangular-pad-tapered-pedestal"),
+  padWidth: z.number().finite(),
+  padLength: z.number().finite(),
+  padThickness: z.number().finite(),
+  frustumHeight: z.number().finite(),
+  pedestalWidth: z.number().finite(),
+  pedestalLength: z.number().finite(),
+  pedestalHeight: z.number().finite(),
+});
+
 export const foundationParametersSchema = z.discriminatedUnion("geometryType", [
   rectangularPadPedestalParametersSchema,
   steppedRectangularParametersSchema,
+  rectangularPadTaperedPedestalParametersSchema,
 ]);
 
 export const foundationInstanceSchema = z.object({
@@ -63,7 +75,7 @@ export const foundationTypeSchema = z
     foundationTypeId: z.string().min(1),
     name: z.string().min(1),
     description: z.string().optional(),
-    geometryType: z.enum(["rectangular-pad-pedestal", "stepped-rectangular"]),
+    geometryType: z.enum(["rectangular-pad-pedestal", "stepped-rectangular", "rectangular-pad-tapered-pedestal"]),
     units: z.literal("m"),
     defaultParameters: foundationParametersSchema,
     defaultColour: z.string().min(1),

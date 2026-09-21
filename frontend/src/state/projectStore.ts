@@ -40,6 +40,7 @@ import { syncFillTopsToFoundations, syncFoundationBaseToFill, syncUpliftFillTops
 import type { LineMastRow } from "../services/csvParsing";
 import { parseLineMastCsv } from "../services/csvParsing";
 import { readProjectJsonFile } from "../services/projectFile";
+import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
 import {
   buildDefaultExcavationInstances,
   buildDefaultFillInstances,
@@ -174,6 +175,39 @@ const IDLE_LINE_IMPORT: LineImportState = {
   centrelineWarnings: [],
 };
 
+/**
+ * Batch-exporting a whole line's masts as standalone HTML files, one per
+ * selected mast (see runBatchExport below) -- session-only UI state, same
+ * as LineImportState. Per-mast status tracks each step (select the mast,
+ * resolve/register its point cloud, regenerate terrain, export) so the UI
+ * can show live progress and, critically, which towers were skipped or
+ * failed and why -- point-cloud survey coverage genuinely differs per
+ * tower, so a batch run is expected to have partial failures, not an
+ * all-or-nothing outcome.
+ */
+export type BatchExportMastStatus =
+  | "pending"
+  | "selecting"
+  | "loading-terrain"
+  | "exporting"
+  | "success"
+  | "error"
+  | "skipped";
+
+export interface BatchExportMastResult {
+  readonly mastIndex: number;
+  readonly mastName: string;
+  readonly status: BatchExportMastStatus;
+  readonly message: string | null;
+}
+
+export interface BatchExportState {
+  readonly status: "idle" | "running" | "done";
+  readonly results: readonly BatchExportMastResult[];
+}
+
+const IDLE_BATCH_EXPORT: BatchExportState = { status: "idle", results: [] };
+
 interface ProjectStoreState {
   readonly project: Project | null;
   readonly hover: HoverReadout | null;
@@ -194,15 +228,19 @@ interface ProjectStoreState {
   readonly pointCloudRegistration: PointCloudRegistrationState;
   readonly orthophotoRegistration: OrthophotoRegistrationState;
   readonly lineImport: LineImportState;
+  readonly batchExport: BatchExportState;
   importPoleModel(filePath: string, baseUrl?: string): Promise<void>;
   importPoleModelFromFile(file: File, baseUrl?: string): Promise<void>;
   registerPointCloudFromFile(file: File, baseUrl?: string): Promise<void>;
+  registerPointCloudFromPath(path: string, baseUrl?: string): Promise<void>;
   registerOrthophoto(imagePath: string, worldFilePath?: string, baseUrl?: string): Promise<void>;
   registerOrthophotoFromFiles(imageFile: File, worldFile: File, baseUrl?: string): Promise<void>;
   fetchWorldImageryOrthophoto(widthM?: number, heightM?: number, baseUrl?: string): Promise<void>;
   importLineCsv(file: File): Promise<void>;
   importLineCentreline(file: File, baseUrl?: string): Promise<void>;
   selectLineMast(index: number, baseUrl?: string): Promise<void>;
+  runBatchExport(indices: readonly number[], baseUrl?: string): Promise<void>;
+  resetBatchExport(): void;
   requestCameraPreset(preset: FixedViewPreset): void;
   setCanvasElement(canvas: HTMLCanvasElement | null): void;
   setReportOpen(open: boolean): void;
@@ -342,6 +380,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
   orthophotoRegistration: IDLE_ORTHOPHOTO_REGISTRATION,
   lineImport: IDLE_LINE_IMPORT,
+  batchExport: IDLE_BATCH_EXPORT,
   importPoleModel: async (filePath, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
     const project = get().project;
     if (!project) return;
@@ -424,6 +463,34 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           project: {
             ...state.project,
             pointCloudSource: { filePath: uploaded.filePath, crs: metadata.crs, contentHash: null },
+            modifiedAt: nowIso,
+          },
+          pointCloudRegistration: { status: "success", errorMessage: null },
+        };
+      });
+    } catch (error) {
+      const message =
+        error instanceof BackendRequestError ? error.message : `Unexpected error: ${(error as Error).message}`;
+      set({ pointCloudRegistration: { status: "error", errorMessage: message } });
+    }
+  },
+  registerPointCloudFromPath: async (path, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    // The path-based sibling of registerPointCloudFromFile above -- for a
+    // point cloud that already sits in the workspace (e.g. a per-mast CSV
+    // row's own pointCloudPath, see runBatchExport), skipping the upload
+    // step entirely, the same way modelPath is already consumed directly
+    // by requestPoleModelImport with no upload.
+    if (!get().project) return;
+    set({ pointCloudRegistration: { status: "loading", errorMessage: null } });
+    try {
+      const metadata = await requestInspect(path, baseUrl);
+      const nowIso = new Date().toISOString();
+      set((state) => {
+        if (!state.project) return {};
+        return {
+          project: {
+            ...state.project,
+            pointCloudSource: { filePath: path, crs: metadata.crs, contentHash: null },
             modifiedAt: nowIso,
           },
           pointCloudRegistration: { status: "success", errorMessage: null },
@@ -542,11 +609,18 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     try {
       const poleModel = await requestPoleModelImport(row.modelPath, baseUrl);
       const nowIso = new Date().toISOString();
-      const defaultLegFoundationType = requireFoundationTypeById("rectangular-pad-pedestal-v1");
+      // The CSV row's own foundationTypeId, when supplied, overrides the leg
+      // foundation type for this mast only -- guy anchors are unaffected
+      // (see LineMastRow.foundationTypeId's doc comment). Already validated
+      // against the library at CSV parse time (csvParsing.ts), so this is
+      // never an unknown id here.
+      const legFoundationType = row.foundationTypeId
+        ? requireFoundationTypeById(row.foundationTypeId)
+        : requireFoundationTypeById("rectangular-pad-pedestal-v1");
       const defaultGuyFoundationType = requireFoundationTypeById("guy-anchor-block-v1");
       const foundationInstances = buildDefaultFoundationInstances(
         poleModel,
-        defaultLegFoundationType,
+        legFoundationType,
         defaultGuyFoundationType,
         nowIso
       );
@@ -602,6 +676,81 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       }));
     }
   },
+  runBatchExport: async (indices, baseUrl = DEFAULT_BACKEND_BASE_URL) => {
+    const masts = get().lineImport.masts;
+    const initialResults: BatchExportMastResult[] = indices.map((mastIndex) => ({
+      mastIndex,
+      mastName: masts[mastIndex]?.mastName ?? `row ${mastIndex + 1}`,
+      status: "pending",
+      message: null,
+    }));
+    set({ batchExport: { status: "running", results: initialResults } });
+
+    const updateResult = (mastIndex: number, patch: Partial<BatchExportMastResult>) => {
+      set((state) => ({
+        batchExport: {
+          ...state.batchExport,
+          results: state.batchExport.results.map((r) => (r.mastIndex === mastIndex ? { ...r, ...patch } : r)),
+        },
+      }));
+    };
+
+    for (const mastIndex of indices) {
+      const row = masts[mastIndex];
+      if (!row) continue;
+
+      updateResult(mastIndex, { status: "selecting" });
+      await get().selectLineMast(mastIndex, baseUrl);
+      if (get().lineImport.selectMastStatus === "error") {
+        updateResult(mastIndex, { status: "error", message: get().lineImport.selectMastErrorMessage });
+        continue;
+      }
+
+      // Each mast's own point cloud, when the CSV row supplies one; falls
+      // back to whatever point cloud is currently registered on the
+      // project otherwise (today's single-shared-point-cloud behaviour,
+      // preserved for a line whose towers don't each have their own file).
+      const pointCloudPath = row.pointCloudPath ?? get().project?.pointCloudSource?.filePath ?? null;
+      if (!pointCloudPath) {
+        updateResult(mastIndex, {
+          status: "skipped",
+          message: "No point cloud available for this mast (no pointCloudPath in the CSV row, and none currently registered on the project).",
+        });
+        continue;
+      }
+
+      updateResult(mastIndex, { status: "loading-terrain" });
+      if (row.pointCloudPath && row.pointCloudPath !== get().project?.pointCloudSource?.filePath) {
+        await get().registerPointCloudFromPath(row.pointCloudPath, baseUrl);
+        if (get().pointCloudRegistration.status === "error") {
+          updateResult(mastIndex, { status: "error", message: get().pointCloudRegistration.errorMessage });
+          continue;
+        }
+      }
+      await get().regenerateTerrainFromPointCloud();
+      if (get().terrainRegeneration.status === "error") {
+        // An export without valid terrain would misrepresent a mast that
+        // genuinely has bad/missing survey data -- surfacing that clearly
+        // is the point of this feature, not silently shipping a broken
+        // viewer for it.
+        updateResult(mastIndex, { status: "error", message: get().terrainRegeneration.errorMessage });
+        continue;
+      }
+
+      updateResult(mastIndex, { status: "exporting" });
+      try {
+        const project = get().project;
+        if (!project) throw new Error("Project was cleared mid-batch.");
+        await exportProjectAsStandaloneHtml(project);
+        updateResult(mastIndex, { status: "success", message: null });
+      } catch (error) {
+        updateResult(mastIndex, { status: "error", message: (error as Error).message });
+      }
+    }
+
+    set((state) => ({ batchExport: { ...state.batchExport, status: "done" } }));
+  },
+  resetBatchExport: () => set({ batchExport: IDLE_BATCH_EXPORT }),
   requestCameraPreset: (preset) =>
     set((state) => ({ cameraPresetRequest: { preset, nonce: (state.cameraPresetRequest?.nonce ?? 0) + 1 } })),
   setCanvasElement: (canvas) => set({ canvasElement: canvas }),
@@ -724,6 +873,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
       orthophotoRegistration: IDLE_ORTHOPHOTO_REGISTRATION,
       lineImport: IDLE_LINE_IMPORT,
+      batchExport: IDLE_BATCH_EXPORT,
     });
   },
   dismissProjectFileLoadError: () => set({ projectFileLoad: IDLE_PROJECT_FILE_LOAD }),
@@ -738,6 +888,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       pointCloudRegistration: IDLE_POINT_CLOUD_REGISTRATION,
       orthophotoRegistration: IDLE_ORTHOPHOTO_REGISTRATION,
       lineImport: IDLE_LINE_IMPORT,
+      batchExport: IDLE_BATCH_EXPORT,
     }),
   setLayerVisible: (layer, visible) =>
     set((state) => {

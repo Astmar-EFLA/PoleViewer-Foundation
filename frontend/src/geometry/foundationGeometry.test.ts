@@ -2,12 +2,19 @@ import { describe, expect, it } from "vitest";
 import type {
   FoundationInstance,
   RectangularPadPedestalParameters,
+  RectangularPadTaperedPedestalParameters,
   SteppedRectangularParameters,
 } from "../domain/foundation";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
 import { parsePoleModel } from "../validation/poleModelSchema";
 import { placedAnchorPosition } from "./polePlacement";
+import type { FoundationGeometryPart, OrientedBox } from "./foundationGeometry";
 import { generateFoundationGeometry } from "./foundationGeometry";
+
+function requireBox(part: FoundationGeometryPart): OrientedBox {
+  if (part.kind !== "box") throw new Error(`Expected a box part, got "${part.kind}".`);
+  return part;
+}
 
 const BASE_PROVENANCE = {
   originType: "assumed" as const,
@@ -31,7 +38,9 @@ function instanceFor(
     foundationTypeId:
       parameters.geometryType === "rectangular-pad-pedestal"
         ? "rectangular-pad-pedestal-v1"
-        : "stepped-rectangular-v1",
+        : parameters.geometryType === "stepped-rectangular"
+          ? "stepped-rectangular-v1"
+          : "rectangular-pad-tapered-pedestal-v1",
     parameters,
     position,
     orientationRadians: 0,
@@ -71,8 +80,8 @@ describe("generateFoundationGeometry: rectangular-pad-pedestal", () => {
     const instance = instanceFor("leg-a", "anchor-leg-a", { x: 0, y: 0 }, 0, params);
     const geometry = generateFoundationGeometry(instance);
     const [pad, pedestal] = geometry.parts;
-    expect(pad!.halfExtents.x).toBeCloseTo(1.0, 9);
-    expect(pedestal!.halfExtents.z).toBeCloseTo(0.45, 9);
+    expect(requireBox(pad!).halfExtents.x).toBeCloseTo(1.0, 9);
+    expect(requireBox(pedestal!).halfExtents.z).toBeCloseTo(0.45, 9);
   });
 });
 
@@ -104,8 +113,8 @@ describe("generateFoundationGeometry: stepped-rectangular", () => {
   it("half-extents reflect each step's own width/length", () => {
     const instance = instanceFor("leg-a", "anchor-leg-a", { x: 0, y: 0 }, 0, params);
     const geometry = generateFoundationGeometry(instance);
-    expect(geometry.parts[0]!.halfExtents.x).toBeCloseTo(1.0, 9);
-    expect(geometry.parts[2]!.halfExtents.x).toBeCloseTo(0.25, 9);
+    expect(requireBox(geometry.parts[0]!).halfExtents.x).toBeCloseTo(1.0, 9);
+    expect(requireBox(geometry.parts[2]!).halfExtents.x).toBeCloseTo(0.25, 9);
   });
 
   it("a single-step foundation still produces a valid top connection point", () => {
@@ -117,6 +126,50 @@ describe("generateFoundationGeometry: stepped-rectangular", () => {
     const geometry = generateFoundationGeometry(instance);
     expect(geometry.parts).toHaveLength(1);
     expect(geometry.topConnectionPoint.z).toBeCloseTo(-1 + 0.6, 9);
+  });
+});
+
+describe("generateFoundationGeometry: rectangular-pad-tapered-pedestal", () => {
+  const params: RectangularPadTaperedPedestalParameters = {
+    geometryType: "rectangular-pad-tapered-pedestal",
+    padWidth: 2.0,
+    padLength: 2.0,
+    padThickness: 0.6,
+    frustumHeight: 0.5,
+    pedestalWidth: 0.6,
+    pedestalLength: 0.6,
+    pedestalHeight: 0.9,
+  };
+
+  it("produces [pad, frustum, pedestal] with the frustum bridging the pad's and pedestal's own footprints", () => {
+    const instance = instanceFor("leg-a", "anchor-leg-a", { x: -1.5, y: 0 }, -1.5, params);
+    const geometry = generateFoundationGeometry(instance);
+
+    expect(geometry.parts).toHaveLength(3);
+    const [pad, frustum, pedestal] = geometry.parts;
+    expect(pad!.kind).toBe("box");
+    expect(frustum!.kind).toBe("frustum");
+    expect(pedestal!.kind).toBe("box");
+
+    expect(pad!.centre.z).toBeCloseTo(-1.5 + 0.3, 9); // baseElevation + padThickness/2
+    expect(frustum!.centre.z).toBeCloseTo(-1.5 + 0.6 + 0.25, 9); // + padThickness + frustumHeight/2
+    expect(pedestal!.centre.z).toBeCloseTo(-1.5 + 0.6 + 0.5 + 0.45, 9); // + padThickness + frustumHeight + pedestalHeight/2
+    expect(geometry.topConnectionPoint.z).toBeCloseTo(-1.5 + 0.6 + 0.5 + 0.9, 9);
+    expect(geometry.topConnectionPoint.x).toBeCloseTo(-1.5, 9);
+    expect(geometry.topConnectionPoint.y).toBeCloseTo(0, 9);
+  });
+
+  it("the frustum's bottom half-extents match the pad, and its top half-extents match the pedestal", () => {
+    const instance = instanceFor("leg-a", "anchor-leg-a", { x: 0, y: 0 }, 0, params);
+    const geometry = generateFoundationGeometry(instance);
+    const frustum = geometry.parts[1];
+    if (frustum?.kind !== "frustum") throw new Error("expected a frustum part");
+
+    expect(frustum.bottomHalfExtents.x).toBeCloseTo(1.0, 9); // padWidth/2
+    expect(frustum.bottomHalfExtents.y).toBeCloseTo(1.0, 9); // padLength/2
+    expect(frustum.topHalfExtents.x).toBeCloseTo(0.3, 9); // pedestalWidth/2
+    expect(frustum.topHalfExtents.y).toBeCloseTo(0.3, 9); // pedestalLength/2
+    expect(frustum.halfHeight).toBeCloseTo(0.25, 9); // frustumHeight/2
   });
 });
 

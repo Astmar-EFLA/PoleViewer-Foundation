@@ -168,25 +168,56 @@ export function SectionView({
     );
   }
 
-  const sMin = Math.min(...allS);
-  const sMax = Math.max(...allS);
-  const zMin = Math.min(...allZ);
-  const zMax = Math.max(...allZ);
-  const sSpan = Math.max(sMax - sMin, 1e-6);
-  const zSpan = Math.max(zMax - zMin, 1e-6);
-
   const usableWidth = width - MARGIN.left - MARGIN.right;
   const usableHeight = height - MARGIN.top - MARGIN.bottom;
   const padFactor = 0.1;
-  const paddedSSpan = sSpan * (1 + padFactor * 2);
-  const paddedZSpan = zSpan * (1 + padFactor * 2);
-  const fitScale = Math.min(usableWidth / paddedSSpan, usableHeight / paddedZSpan);
-  const fitView: View = { scale: fitScale, sCenter: (sMin + sMax) / 2, zCenter: (zMin + zMax) / 2 };
 
-  const minScale = fitScale * 0.4;
-  const maxScale = fitScale * 200;
+  function fitFrom(sVals: readonly number[], zVals: readonly number[]): View {
+    const sMin = Math.min(...sVals);
+    const sMax = Math.max(...sVals);
+    const zMin = Math.min(...zVals);
+    const zMax = Math.max(...zVals);
+    const sSpan = Math.max(sMax - sMin, 1e-6);
+    const zSpan = Math.max(zMax - zMin, 1e-6);
+    const paddedSSpan = sSpan * (1 + padFactor * 2);
+    const paddedZSpan = zSpan * (1 + padFactor * 2);
+    const scale = Math.min(usableWidth / paddedSSpan, usableHeight / paddedZSpan);
+    return { scale, sCenter: (sMin + sMax) / 2, zCenter: (zMin + zMax) / 2 };
+  }
 
-  const effective = view ?? fitView;
+  // Full-extent fit (terrain, geotech layers, everything) -- used only to
+  // bound how far out zooming can go, so "see the whole profile" is always
+  // reachable by scrolling out.
+  const fitView = fitFrom(allS, allZ);
+  const minScale = fitView.scale * 0.4;
+  const maxScale = fitView.scale * 200;
+
+  // The INITIAL/reset view fits only the built structures (foundations,
+  // anchors, excavation, fill) -- a geotech profile can span the whole
+  // terrain clip width, which made the old "fit everything" default open
+  // zoomed out far past the point anyone actually looks at first. Falls
+  // back to the full-extent fit for a section that happens to cross no
+  // structure at all.
+  const structureS: number[] = [];
+  const structureZ: number[] = [];
+  const collectInto = (sArr: number[], zArr: number[], segs: readonly SectionSegment[]) => {
+    for (const seg of segs) {
+      sArr.push(seg.a.s, seg.b.s);
+      zArr.push(seg.a.z, seg.b.z);
+    }
+  };
+  for (const a of result.anchors) {
+    structureS.push(a.s);
+    structureZ.push(a.z);
+  }
+  for (const f of result.foundations) collectInto(structureS, structureZ, f.segments);
+  for (const e of result.excavations) collectInto(structureS, structureZ, e.segments);
+  for (const fl of result.fillOutlines) collectInto(structureS, structureZ, fl.segments);
+  for (const fl of result.upliftFillOutlines) collectInto(structureS, structureZ, fl.segments);
+  const structureFit = structureS.length > 0 ? fitFrom(structureS, structureZ) : null;
+  const defaultView = structureFit ? { ...structureFit, scale: clamp(structureFit.scale, minScale, maxScale) } : fitView;
+
+  const effective = view ?? defaultView;
   const { scale, sCenter, zCenter } = effective;
 
   const plotCentreX = MARGIN.left + usableWidth / 2;

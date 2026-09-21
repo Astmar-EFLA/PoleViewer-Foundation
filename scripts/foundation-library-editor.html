@@ -225,7 +225,7 @@
 <script>
 'use strict';
 
-const GEOMETRY_TYPES = ["rectangular-pad-pedestal", "stepped-rectangular"];
+const GEOMETRY_TYPES = ["rectangular-pad-pedestal", "stepped-rectangular", "rectangular-pad-tapered-pedestal"];
 const VERIFICATION_STATES = ["unverified", "verified", "rejected"];
 const ORIGIN_TYPES = ["imported", "user-entered", "assumed", "transformed", "interpolated", "calculated", "library-default"];
 
@@ -233,6 +233,16 @@ const RECT_FIELDS = [
   ["padWidth", "Pad width (m)"],
   ["padLength", "Pad length (m)"],
   ["padThickness", "Pad thickness (m)"],
+  ["pedestalWidth", "Pedestal width (m)"],
+  ["pedestalLength", "Pedestal length (m)"],
+  ["pedestalHeight", "Pedestal height (m)"],
+];
+
+const TAPERED_FIELDS = [
+  ["padWidth", "Pad width (m)"],
+  ["padLength", "Pad length (m)"],
+  ["padThickness", "Pad thickness (m)"],
+  ["frustumHeight", "Frustum height (m)"],
   ["pedestalWidth", "Pedestal width (m)"],
   ["pedestalLength", "Pedestal length (m)"],
   ["pedestalHeight", "Pedestal height (m)"],
@@ -265,6 +275,14 @@ function defaultRectParams() {
 }
 function defaultSteppedParams() {
   return { geometryType: "stepped-rectangular", steps: [{ width: 1.0, length: 1.0, height: 0.4 }] };
+}
+function defaultTaperedParams() {
+  return {
+    geometryType: "rectangular-pad-tapered-pedestal",
+    padWidth: 1.6, padLength: 1.6, padThickness: 0.3,
+    frustumHeight: 0.5,
+    pedestalWidth: 0.4, pedestalLength: 0.4, pedestalHeight: 1.0,
+  };
 }
 function defaultEntry() {
   return {
@@ -525,7 +543,9 @@ function renderForm() {
   const geometry = el("fieldset", {}, [el("legend", { text: "Geometry" })]);
   geometry.appendChild(field("Geometry type", selectInput(GEOMETRY_TYPES, entry.geometryType, (v) => {
     entry.geometryType = v;
-    entry.defaultParameters = v === "rectangular-pad-pedestal" ? defaultRectParams() : defaultSteppedParams();
+    if (v === "rectangular-pad-pedestal") entry.defaultParameters = defaultRectParams();
+    else if (v === "stepped-rectangular") entry.defaultParameters = defaultSteppedParams();
+    else entry.defaultParameters = defaultTaperedParams();
     renderForm();
   })));
   formEl.appendChild(geometry);
@@ -534,6 +554,12 @@ function renderForm() {
   if (entry.geometryType === "rectangular-pad-pedestal") {
     const grid = el("div", { class: "row-2col" });
     for (const [key, label] of RECT_FIELDS) {
+      grid.appendChild(field(label, numberInput(entry.defaultParameters[key], (v) => entry.defaultParameters[key] = v, { step: "0.05", min: "0" })));
+    }
+    params.appendChild(grid);
+  } else if (entry.geometryType === "rectangular-pad-tapered-pedestal") {
+    const grid = el("div", { class: "row-2col" });
+    for (const [key, label] of TAPERED_FIELDS) {
       grid.appendChild(field(label, numberInput(entry.defaultParameters[key], (v) => entry.defaultParameters[key] = v, { step: "0.05", min: "0" })));
     }
     params.appendChild(grid);
@@ -653,6 +679,13 @@ function validateLibrary() {
 
     if (entry.geometryType === "rectangular-pad-pedestal") {
       for (const [key, fieldLabel] of RECT_FIELDS) {
+        const v = entry.defaultParameters[key];
+        if (typeof v !== "number" || !Number.isFinite(v)) {
+          errors.push(`"${label}": ${fieldLabel} must be a number.`);
+        }
+      }
+    } else if (entry.geometryType === "rectangular-pad-tapered-pedestal") {
+      for (const [key, fieldLabel] of TAPERED_FIELDS) {
         const v = entry.defaultParameters[key];
         if (typeof v !== "number" || !Number.isFinite(v)) {
           errors.push(`"${label}": ${fieldLabel} must be a number.`);

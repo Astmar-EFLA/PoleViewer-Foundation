@@ -24,6 +24,13 @@ export function foundationBottomFootprint(foundation: FoundationInstance): Recta
   if (!bottomPart) {
     throw new Error(`Foundation "${foundation.instanceId}" produced no geometry parts.`);
   }
+  if (bottomPart.kind !== "box") {
+    // Every geometry type places a flat box (the pad) at index 0 -- a
+    // frustum or other tapered part is never the bottom-most part -- so
+    // this never actually fires; it exists to fail loudly rather than
+    // silently if that invariant is ever broken by a future geometry type.
+    throw new Error(`Foundation "${foundation.instanceId}"'s bottom-most part must be a box (got "${bottomPart.kind}").`);
+  }
   return {
     centre: { x: bottomPart.centre.x, y: bottomPart.centre.y },
     halfWidth: bottomPart.halfExtents.x,

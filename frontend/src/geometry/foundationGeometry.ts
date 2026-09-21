@@ -4,18 +4,38 @@ import type {
   FoundationInstance,
   FoundationParameters,
   RectangularPadPedestalParameters,
+  RectangularPadTaperedPedestalParameters,
   SteppedRectangularParameters,
 } from "../domain/foundation";
 
 export interface OrientedBox {
+  readonly kind: "box";
   readonly centre: LocalCoordinate;
   readonly halfExtents: { readonly x: number; readonly y: number; readonly z: number };
   readonly orientationRadians: number;
 }
 
+/**
+ * A tapered rectangular frustum -- the sloped transition between a pad and a
+ * narrower pedestal (rectangular-pad-tapered-pedestal). Unlike OrientedBox,
+ * top and bottom faces have independent half-extents; `centre.z` is the
+ * vertical midpoint (bottomZ = centre.z - halfHeight, topZ = centre.z +
+ * halfHeight).
+ */
+export interface OrientedFrustum {
+  readonly kind: "frustum";
+  readonly centre: LocalCoordinate;
+  readonly bottomHalfExtents: { readonly x: number; readonly y: number };
+  readonly topHalfExtents: { readonly x: number; readonly y: number };
+  readonly halfHeight: number;
+  readonly orientationRadians: number;
+}
+
+export type FoundationGeometryPart = OrientedBox | OrientedFrustum;
+
 export interface FoundationGeometry {
-  /** Bottom to top. Rectangular-pad-pedestal produces [pad, pedestal]; stepped-rectangular produces one entry per step. */
-  readonly parts: readonly OrientedBox[];
+  /** Bottom to top. Rectangular-pad-pedestal produces [pad, pedestal]; stepped-rectangular produces one entry per step; rectangular-pad-tapered-pedestal produces [pad, frustum, pedestal]. */
+  readonly parts: readonly FoundationGeometryPart[];
   /** Top face centre of the topmost part -- where this foundation should meet its leg's anchor. */
   readonly topConnectionPoint: LocalCoordinate;
 }
@@ -46,11 +66,13 @@ export function generateRectangularPadPedestalGeometry(
   return {
     parts: [
       {
+        kind: "box",
         centre: localCoordinate(position.x, position.y, padCentreZ),
         halfExtents: { x: padWidth / 2, y: padLength / 2, z: padThickness / 2 },
         orientationRadians,
       },
       {
+        kind: "box",
         centre: localCoordinate(position.x, position.y, pedestalCentreZ),
         halfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2, z: pedestalHeight / 2 },
         orientationRadians,
@@ -72,6 +94,7 @@ export function generateSteppedRectangularGeometry(
   for (const step of params.steps) {
     const centreZ = currentZ + step.height / 2;
     parts.push({
+      kind: "box",
       centre: localCoordinate(position.x, position.y, centreZ),
       halfExtents: { x: step.width / 2, y: step.length / 2, z: step.height / 2 },
       orientationRadians,
@@ -85,6 +108,48 @@ export function generateSteppedRectangularGeometry(
   };
 }
 
+/** Pad -> tapered frustum -> pedestal, bottom to top. The frustum's own footprint is implied: its bottom face matches the pad's footprint, its top face matches the pedestal's -- no separate frustum footprint fields needed. */
+export function generateRectangularPadTaperedPedestalGeometry(
+  params: RectangularPadTaperedPedestalParameters,
+  placement: PlacementFields
+): FoundationGeometry {
+  const { padWidth, padLength, padThickness, frustumHeight, pedestalWidth, pedestalLength, pedestalHeight } = params;
+  const { position, orientationRadians, baseElevation } = placement;
+
+  const padCentreZ = baseElevation + padThickness / 2;
+  const frustumBottomZ = baseElevation + padThickness;
+  const frustumTopZ = frustumBottomZ + frustumHeight;
+  const frustumCentreZ = (frustumBottomZ + frustumTopZ) / 2;
+  const pedestalCentreZ = frustumTopZ + pedestalHeight / 2;
+  const topConnectionZ = frustumTopZ + pedestalHeight;
+
+  return {
+    parts: [
+      {
+        kind: "box",
+        centre: localCoordinate(position.x, position.y, padCentreZ),
+        halfExtents: { x: padWidth / 2, y: padLength / 2, z: padThickness / 2 },
+        orientationRadians,
+      },
+      {
+        kind: "frustum",
+        centre: localCoordinate(position.x, position.y, frustumCentreZ),
+        bottomHalfExtents: { x: padWidth / 2, y: padLength / 2 },
+        topHalfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2 },
+        halfHeight: frustumHeight / 2,
+        orientationRadians,
+      },
+      {
+        kind: "box",
+        centre: localCoordinate(position.x, position.y, pedestalCentreZ),
+        halfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2, z: pedestalHeight / 2 },
+        orientationRadians,
+      },
+    ],
+    topConnectionPoint: localCoordinate(position.x, position.y, topConnectionZ),
+  };
+}
+
 export function generateFoundationGeometryFromParameters(
   parameters: FoundationParameters,
   placement: PlacementFields
@@ -94,6 +159,8 @@ export function generateFoundationGeometryFromParameters(
       return generateRectangularPadPedestalGeometry(parameters, placement);
     case "stepped-rectangular":
       return generateSteppedRectangularGeometry(parameters, placement);
+    case "rectangular-pad-tapered-pedestal":
+      return generateRectangularPadTaperedPedestalGeometry(parameters, placement);
   }
 }
 

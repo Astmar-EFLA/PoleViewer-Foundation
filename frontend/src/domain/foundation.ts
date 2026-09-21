@@ -20,6 +20,32 @@ export interface RectangularPadPedestalParameters {
   readonly pedestalHeight: number;
 }
 
+/**
+ * Foundation type #3 from the parametric library: a flat pad, a tapered
+ * (frustum) transition, then a flat pedestal -- the pad/pedestal fields are
+ * identical to RectangularPadPedestalParameters; frustumHeight is the only
+ * new dimension (the sloped section's own height, pad-top to
+ * pedestal-bottom). Real-world use case: a footing whose sides batter
+ * inward to the column instead of stepping sharply, saving concrete.
+ */
+export interface RectangularPadTaperedPedestalParameters {
+  readonly geometryType: "rectangular-pad-tapered-pedestal";
+  /** Pad width along local X (transverse), m. */
+  readonly padWidth: number;
+  /** Pad length along local Y (longitudinal), m. */
+  readonly padLength: number;
+  /** Pad thickness (vertical), m. */
+  readonly padThickness: number;
+  /** Height of the tapered frustum, pad top to pedestal bottom, m. */
+  readonly frustumHeight: number;
+  /** Pedestal width along local X, m. */
+  readonly pedestalWidth: number;
+  /** Pedestal length along local Y, m. */
+  readonly pedestalLength: number;
+  /** Pedestal height, frustum top to pedestal top, m. */
+  readonly pedestalHeight: number;
+}
+
 /** One rectangular tier of a stepped foundation, ordered bottom to top and centred on the same (x, y). */
 export interface RectangularStep {
   readonly width: number;
@@ -40,7 +66,10 @@ export interface SteppedRectangularParameters {
  * generation stays a pure function of a FoundationInstance alone -- no
  * library lookup required at render time (ADR-006).
  */
-export type FoundationParameters = RectangularPadPedestalParameters | SteppedRectangularParameters;
+export type FoundationParameters =
+  | RectangularPadPedestalParameters
+  | SteppedRectangularParameters
+  | RectangularPadTaperedPedestalParameters;
 export type FoundationGeometryType = FoundationParameters["geometryType"];
 
 export interface FoundationType {

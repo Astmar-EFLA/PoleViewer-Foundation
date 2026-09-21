@@ -1,7 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildSyntheticDemoProject } from "../services/buildSyntheticDemoProject";
+import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
 import { useProjectStore } from "./projectStore";
+
+// Nothing else in this file exercises the real download path (fetch the
+// viewer template, splice JSON, trigger a browser download) -- jsdom has no
+// real URL.createObjectURL/anchor-download support, the same reason
+// exportProjectHtml.test.ts itself only unit-tests the pure
+// embedProjectIntoTemplate function rather than this one. Mocked file-wide
+// here since only the new batch-export tests below call it.
+vi.mock("../services/exportProjectHtml", () => ({
+  exportProjectAsStandaloneHtml: vi.fn().mockResolvedValue(undefined),
+}));
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -27,6 +38,7 @@ function hangingFetchThatRejectsOnAbort() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.mocked(exportProjectAsStandaloneHtml).mockClear();
 });
 
 describe("checkPointCloudAssetStatus cancellation", () => {
@@ -415,6 +427,28 @@ describe("whole-line import", () => {
     expect(useProjectStore.getState().lineImport.selectMastStatus).toBe("idle");
   });
 
+  it("selectLineMast uses the CSV row's own foundationTypeId for leg foundations, leaving guy anchors on the default type", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse(200, loadSyntheticFixtureJson("pole-portal-2leg.json")))
+    );
+    const csvWithType = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,foundationTypeId",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,3.0,2.1,stepped-rectangular-v1",
+    ].join("\n");
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    await useProjectStore.getState().importLineCsv(csvFile(csvWithType));
+
+    await useProjectStore.getState().selectLineMast(0);
+
+    const project = useProjectStore.getState().project!;
+    const legInstances = project.foundationInstances.filter((f) => f.legId !== null);
+    const guyInstances = project.foundationInstances.filter((f) => f.legId === null);
+    expect(legInstances.length).toBeGreaterThan(0);
+    for (const f of legInstances) expect(f.foundationTypeId).toBe("stepped-rectangular-v1");
+    for (const f of guyInstances) expect(f.foundationTypeId).toBe("guy-anchor-block-v1");
+  });
+
   it("selectLineMast falls back to the straight mast-to-mast bearing when no centreline was uploaded", async () => {
     vi.stubGlobal(
       "fetch",
@@ -441,5 +475,171 @@ describe("whole-line import", () => {
 
     expect(useProjectStore.getState().lineImport.selectMastStatus).toBe("error");
     expect(useProjectStore.getState().project?.poleModel.modelId).toBe(demo.poleModel.modelId);
+  });
+});
+
+describe("registerPointCloudFromPath", () => {
+  const METADATA_BODY = {
+    filePath: "mast-a.las",
+    pointCount: 1646,
+    boundsProject: {
+      minEasting: 512_310.678,
+      maxEasting: 512_380.678,
+      minNorthing: 487_619.321,
+      maxNorthing: 487_689.321,
+      minElevation: 122.056,
+      maxElevation: 130.262,
+    },
+    scale: [0.001, 0.001, 0.001],
+    offset: [512_345.678, 487_654.321, 123.456],
+    availableDimensions: ["X", "Y", "Z", "Classification"],
+    crs: { kind: "epsg", epsgCode: 3057 },
+    classificationCounts: [{ classificationCode: 2, pointCount: 1296 }],
+    hasRgb: true,
+    hasReturnInformation: true,
+    warnings: [],
+  };
+
+  it("registers the given path directly, with no upload step", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, METADATA_BODY));
+    vi.stubGlobal("fetch", fetchMock);
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+
+    await useProjectStore.getState().registerPointCloudFromPath("mast-a.las");
+
+    expect(useProjectStore.getState().pointCloudRegistration.status).toBe("success");
+    expect(useProjectStore.getState().project?.pointCloudSource).toEqual({
+      filePath: "mast-a.las",
+      crs: { kind: "epsg", epsgCode: 3057 },
+      contentHash: null,
+    });
+    // Only one call (the inspect) -- no upload request was made.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/pointcloud/inspect");
+  });
+
+  it("surfaces a backend error without touching the existing point-cloud source", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    const demo = buildSyntheticDemoProject();
+    useProjectStore.getState().setProject(demo);
+
+    await useProjectStore.getState().registerPointCloudFromPath("missing.las");
+
+    expect(useProjectStore.getState().pointCloudRegistration.status).toBe("error");
+    expect(useProjectStore.getState().project?.pointCloudSource).toEqual(demo.pointCloudSource);
+  });
+});
+
+describe("batch export", () => {
+  const CSV = [
+    "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,pointCloudPath",
+    "mast-no-cloud,512345.678,487654.321,123.456,mast.pol,3.0,2.1,",
+    "mast-good,512410.2,487720.9,121.0,mast.pol,3.5,2.4,mast-good.las",
+    "mast-bad-terrain,512480.0,487780.0,120.0,mast.pol,3.2,2.0,mast-bad-terrain.las",
+  ].join("\n");
+
+  function csvFile(text: string): File {
+    return new File([text], "line.csv", { type: "text/csv" });
+  }
+
+  const INSPECT_BODY = {
+    filePath: "mast-good.las",
+    pointCount: 4,
+    boundsProject: {
+      minEasting: 512_300,
+      maxEasting: 512_500,
+      minNorthing: 487_600,
+      maxNorthing: 487_800,
+      minElevation: 118,
+      maxElevation: 125,
+    },
+    scale: [0.001, 0.001, 0.001],
+    offset: [512_345.678, 487_654.321, 123.456],
+    availableDimensions: ["X", "Y", "Z", "Classification"],
+    crs: { kind: "epsg", epsgCode: 3057 },
+    classificationCounts: [{ classificationCode: 2, pointCount: 4 }],
+    hasRgb: false,
+    hasReturnInformation: false,
+    warnings: [],
+  };
+
+  // A real, minimal 4-point square that generateTin can actually
+  // triangulate -- the same fixture shape terrainGeneration.test.ts's own
+  // success-path test uses.
+  const CLIP_SUCCESS_BODY = {
+    points: [
+      { x: 0, y: 0, z: 1.0, classification: 2 },
+      { x: 3, y: 0, z: 1.5, classification: 2 },
+      { x: 0, y: 3, z: 2.0, classification: 2 },
+      { x: 3, y: 3, z: 2.5, classification: 2 },
+    ],
+    sourcePointCount: 4,
+    clippedPointCount: 4,
+    returnedPointCount: 4,
+    classificationCounts: [{ classificationCode: 2, pointCount: 4 }],
+    warnings: [],
+    processingMetadata: {
+      filePath: "mast-good.las",
+      boundary: { shape: "rectangular", widthM: 40, lengthM: 40, centerOffsetLocal: { x: 0, y: 0 }, rotationRadians: 0 },
+      classificationFilter: [2],
+      decimationStep: null,
+      durationMs: 1,
+    },
+  };
+
+  function routedFetchMock() {
+    return vi.fn(async (url: string, init?: RequestInit) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/polemodel/import")) {
+        return jsonResponse(200, loadSyntheticFixtureJson("pole-portal-2leg.json"));
+      }
+      if (urlStr.includes("/pointcloud/inspect")) {
+        return jsonResponse(200, INSPECT_BODY);
+      }
+      if (urlStr.includes("/pointcloud/clip")) {
+        const body = JSON.parse(init!.body as string) as { filePath: string };
+        if (body.filePath === "mast-bad-terrain.las") {
+          return jsonResponse(422, { detail: "simulated clip failure" });
+        }
+        return jsonResponse(200, CLIP_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected fetch in test to ${urlStr}`);
+    });
+  }
+
+  it("exports the masts it can, skips the one with no point cloud, and errors the one whose terrain fails -- without aborting the batch", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+    const demo = { ...buildSyntheticDemoProject(), pointCloudSource: null };
+    useProjectStore.getState().setProject(demo);
+    await useProjectStore.getState().importLineCsv(csvFile(CSV));
+
+    await useProjectStore.getState().runBatchExport([0, 1, 2]);
+
+    const { batchExport } = useProjectStore.getState();
+    expect(batchExport.status).toBe("done");
+    expect(batchExport.results).toHaveLength(3);
+
+    const byName = (name: string) => batchExport.results.find((r) => r.mastName === name)!;
+    expect(byName("mast-no-cloud").status).toBe("skipped");
+    expect(byName("mast-good").status).toBe("success");
+    expect(byName("mast-bad-terrain").status).toBe("error");
+    expect(byName("mast-bad-terrain").message).toContain("simulated clip failure");
+
+    // Export was only actually attempted for the one mast that made it
+    // all the way through -- never for the skipped or terrain-failed ones.
+    expect(vi.mocked(exportProjectAsStandaloneHtml)).toHaveBeenCalledTimes(1);
+  });
+
+  it("resetBatchExport returns to idle with no results", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+    const demo = { ...buildSyntheticDemoProject(), pointCloudSource: null };
+    useProjectStore.getState().setProject(demo);
+    await useProjectStore.getState().importLineCsv(csvFile(CSV));
+    await useProjectStore.getState().runBatchExport([1]);
+    expect(useProjectStore.getState().batchExport.status).toBe("done");
+
+    useProjectStore.getState().resetBatchExport();
+
+    expect(useProjectStore.getState().batchExport).toEqual({ status: "idle", results: [] });
   });
 });

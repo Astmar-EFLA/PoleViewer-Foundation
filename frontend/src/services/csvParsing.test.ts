@@ -21,6 +21,8 @@ describe("parseLineMastCsv", () => {
       bearingLayerDepthM: 2.5,
       groundwaterDepthM: 1.8,
       legAxis: null,
+      pointCloudPath: null,
+      foundationTypeId: null,
     });
     expect(result.data[1]!.mastName).toBe("9-B-BS");
   });
@@ -106,5 +108,66 @@ describe("parseLineMastCsv", () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.errors.some((e) => e.includes("row 2") && e.includes("legAEasting"))).toBe(true);
+  });
+
+  it("parses an optional per-mast pointCloudPath column", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,pointCloudPath",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,8-B-BS.las",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]!.pointCloudPath).toBe("8-B-BS.las");
+  });
+
+  it("treats pointCloudPath as optional when the header omits it, or the cell is blank", () => {
+    const withoutColumn = parseLineMastCsv(VALID_CSV);
+    expect(withoutColumn.success).toBe(true);
+    if (withoutColumn.success) expect(withoutColumn.data[0]!.pointCloudPath).toBeNull();
+
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,pointCloudPath",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,",
+    ].join("\n");
+    const withBlankCell = parseLineMastCsv(csv);
+    expect(withBlankCell.success).toBe(true);
+    if (withBlankCell.success) expect(withBlankCell.data[0]!.pointCloudPath).toBeNull();
+  });
+
+  it("parses an optional foundationTypeId column that names a real library entry", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,foundationTypeId",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,stepped-rectangular-v1",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]!.foundationTypeId).toBe("stepped-rectangular-v1");
+  });
+
+  it("treats foundationTypeId as optional when the header omits it, or the cell is blank", () => {
+    const withoutColumn = parseLineMastCsv(VALID_CSV);
+    expect(withoutColumn.success).toBe(true);
+    if (withoutColumn.success) expect(withoutColumn.data[0]!.foundationTypeId).toBeNull();
+
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,foundationTypeId",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,",
+    ].join("\n");
+    const withBlankCell = parseLineMastCsv(csv);
+    expect(withBlankCell.success).toBe(true);
+    if (withBlankCell.success) expect(withBlankCell.data[0]!.foundationTypeId).toBeNull();
+  });
+
+  it("rejects a foundationTypeId that isn't in the foundation library", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,foundationTypeId",
+      "8-B-BS,512345.678,487654.321,123.456,8-B-BS.pol,2.5,1.8,not-a-real-type",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.errors.some((e) => e.includes("row 2") && e.includes("foundationTypeId"))).toBe(true);
   });
 });

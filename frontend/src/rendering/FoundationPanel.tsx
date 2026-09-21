@@ -131,6 +131,46 @@ export function FoundationPanel() {
             </>
           )}
 
+          {instance.parameters.geometryType === "rectangular-pad-tapered-pedestal" && (
+            <>
+              <NumberField
+                label="Pad width"
+                value={instance.parameters.padWidth}
+                onChange={(v) => updateParameters({ ...instance.parameters, padWidth: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Pad length"
+                value={instance.parameters.padLength}
+                onChange={(v) => updateParameters({ ...instance.parameters, padLength: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Pad thickness"
+                value={instance.parameters.padThickness}
+                onChange={(v) => updateParameters({ ...instance.parameters, padThickness: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Frustum height"
+                value={instance.parameters.frustumHeight}
+                onChange={(v) => updateParameters({ ...instance.parameters, frustumHeight: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Pedestal width"
+                value={instance.parameters.pedestalWidth}
+                onChange={(v) => updateParameters({ ...instance.parameters, pedestalWidth: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Pedestal length"
+                value={instance.parameters.pedestalLength}
+                onChange={(v) => updateParameters({ ...instance.parameters, pedestalLength: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Pedestal height"
+                value={instance.parameters.pedestalHeight}
+                onChange={(v) => updateParameters({ ...instance.parameters, pedestalHeight: v } as FoundationParameters)}
+              />
+            </>
+          )}
+
           {instance.parameters.geometryType === "stepped-rectangular" && (
             <>
               {instance.parameters.steps.map((step, index) => (

@@ -38,6 +38,25 @@ describe("parseFoundationLibrary", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a well-formed rectangular-pad-tapered-pedestal entry", () => {
+    const result = parseFoundationLibrary([
+      validEntry({
+        geometryType: "rectangular-pad-tapered-pedestal",
+        defaultParameters: {
+          geometryType: "rectangular-pad-tapered-pedestal",
+          padWidth: 1.6,
+          padLength: 1.6,
+          padThickness: 0.3,
+          frustumHeight: 0.5,
+          pedestalWidth: 0.4,
+          pedestalLength: 0.4,
+          pedestalHeight: 1.0,
+        },
+      }),
+    ]);
+    expect(result.success).toBe(true);
+  });
+
   it("rejects an entry whose geometryType doesn't match its own defaultParameters.geometryType", () => {
     const mismatched = validEntry({
       geometryType: "stepped-rectangular",

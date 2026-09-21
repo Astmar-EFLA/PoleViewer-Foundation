@@ -19,7 +19,7 @@ import type { SectionDefinition, SectionPlane } from "../domain/section";
 import type { IndexedTriangle, XYZ } from "./barycentric";
 import { generateExcavationGeometry, type ExcavationGeometry } from "./excavationGeometry";
 import { generateFillGeometry, type FillGeometry } from "./fillGeometry";
-import { generateFoundationGeometry, type OrientedBox } from "./foundationGeometry";
+import { generateFoundationGeometry, type OrientedBox, type OrientedFrustum } from "./foundationGeometry";
 import { generateBoundarySurface } from "./geotechBoundary";
 import { placePoleModelPoint } from "./polePlacement";
 
@@ -164,6 +164,42 @@ export function orientedBoxTriangles(box: OrientedBox): Triangle3[] {
   ];
 }
 
+function frustumCorner(frustum: OrientedFrustum, bx: -1 | 1, by: -1 | 1, top: boolean): XYZ {
+  const cos = Math.cos(frustum.orientationRadians);
+  const sin = Math.sin(frustum.orientationRadians);
+  const halfExtents = top ? frustum.topHalfExtents : frustum.bottomHalfExtents;
+  const lx = bx * halfExtents.x;
+  const ly = by * halfExtents.y;
+  const z = frustum.centre.z + (top ? frustum.halfHeight : -frustum.halfHeight);
+  return {
+    x: frustum.centre.x + lx * cos - ly * sin,
+    y: frustum.centre.y + lx * sin + ly * cos,
+    z,
+  };
+}
+
+/** The tapered-frustum mirror of orientedBoxTriangles -- same bottom/top/4-side-face layout, but top and bottom faces have independent half-extents instead of a single shared one. */
+export function orientedFrustumTriangles(frustum: OrientedFrustum): Triangle3[] {
+  const c = (bx: -1 | 1, by: -1 | 1, top: boolean) => frustumCorner(frustum, bx, by, top);
+  return [
+    // bottom / top
+    { a: c(-1, -1, false), b: c(1, -1, false), c: c(1, 1, false) },
+    { a: c(-1, -1, false), b: c(1, 1, false), c: c(-1, 1, false) },
+    { a: c(-1, -1, true), b: c(1, -1, true), c: c(1, 1, true) },
+    { a: c(-1, -1, true), b: c(1, 1, true), c: c(-1, 1, true) },
+    // x faces
+    { a: c(-1, -1, false), b: c(-1, 1, false), c: c(-1, 1, true) },
+    { a: c(-1, -1, false), b: c(-1, 1, true), c: c(-1, -1, true) },
+    { a: c(1, -1, false), b: c(1, 1, false), c: c(1, 1, true) },
+    { a: c(1, -1, false), b: c(1, 1, true), c: c(1, -1, true) },
+    // y faces
+    { a: c(-1, -1, false), b: c(1, -1, false), c: c(1, -1, true) },
+    { a: c(-1, -1, false), b: c(1, -1, true), c: c(-1, -1, true) },
+    { a: c(-1, 1, false), b: c(1, 1, false), c: c(1, 1, true) },
+    { a: c(-1, 1, false), b: c(1, 1, true), c: c(-1, 1, true) },
+  ];
+}
+
 /** Mirrors ExcavationMesh.tsx's own triangulation (bottom quad + skirt ring quads) so the section is guaranteed to match the rendered excavation. */
 export function excavationGeometryTriangles(geometry: ExcavationGeometry): Triangle3[] {
   const triangles: Triangle3[] = [];
@@ -212,9 +248,9 @@ export function buildSectionPlane(
 ): SectionPlane {
   switch (mode) {
     case "longitudinal":
-      return { originX: 0, originY: 0, directionRadians: Math.PI / 2 };
-    case "transverse":
       return { originX: 0, originY: 0, directionRadians: 0 };
+    case "transverse":
+      return { originX: 0, originY: 0, directionRadians: Math.PI / 2 };
     case "leg": {
       const foundation = legId ? project.foundationInstances.find((f) => f.legId === legId) : undefined;
       if (!foundation) return { originX: 0, originY: 0, directionRadians: 0 };
@@ -288,7 +324,9 @@ function withinTolerance(perpendicularM: number, toleranceM: number): boolean {
 
 function foundationOutline(foundation: FoundationInstance, plane: SectionPlane): SectionFoundationOutline {
   const geometry = generateFoundationGeometry(foundation);
-  const triangles = geometry.parts.flatMap(orientedBoxTriangles);
+  const triangles = geometry.parts.flatMap((part) =>
+    part.kind === "box" ? orientedBoxTriangles(part) : orientedFrustumTriangles(part)
+  );
   return {
     instanceId: foundation.instanceId,
     legId: foundation.legId,

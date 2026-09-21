@@ -28,6 +28,21 @@ function nonPositiveDimensionFields(params: FoundationParameters): string[] {
       });
       return bad;
     }
+    case "rectangular-pad-tapered-pedestal": {
+      const { padWidth, padLength, padThickness, frustumHeight, pedestalWidth, pedestalLength, pedestalHeight } =
+        params;
+      return Object.entries({
+        padWidth,
+        padLength,
+        padThickness,
+        frustumHeight,
+        pedestalWidth,
+        pedestalLength,
+        pedestalHeight,
+      })
+        .filter(([, value]) => !(value > 0))
+        .map(([key]) => key);
+    }
   }
 }
 

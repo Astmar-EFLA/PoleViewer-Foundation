@@ -141,7 +141,7 @@ function buildSyntheticProject(): Project {
         name: "Longitudinal (through mast centre)",
         mode: "longitudinal",
         legId: null,
-        plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+        plane: { originX: 0, originY: 0, directionRadians: 0 },
         pointToleranceM: 1.0,
         visible: true,
       },

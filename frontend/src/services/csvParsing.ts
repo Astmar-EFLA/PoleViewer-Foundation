@@ -10,6 +10,7 @@
 
 import type { ProjectCoordinate } from "../domain/coordinates";
 import { projectCoordinate } from "../domain/coordinates";
+import { getFoundationTypeById } from "../domain/foundationLibrary";
 import type { ParseResult } from "../validation/parseResult";
 
 /** Structurally identical to geometry/centreline.ts's PolylinePoint -- not imported directly to avoid a service->geometry->service cycle. */
@@ -47,6 +48,28 @@ export interface LineMastRow {
    * validation error, not a silent partial guess).
    */
   readonly legAxis: { readonly a: LegAxisPoint; readonly b: LegAxisPoint } | null;
+  /**
+   * Optional workspace-relative path to this mast's own point-cloud
+   * (.las/.laz) file, same convention as `modelPath` -- since a whole
+   * line's towers are often surveyed as separate per-tower tiles, not one
+   * file covering the whole line. Null when the CSV doesn't supply it for
+   * this row; a batch export then falls back to whatever point cloud is
+   * currently registered on the project (see state/projectStore.ts's
+   * runBatchExport).
+   */
+  readonly pointCloudPath: string | null;
+  /**
+   * Optional override for this mast's LEG foundation type (guy-anchor
+   * foundations are unaffected -- see state/projectStore.ts's
+   * selectLineMast), by id into domain/foundationLibrary.json (e.g.
+   * "stepped-rectangular-v1"). Validated against the library at parse
+   * time, the same layer `legAxis`'s numbers are validated at -- an
+   * unknown id is a data-entry mistake as concrete as a bad number, not
+   * something to discover later as an opaque runtime error when the mast
+   * is actually selected. Null when the CSV doesn't supply it for this
+   * row, falling back to the app's existing default leg foundation type.
+   */
+  readonly foundationTypeId: string | null;
 }
 
 const REQUIRED_COLUMNS = [
@@ -136,8 +159,13 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
 
     const mastName = get("mastName");
     const modelPath = get("modelPath");
+    const pointCloudPath = get("pointCloudPath")?.trim() || null;
+    const foundationTypeId = get("foundationTypeId")?.trim() || null;
     if (!mastName) errors.push(`row ${rowNumber}: "mastName" is required`);
     if (!modelPath) errors.push(`row ${rowNumber}: "modelPath" is required`);
+    if (foundationTypeId && !getFoundationTypeById(foundationTypeId)) {
+      errors.push(`row ${rowNumber}: "foundationTypeId" ("${foundationTypeId}") is not a known foundation type`);
+    }
 
     const easting = parseRequiredNumber(get("easting"), "easting", rowNumber);
     const northing = parseRequiredNumber(get("northing"), "northing", rowNumber);
@@ -191,6 +219,8 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
         bearingLayerDepthM,
         groundwaterDepthM,
         legAxis,
+        pointCloudPath,
+        foundationTypeId,
       });
     }
   }

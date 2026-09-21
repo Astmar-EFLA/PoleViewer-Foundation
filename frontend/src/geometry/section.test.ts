@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { localCoordinate } from "../domain/coordinates";
 import type { ExcavationInstance } from "../domain/excavation";
 import type { FillInstance } from "../domain/fill";
-import type { FoundationInstance } from "../domain/foundation";
+import type { FoundationInstance, RectangularPadTaperedPedestalParameters } from "../domain/foundation";
 import { DEFAULT_TERRAIN_GENERATION_SETTINGS } from "../domain/pointCloud";
 import type { Project } from "../domain/project";
 import type { SectionDefinition } from "../domain/section";
@@ -12,6 +12,7 @@ import { parsePoleModel } from "../validation/poleModelSchema";
 import { buildDefaultFoundationInstances } from "../services/buildFoundationInstances";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import { generateFoundationGeometry } from "./foundationGeometry";
+import type { OrientedFrustum } from "./foundationGeometry";
 import {
   buildSectionPlane,
   excavationGeometryTriangles,
@@ -19,6 +20,7 @@ import {
   generateSectionResult,
   intersectTriangleWithPlane,
   orientedBoxTriangles,
+  orientedFrustumTriangles,
   trianglesFromIndexedSurface,
   type Triangle3,
 } from "./section";
@@ -64,6 +66,7 @@ describe("intersectTriangleWithPlane", () => {
 describe("orientedBoxTriangles + plane intersection", () => {
   it("a vertical plane through the centre of an axis-aligned box yields its exact rectangular cross-section", () => {
     const box = {
+      kind: "box" as const,
       centre: localCoordinate(0, 0, 5),
       halfExtents: { x: 2, y: 3, z: 1 },
       orientationRadians: 0,
@@ -81,6 +84,26 @@ describe("orientedBoxTriangles + plane intersection", () => {
     expect(Math.max(...allS)).toBeCloseTo(2, 9);
     expect(Math.min(...allZ)).toBeCloseTo(4, 9); // centre z - half-extent z
     expect(Math.max(...allZ)).toBeCloseTo(6, 9);
+  });
+});
+
+describe("orientedFrustumTriangles", () => {
+  it("bottom face triangles sit at the bottom half-extents/elevation, top face triangles at the top half-extents/elevation", () => {
+    const frustum: OrientedFrustum = {
+      kind: "frustum",
+      centre: localCoordinate(0, 0, 5),
+      bottomHalfExtents: { x: 2, y: 3 },
+      topHalfExtents: { x: 1, y: 1.5 },
+      halfHeight: 1,
+      orientationRadians: 0,
+    };
+    const triangles = orientedFrustumTriangles(frustum);
+    // First two triangles: bottom face.
+    expect(triangles[0]!.a.z).toBeCloseTo(4, 9); // centre.z - halfHeight
+    expect(Math.abs(triangles[0]!.a.x)).toBeCloseTo(2, 9); // bottomHalfExtents.x
+    // Next two triangles: top face.
+    expect(triangles[2]!.a.z).toBeCloseTo(6, 9); // centre.z + halfHeight
+    expect(Math.abs(triangles[2]!.a.x)).toBeCloseTo(1, 9); // topHalfExtents.x
   });
 });
 
@@ -243,16 +266,16 @@ describe("buildSectionPlane", () => {
     };
   }
 
-  it("longitudinal runs along local +Y and passes through the mast centre", () => {
+  it("longitudinal runs along local +X and passes through the mast centre", () => {
     const plane = buildSectionPlane(minimalProject(), "longitudinal", null);
     expect(plane.originX).toBe(0);
     expect(plane.originY).toBe(0);
-    expect(plane.directionRadians).toBeCloseTo(Math.PI / 2, 9);
+    expect(plane.directionRadians).toBeCloseTo(0, 9);
   });
 
-  it("transverse runs along local +X and passes through the mast centre", () => {
+  it("transverse runs along local +Y and passes through the mast centre", () => {
     const plane = buildSectionPlane(minimalProject(), "transverse", null);
-    expect(plane.directionRadians).toBeCloseTo(0, 9);
+    expect(plane.directionRadians).toBeCloseTo(Math.PI / 2, 9);
   });
 
   it("leg mode points toward the selected leg's foundation position from the mast centre", () => {
@@ -365,6 +388,43 @@ describe("generateSectionResult", () => {
     expect(result.upliftFillOutlines[0]!.segments.length).toBeGreaterThan(0);
   });
 
+  it("a tapered-pedestal foundation's outline includes the frustum's sloped face, not just the pad/pedestal boxes", () => {
+    const base = projectWithFoundationAtOrigin();
+    const taperedParams: RectangularPadTaperedPedestalParameters = {
+      geometryType: "rectangular-pad-tapered-pedestal",
+      padWidth: 2.0,
+      padLength: 2.0,
+      padThickness: 0.6,
+      frustumHeight: 0.5,
+      pedestalWidth: 0.6,
+      pedestalLength: 0.6,
+      pedestalHeight: 0.9,
+    };
+    const project: Project = {
+      ...base,
+      foundationInstances: [{ ...base.foundationInstances[0]!, parameters: taperedParams }],
+    };
+    const section: SectionDefinition = {
+      id: "s1c",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: 0 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+
+    expect(result.foundations).toHaveLength(1);
+    expect(result.foundations[0]!.segments.length).toBeGreaterThan(0);
+    // The frustum's sloped side means the outline's width isn't uniform top
+    // to bottom the way a sharp-step pad/pedestal's would be -- a loose but
+    // meaningful sanity check that the taper actually made it into the
+    // triangulated outline rather than being silently dropped.
+    const widths = result.foundations[0]!.segments.map((s) => Math.abs(s.a.s - s.b.s));
+    expect(new Set(widths.map((w) => w.toFixed(3))).size).toBeGreaterThan(1);
+  });
+
   it("a plane far from every object produces empty content", () => {
     const project = projectWithFoundationAtOrigin();
     const section: SectionDefinition = {
@@ -407,9 +467,11 @@ describe("consistency with the main viewer's foundation geometry", () => {
   it("the box triangulation used for sections matches generateFoundationGeometry's own parts (no independent illustrative section)", () => {
     const f = foundation();
     const geometry = generateFoundationGeometry(f);
+    const bottomPart = geometry.parts[0]!;
+    if (bottomPart.kind !== "box") throw new Error("expected a box part");
     // Sanity: the triangulated box for the bottom-most part spans exactly its declared half-extents.
-    const triangles = orientedBoxTriangles(geometry.parts[0]!);
+    const triangles = orientedBoxTriangles(bottomPart);
     const xs = triangles.flatMap((t) => [t.a.x, t.b.x, t.c.x]);
-    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(geometry.parts[0]!.halfExtents.x * 2, 9);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(bottomPart.halfExtents.x * 2, 9);
   });
 });

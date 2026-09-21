@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   FoundationInstance,
   RectangularPadPedestalParameters,
+  RectangularPadTaperedPedestalParameters,
   SteppedRectangularParameters,
 } from "../domain/foundation";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
@@ -162,5 +163,45 @@ describe("validateFoundationInstance: stepped-rectangular", () => {
     const nonPositive = results.find((r) => r.ruleId === "foundation.non-positive-dimension");
     expect(nonPositive?.severity).toBe("blocking");
     expect(nonPositive?.detail).toContain("steps[1].width");
+  });
+});
+
+describe("validateFoundationInstance: rectangular-pad-tapered-pedestal", () => {
+  const TAPERED_PARAMS: RectangularPadTaperedPedestalParameters = {
+    geometryType: "rectangular-pad-tapered-pedestal",
+    padWidth: 1.6,
+    padLength: 1.6,
+    padThickness: 0.5,
+    frustumHeight: 0.4,
+    pedestalWidth: 0.5,
+    pedestalLength: 0.5,
+    pedestalHeight: 0.8,
+  };
+
+  it("passes for a correctly-connected tapered-pedestal foundation with valid dimensions", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const anchorPos = placedAnchorPosition("anchor-leg-ne", parsed.data);
+
+    const instance = baseInstance({
+      parameters: TAPERED_PARAMS,
+      baseElevation: anchorPos.z - 0.5 - 0.4 - 0.8,
+    });
+    const results = validateFoundationInstance(instance, anchorPos, NOW);
+    expect(results).toHaveLength(0);
+  });
+
+  it("flags a non-positive frustumHeight as blocking", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-lattice-4leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const anchorPos = placedAnchorPosition("anchor-leg-ne", parsed.data);
+
+    const instance = baseInstance({ parameters: { ...TAPERED_PARAMS, frustumHeight: 0 } });
+    const results = validateFoundationInstance(instance, anchorPos, NOW);
+    const nonPositive = results.find((r) => r.ruleId === "foundation.non-positive-dimension");
+    expect(nonPositive?.severity).toBe("blocking");
+    expect(nonPositive?.detail).toContain("frustumHeight");
   });
 });
