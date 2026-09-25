@@ -78,6 +78,27 @@ describe("buildSectionDxf", () => {
     expect(dxf).not.toContain("TOWER");
   });
 
+  it("puts projected (off-plane) foundations on their own dashed layer", () => {
+    const { result } = transverseResult();
+    const projected = {
+      ...result,
+      foundations: [
+        {
+          instanceId: "guy-1",
+          legId: null,
+          colour: "#888888",
+          projected: true,
+          segments: [{ a: { s: 2, z: -1 }, b: { s: 3, z: -1 } }],
+        },
+      ],
+    };
+    const dxf = buildSectionDxf(projected, { elevationOffsetM: 0, title: "t" });
+    const lines = dxfEntities(dxf).filter((e) => e.type === "LINE");
+    expect(lines.filter((l) => l.codes.get("8")![0] === "FOUNDATION-PROJECTED")).toHaveLength(1);
+    expect(lines.filter((l) => l.codes.get("8")![0] === "FOUNDATION")).toHaveLength(0);
+    expect(dxf).toMatch(/LAYER\r\n2\r\nFOUNDATION-PROJECTED\r\n70\r\n0\r\n62\r\n8\r\n6\r\nDASHED/);
+  });
+
   it("puts truncated excavations on their own layer", () => {
     const { result } = transverseResult();
     const truncated = {

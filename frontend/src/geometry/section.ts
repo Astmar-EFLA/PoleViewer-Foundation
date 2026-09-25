@@ -278,6 +278,13 @@ export interface SectionFoundationOutline {
   readonly legId: string | null;
   readonly colour: string;
   readonly segments: readonly SectionSegment[];
+  /**
+   * True when the plane misses this foundation entirely (e.g. a guy-anchor
+   * block well off a transverse section), so `segments` is instead its
+   * silhouette projected onto the plane -- drawn as a "beyond the cut"
+   * outline, the way a section drawing shows structure behind the plane.
+   */
+  readonly projected: boolean;
 }
 
 export interface SectionExcavationOutline {
@@ -336,17 +343,44 @@ function withinTolerance(perpendicularM: number, toleranceM: number): boolean {
   return Math.abs(perpendicularM) <= toleranceM / 2;
 }
 
+/** Andrew's monotone chain -- counter-clockwise hull, no repeated end point. */
+function convexHull(points: readonly SectionXZ[]): SectionXZ[] {
+  const sorted = [...points].sort((p, q) => p.s - q.s || p.z - q.z);
+  if (sorted.length <= 2) return sorted;
+  const cross = (o: SectionXZ, a: SectionXZ, b: SectionXZ) => (a.s - o.s) * (b.z - o.z) - (a.z - o.z) * (b.s - o.s);
+  const lower: SectionXZ[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= EPS) lower.pop();
+    lower.push(p);
+  }
+  const upper: SectionXZ[] = [];
+  for (const p of [...sorted].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= EPS) upper.pop();
+    upper.push(p);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+/** Each part (box/frustum) is convex, so its projection onto the plane is exactly the convex hull of its projected corners; one closed outline per part keeps a stepped foundation's steps visible. */
+function projectedPartOutline(triangles: readonly Triangle3[], plane: SectionPlane): SectionSegment[] {
+  const points = triangles.flatMap((t) => [t.a, t.b, t.c]).map((p) => {
+    const coord = sectionCoordinateOf(p, plane);
+    return { s: coord.s, z: coord.z };
+  });
+  const hull = convexHull(points);
+  if (hull.length < 2) return [];
+  return hull.map((a, i) => ({ a, b: hull[(i + 1) % hull.length]! }));
+}
+
 function foundationOutline(foundation: FoundationInstance, plane: SectionPlane): SectionFoundationOutline {
   const geometry = generateFoundationGeometry(foundation);
-  const triangles = geometry.parts.flatMap((part) =>
+  const partTriangles = geometry.parts.map((part) =>
     part.kind === "box" ? orientedBoxTriangles(part) : orientedFrustumTriangles(part)
   );
-  return {
-    instanceId: foundation.instanceId,
-    legId: foundation.legId,
-    colour: foundation.colour,
-    segments: intersectTrianglesWithPlane(triangles, plane),
-  };
+  const cut = intersectTrianglesWithPlane(partTriangles.flat(), plane);
+  const base = { instanceId: foundation.instanceId, legId: foundation.legId, colour: foundation.colour };
+  if (cut.length > 0) return { ...base, segments: cut, projected: false };
+  return { ...base, segments: partTriangles.flatMap((t) => projectedPartOutline(t, plane)), projected: true };
 }
 
 function excavationOutline(

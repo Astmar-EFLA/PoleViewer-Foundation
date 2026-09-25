@@ -336,6 +336,17 @@ export function SectionView({
 
   const memberCategories = POLE_MEMBER_CATEGORY_ORDER.filter((c) => result.poleMembers.some((m) => m.category === c));
   const legendItems = [
+    ...(result.foundations.some((f) => f.projected && f.segments.length > 0)
+      ? [
+          {
+            id: "foundation-projected",
+            name: "Foundation beyond section (dashed)",
+            colour: result.foundations.find((f) => f.projected)!.colour,
+            status: "n/a",
+            hatch: false,
+          },
+        ]
+      : []),
     ...memberCategories.map((c) => ({
       id: `tower-${c}`,
       name: POLE_MEMBER_LEGEND_LABELS[c],
@@ -467,7 +478,10 @@ export function SectionView({
           ))}
 
           {result.foundations.map((f) => (
-            <g key={f.instanceId}>{renderSegments(f.segments, f.colour, f.instanceId, 1.2)}</g>
+            // A projected (beyond-the-cut) foundation is drawn dashed and lighter, like hidden detail on a drawing.
+            <g key={f.instanceId} opacity={f.projected ? 0.7 : 1}>
+              {renderSegments(f.segments, f.colour, f.instanceId, f.projected ? 0.9 : 1.2, f.projected)}
+            </g>
           ))}
           {result.excavations.map((e) => (
             <g key={e.excavationId}>

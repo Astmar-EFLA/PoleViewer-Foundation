@@ -362,6 +362,52 @@ describe("generateSectionResult", () => {
     expect(result.foundations[0]!.segments.length).toBeGreaterThan(0);
   });
 
+  it("marks a cut foundation as not projected", () => {
+    const project = projectWithFoundationAtOrigin();
+    const section: SectionDefinition = {
+      id: "s-cut",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    expect(generateSectionResult(project, section).foundations[0]!.projected).toBe(false);
+  });
+
+  it("projects a foundation the plane misses (e.g. a guy-anchor block) as one closed silhouette per part", () => {
+    const base = projectWithFoundationAtOrigin();
+    // 12 m off a transverse (along-Y) plane, like a guy-anchor block.
+    const offPlane = { ...base.foundationInstances[0]!, position: { x: 12, y: 2 } };
+    const project: Project = { ...base, foundationInstances: [offPlane] };
+    const section: SectionDefinition = {
+      id: "s-proj",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const outline = generateSectionResult(project, section).foundations[0]!;
+    expect(outline.projected).toBe(true);
+
+    // Each axis-aligned box part projects to a rectangle: 4 edges per part,
+    // spanning the part's own width about the foundation's s (= y = 2) and
+    // its own height.
+    const geometry = generateFoundationGeometry(offPlane);
+    expect(outline.segments).toHaveLength(4 * geometry.parts.length);
+    const ss = outline.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+    const zs = outline.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
+    const pad = geometry.parts[0]!;
+    if (pad.kind !== "box") throw new Error("expected a box pad");
+    expect(Math.min(...ss)).toBeCloseTo(2 - pad.halfExtents.y, 9);
+    expect(Math.max(...ss)).toBeCloseTo(2 + pad.halfExtents.y, 9);
+    expect(Math.min(...zs)).toBeCloseTo(offPlane.baseElevation, 9);
+    expect(Math.max(...zs)).toBeCloseTo(geometry.topConnectionPoint.z, 9);
+  });
+
   it("projects every tower member onto the plane, including ones well off it", () => {
     const base = projectWithFoundationAtOrigin();
     const members = [
@@ -478,7 +524,7 @@ describe("generateSectionResult", () => {
     expect(new Set(widths.map((w) => w.toFixed(3))).size).toBeGreaterThan(1);
   });
 
-  it("a plane far from every object produces empty content", () => {
+  it("a plane far from every object cuts nothing -- the foundation only comes through projected", () => {
     const project = projectWithFoundationAtOrigin();
     const section: SectionDefinition = {
       id: "s2",
@@ -494,7 +540,9 @@ describe("generateSectionResult", () => {
     };
     const result = generateSectionResult(project, section);
     expect(result.terrainSegments).toHaveLength(0);
-    expect(result.foundations[0]!.segments).toHaveLength(0);
+    // Nothing is cut; the foundation (like the tower) is still shown as the
+    // structure's projected elevation, never as cut section.
+    expect(result.foundations[0]!.projected).toBe(true);
   });
 
   it("terrain source points are only included within the point tolerance", () => {

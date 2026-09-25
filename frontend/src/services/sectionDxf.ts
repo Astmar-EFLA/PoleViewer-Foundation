@@ -56,8 +56,15 @@ export function buildSectionDxf(result: SectionResult, options: SectionDxfOption
 
   writeSegments(doc.addLayer("TERRAIN", ACI.brown), result.terrainSegments);
 
-  const foundationLayer = doc.addLayer("FOUNDATION", ACI.grey);
-  for (const f of result.foundations) writeSegments(foundationLayer, f.segments);
+  // Foundations the plane misses (e.g. guy-anchor blocks off a transverse
+  // section) come through as projected silhouettes -- dashed, on their own
+  // layer, so they read as "beyond the cut" rather than cut section.
+  for (const f of result.foundations) {
+    const layer = f.projected
+      ? doc.addLayer("FOUNDATION-PROJECTED", ACI.grey, "DASHED")
+      : doc.addLayer("FOUNDATION", ACI.grey);
+    writeSegments(layer, f.segments);
+  }
 
   for (const e of result.excavations) {
     const layer = e.truncated
