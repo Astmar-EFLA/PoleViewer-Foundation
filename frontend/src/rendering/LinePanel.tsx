@@ -158,7 +158,8 @@ export function LinePanel() {
           <div style={{ opacity: 0.8, marginBottom: 2 }}>Batch export (interactive HTML)</div>
           <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 4 }}>
             Choose which masts to export -- each one is selected, its terrain regenerated from its own point
-            cloud (or the shared one if the row has none), then exported, in order. Point-cloud coverage often
+            cloud (or the shared one if the row has none), then exported, in order, as an interactive HTML viewer
+            (&lt;mast&gt;-viewer.html) plus its transverse section as a DXF drawing (&lt;mast&gt;.dxf). Point-cloud coverage often
             differs per tower, so nothing is selected by default.
           </div>
           <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>

@@ -74,8 +74,13 @@ function projectFileBaseName(project: Project): string {
  * Fetches the prebuilt viewer template, embeds this exact project (a
  * snapshot -- opening the downloaded file later never reflects edits made
  * in the live app afterward), and downloads the result as one .html file.
+ * `fileBaseName` overrides the default `<project-name>-viewer` filename (the
+ * batch export names each file after its mast instead).
  */
-export async function exportProjectAsStandaloneHtml(project: Project): Promise<void> {
+export async function exportProjectAsStandaloneHtml(
+  project: Project,
+  fileBaseName: string = `${projectFileBaseName(project)}-viewer`
+): Promise<void> {
   const response = await fetch(TEMPLATE_URL);
   if (!response.ok) {
     throw new ViewerExportError(
@@ -84,5 +89,5 @@ export async function exportProjectAsStandaloneHtml(project: Project): Promise<v
   }
   const template = await response.text();
   const html = embedProjectIntoTemplate(template, project);
-  downloadText(html, `${projectFileBaseName(project)}-viewer.html`, "text/html");
+  downloadText(html, `${fileBaseName}.html`, "text/html");
 }

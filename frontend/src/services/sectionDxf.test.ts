@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { generateSectionResult } from "../geometry/section";
+import { dxfEntities } from "../tests/dxfParsing";
+import { buildSyntheticDemoProject } from "./buildSyntheticDemoProject";
+import { buildSectionDxf } from "./sectionDxf";
+
+function transverseResult() {
+  const project = buildSyntheticDemoProject();
+  const section = project.sections.find((s) => s.mode === "transverse")!;
+  return { project, result: generateSectionResult(project, section) };
+}
+
+describe("buildSectionDxf", () => {
+  it("writes one LINE per section segment on the right layer", () => {
+    const { project, result } = transverseResult();
+    const dxf = buildSectionDxf(result, { elevationOffsetM: project.mastCentreProject.elevation, title: "M-1" });
+    const lines = dxfEntities(dxf).filter((e) => e.type === "LINE");
+    const onLayer = (prefix: string) => lines.filter((l) => l.codes.get("8")![0]!.startsWith(prefix)).length;
+
+    expect(result.terrainSegments.length).toBeGreaterThan(0);
+    expect(onLayer("TERRAIN")).toBe(result.terrainSegments.length);
+    expect(onLayer("FOUNDATION")).toBe(result.foundations.reduce((n, f) => n + f.segments.length, 0));
+    expect(onLayer("EXCAVATION")).toBe(result.excavations.reduce((n, e) => n + e.segments.length, 0));
+    expect(onLayer("GEOTECH-")).toBe(result.geotechBoundaries.reduce((n, b) => n + b.segments.length, 0));
+    expect(onLayer("MAST-CENTRE")).toBe(1);
+  });
+
+  it("uses X = offset along the section and Y = absolute elevation", () => {
+    const { result } = transverseResult();
+    const offset = 123.5;
+    const dxf = buildSectionDxf(result, { elevationOffsetM: offset, title: "M-1" });
+    const firstTerrain = dxfEntities(dxf).find((e) => e.type === "LINE" && e.codes.get("8")![0] === "TERRAIN")!;
+    const seg = result.terrainSegments[0]!;
+
+    expect(Number(firstTerrain.codes.get("10")![0])).toBeCloseTo(seg.a.s, 3);
+    expect(Number(firstTerrain.codes.get("20")![0])).toBeCloseTo(seg.a.z + offset, 3);
+    expect(Number(firstTerrain.codes.get("11")![0])).toBeCloseTo(seg.b.s, 3);
+    expect(Number(firstTerrain.codes.get("21")![0])).toBeCloseTo(seg.b.z + offset, 3);
+  });
+
+  it("labels each anchor and writes the title", () => {
+    const { result } = transverseResult();
+    const dxf = buildSectionDxf(result, { elevationOffsetM: 0, title: "M-12 - Transverse (through mast centre)" });
+    const texts = dxfEntities(dxf).filter((e) => e.type === "TEXT");
+    const values = texts.map((t) => t.codes.get("1")![0]);
+
+    expect(values).toContain("M-12 - Transverse (through mast centre)");
+    for (const anchor of result.anchors) expect(values).toContain(anchor.name);
+    expect(dxfEntities(dxf).filter((e) => e.type === "POINT")).toHaveLength(result.anchors.length);
+  });
+
+  it("puts truncated excavations on their own layer", () => {
+    const { result } = transverseResult();
+    const truncated = {
+      ...result,
+      excavations: result.excavations.map((e) => ({ ...e, truncated: true })),
+    };
+    const dxf = buildSectionDxf(truncated, { elevationOffsetM: 0, title: "t" });
+    const layers = new Set(dxfEntities(dxf).map((e) => e.codes.get("8")![0]));
+    expect(layers.has("EXCAVATION-TRUNCATED")).toBe(result.excavations.some((e) => e.segments.length > 0));
+    expect(layers.has("EXCAVATION")).toBe(false);
+  });
+});

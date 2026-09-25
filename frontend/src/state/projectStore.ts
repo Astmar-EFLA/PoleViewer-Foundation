@@ -41,6 +41,8 @@ import type { LineMastRow } from "../services/csvParsing";
 import { parseLineMastCsv } from "../services/csvParsing";
 import { readProjectJsonFile } from "../services/projectFile";
 import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
+import { fileSafeName } from "../services/fileNames";
+import { exportSectionAsDxf } from "../services/sectionDxf";
 import {
   buildDefaultExcavationInstances,
   buildDefaultFillInstances,
@@ -741,7 +743,13 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       try {
         const project = get().project;
         if (!project) throw new Error("Project was cleared mid-batch.");
-        await exportProjectAsStandaloneHtml(project);
+        // Both files are named after the mast itself -- project.name is the
+        // same for every mast in a batch, so it can't tell them apart.
+        const fileBaseName = fileSafeName(row.mastName, `mast-${mastIndex + 1}`);
+        const transverseSection = project.sections.find((s) => s.mode === "transverse");
+        if (!transverseSection) throw new Error("No transverse section defined for this mast -- cannot export its DXF.");
+        exportSectionAsDxf(project, transverseSection, fileBaseName, row.mastName);
+        await exportProjectAsStandaloneHtml(project, `${fileBaseName}-viewer`);
         updateResult(mastIndex, { status: "success", message: null });
       } catch (error) {
         updateResult(mastIndex, { status: "error", message: (error as Error).message });
