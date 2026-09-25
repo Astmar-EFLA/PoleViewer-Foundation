@@ -13,7 +13,7 @@ project's conventions.
 
 ## Git state right now
 
-- Branch `master`, ahead of `origin/master` (not pushed).
+- Branch `master`, in sync with `origin/master` (pushed 2026-09-25).
 - Recent commits: `4325d5b` — "Add tapered-pedestal foundations, batch HTML
   export, and fix section labels"; `9b67433` — "Rebuild viewer export
   template for tapered-pedestal foundations" (the rebuilt prebuilt
@@ -32,7 +32,7 @@ project's conventions.
    Rebuilt it and verified live (exported a project with a tapered-pedestal
    foundation, reopened the standalone HTML, loads clean). Committed as
    `9b67433`.
-2. Commit `4325d5b` (already pushed to local master, not to origin):
+2. Commit `4325d5b`:
    - New foundation type `rectangular-pad-tapered-pedestal` (pad → sloped
      frustum → pedestal), matching a real EFLA footing drawing. Wired into
      3D rendering, 2D section triangulation, schema, library, and
