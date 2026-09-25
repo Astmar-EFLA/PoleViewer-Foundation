@@ -408,6 +408,114 @@ describe("generateSectionResult", () => {
     expect(Math.max(...zs)).toBeCloseTo(geometry.topConnectionPoint.z, 9);
   });
 
+  it("projects an excavation the plane misses (e.g. a guy-anchor pit) as its silhouette, and keeps cut ones cut", () => {
+    const base = projectWithFoundationAtOrigin();
+    const offPlane = { ...base.foundationInstances[0]!, instanceId: "foundation-off", position: { x: 12, y: 2 } };
+    const project: Project = {
+      ...base,
+      foundationInstances: [base.foundationInstances[0]!, offPlane],
+      excavationInstances: [
+        excavation({ id: "exc-cut", foundationInstanceId: base.foundationInstances[0]!.instanceId, bottomElevationM: -1 }),
+        excavation({ id: "exc-off", foundationInstanceId: offPlane.instanceId, bottomElevationM: -1 }),
+      ],
+    };
+    const section: SectionDefinition = {
+      id: "s-exc-proj",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+    const cut = result.excavations.find((e) => e.excavationId === "exc-cut")!;
+    const projected = result.excavations.find((e) => e.excavationId === "exc-off")!;
+
+    expect(cut.projected).toBe(false);
+    expect(projected.projected).toBe(true);
+    expect(projected.segments.length).toBeGreaterThanOrEqual(3);
+
+    // A closed silhouette from the dig floor up to the (flat, z = 0) terrain,
+    // centred on the pit's own s (= y = 2), wider at the top than the floor
+    // because of the side slopes.
+    const ss = projected.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+    const zs = projected.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
+    expect(Math.min(...zs)).toBeCloseTo(-1, 6);
+    expect(Math.max(...zs)).toBeCloseTo(0, 6);
+    expect((Math.min(...ss) + Math.max(...ss)) / 2).toBeCloseTo(2, 6);
+    const widthAt = (z: number) => {
+      const atZ = projected.segments.flatMap((seg) => [seg.a, seg.b]).filter((p) => Math.abs(p.z - z) < 1e-6);
+      return Math.max(...atZ.map((p) => p.s)) - Math.min(...atZ.map((p) => p.s));
+    };
+    expect(widthAt(0)).toBeGreaterThan(widthAt(-1));
+    const edgeKeys = projected.segments.map((seg) => `${seg.a.s.toFixed(6)},${seg.a.z.toFixed(6)}`);
+    expect(new Set(edgeKeys).size).toBe(projected.segments.length);
+  });
+
+  it("projects fill and uplift fill the plane misses as their silhouettes, and keeps cut ones cut", () => {
+    const base = projectWithFoundationAtOrigin();
+    const onPlane = { ...base.foundationInstances[0]!, baseElevation: 2.0 };
+    const offPlane = { ...onPlane, instanceId: "foundation-off", position: { x: 12, y: 2 } };
+    const project: Project = {
+      ...base,
+      foundationInstances: [onPlane, offPlane],
+      fillInstances: [
+        fill({ id: "fill-cut", foundationInstanceId: onPlane.instanceId, topElevationM: 2.0 }),
+        fill({ id: "fill-off", foundationInstanceId: offPlane.instanceId, topElevationM: 2.0 }),
+      ],
+      upliftFillInstances: [
+        fill({ id: "uplift-off", foundationInstanceId: offPlane.instanceId, topElevationM: 3.3 }),
+      ],
+    };
+    const section: SectionDefinition = {
+      id: "s-fill-proj",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+    const byId = (outlines: typeof result.fillOutlines, id: string) => outlines.find((o) => o.fillId === id)!;
+
+    expect(byId(result.fillOutlines, "fill-cut").projected).toBe(false);
+    for (const outline of [byId(result.fillOutlines, "fill-off"), byId(result.upliftFillOutlines, "uplift-off")]) {
+      expect(outline.projected).toBe(true);
+      expect(outline.segments.length).toBeGreaterThanOrEqual(3);
+      // From the (flat, z = 0) terrain up to the fill's own top, centred on the fill's s (= y = 2).
+      const ss = outline.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+      const zs = outline.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
+      expect(Math.min(...zs)).toBeCloseTo(0, 6);
+      expect(Math.max(...zs)).toBeCloseTo(outline.topElevationM, 6);
+      expect((Math.min(...ss) + Math.max(...ss)) / 2).toBeCloseTo(2, 6);
+    }
+  });
+
+  it("draws a zero-height projected fill as a single line, not a doubled edge", () => {
+    const base = projectWithFoundationAtOrigin();
+    const offPlane = { ...base.foundationInstances[0]!, instanceId: "foundation-off", position: { x: 12, y: 2 } };
+    const project: Project = {
+      ...base,
+      foundationInstances: [offPlane],
+      // Top at the flat terrain (z = 0): nothing to fill, so the solid is flat.
+      fillInstances: [fill({ id: "fill-flat", foundationInstanceId: offPlane.instanceId, topElevationM: 0 })],
+    };
+    const section: SectionDefinition = {
+      id: "s-fill-flat",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const outline = generateSectionResult(project, section).fillOutlines[0]!;
+    expect(outline.projected).toBe(true);
+    expect(outline.segments).toHaveLength(1);
+  });
+
   it("projects every tower member onto the plane, including ones well off it", () => {
     const base = projectWithFoundationAtOrigin();
     const members = [

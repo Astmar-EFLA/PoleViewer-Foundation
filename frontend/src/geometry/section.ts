@@ -293,6 +293,8 @@ export interface SectionExcavationOutline {
   readonly truncated: boolean;
   readonly bottomElevationM: number;
   readonly segments: readonly SectionSegment[];
+  /** True when the plane misses this excavation (e.g. a guy-anchor pit off a transverse section) and `segments` is its projected silhouette instead -- see SectionFoundationOutline.projected. */
+  readonly projected: boolean;
 }
 
 /** Shared by both fill layers (fillInstances/upliftFillInstances) -- same FillInstance shape either way, so one outline type and one builder function serve both. */
@@ -302,6 +304,8 @@ export interface SectionFillOutline {
   readonly truncated: boolean;
   readonly topElevationM: number;
   readonly segments: readonly SectionSegment[];
+  /** True when the plane misses this fill (e.g. around a guy-anchor block off a transverse section) and `segments` is its projected silhouette instead -- see SectionFoundationOutline.projected. */
+  readonly projected: boolean;
 }
 
 /**
@@ -361,14 +365,22 @@ function convexHull(points: readonly SectionXZ[]): SectionXZ[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** Each part (box/frustum) is convex, so its projection onto the plane is exactly the convex hull of its projected corners; one closed outline per part keeps a stepped foundation's steps visible. */
-function projectedPartOutline(triangles: readonly Triangle3[], plane: SectionPlane): SectionSegment[] {
+/**
+ * The silhouette of a solid projected onto the plane, as the convex hull of
+ * its projected vertices. Exact for a convex solid -- each foundation part
+ * (box/frustum), one closed outline per part so a stepped foundation's steps
+ * stay visible -- and a close outline for an excavation or fill, each a
+ * frustum apart from its terrain-following edge.
+ */
+function projectedOutline(triangles: readonly Triangle3[], plane: SectionPlane): SectionSegment[] {
   const points = triangles.flatMap((t) => [t.a, t.b, t.c]).map((p) => {
     const coord = sectionCoordinateOf(p, plane);
     return { s: coord.s, z: coord.z };
   });
   const hull = convexHull(points);
   if (hull.length < 2) return [];
+  // A zero-height solid (e.g. a fill whose top sits at terrain) collapses to one line, not a there-and-back pair.
+  if (hull.length === 2) return [{ a: hull[0]!, b: hull[1]! }];
   return hull.map((a, i) => ({ a, b: hull[(i + 1) % hull.length]! }));
 }
 
@@ -380,7 +392,7 @@ function foundationOutline(foundation: FoundationInstance, plane: SectionPlane):
   const cut = intersectTrianglesWithPlane(partTriangles.flat(), plane);
   const base = { instanceId: foundation.instanceId, legId: foundation.legId, colour: foundation.colour };
   if (cut.length > 0) return { ...base, segments: cut, projected: false };
-  return { ...base, segments: partTriangles.flatMap((t) => projectedPartOutline(t, plane)), projected: true };
+  return { ...base, segments: partTriangles.flatMap((t) => projectedOutline(t, plane)), projected: true };
 }
 
 function excavationOutline(
@@ -392,12 +404,14 @@ function excavationOutline(
   if (!terrainSurface) return null;
   const geometry = generateExcavationGeometry(excavation, foundation, terrainSurface);
   const triangles = excavationGeometryTriangles(geometry);
+  const cut = intersectTrianglesWithPlane(triangles, plane);
   return {
     excavationId: excavation.id,
     colour: excavation.colour,
     truncated: geometry.truncated,
     bottomElevationM: excavation.bottomElevationM,
-    segments: intersectTrianglesWithPlane(triangles, plane),
+    segments: cut.length > 0 ? cut : projectedOutline(triangles, plane),
+    projected: cut.length === 0,
   };
 }
 
@@ -411,12 +425,14 @@ function fillOutline(
   if (!terrainSurface) return null;
   const geometry = generateFillGeometry(fill, foundation, terrainSurface);
   const triangles = fillGeometryTriangles(geometry);
+  const cut = intersectTrianglesWithPlane(triangles, plane);
   return {
     fillId: fill.id,
     colour: fill.colour,
     truncated: geometry.truncated,
     topElevationM: fill.topElevationM,
-    segments: intersectTrianglesWithPlane(triangles, plane),
+    segments: cut.length > 0 ? cut : projectedOutline(triangles, plane),
+    projected: cut.length === 0,
   };
 }
 

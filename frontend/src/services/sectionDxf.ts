@@ -66,10 +66,14 @@ export function buildSectionDxf(result: SectionResult, options: SectionDxfOption
     writeSegments(layer, f.segments);
   }
 
+  // Projected (off-plane) excavations, e.g. guy-anchor pits, get their own
+  // dashed layers the same way projected foundations do.
   for (const e of result.excavations) {
+    const suffix = e.projected ? "-PROJECTED" : "";
+    const linetype = e.projected ? "DASHED" : "CONTINUOUS";
     const layer = e.truncated
-      ? doc.addLayer("EXCAVATION-TRUNCATED", ACI.red)
-      : doc.addLayer("EXCAVATION", ACI.orange);
+      ? doc.addLayer(`EXCAVATION-TRUNCATED${suffix}`, ACI.red, linetype)
+      : doc.addLayer(`EXCAVATION${suffix}`, ACI.orange, linetype);
     writeSegments(layer, e.segments);
   }
 
@@ -78,9 +82,10 @@ export function buildSectionDxf(result: SectionResult, options: SectionDxfOption
     ["UPLIFT-FILL", result.upliftFillOutlines, ACI.olive],
   ] as const) {
     for (const f of outlines) {
+      const suffix = f.projected ? "-PROJECTED" : "";
       const layer = f.truncated
-        ? doc.addLayer(`${baseName}-TRUNCATED`, ACI.red, "DASHED")
-        : doc.addLayer(baseName, colour, "DASHED");
+        ? doc.addLayer(`${baseName}-TRUNCATED${suffix}`, ACI.red, "DASHED")
+        : doc.addLayer(`${baseName}${suffix}`, colour, "DASHED");
       writeSegments(layer, f.segments);
     }
   }

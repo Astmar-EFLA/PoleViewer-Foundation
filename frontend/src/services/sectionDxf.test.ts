@@ -99,6 +99,49 @@ describe("buildSectionDxf", () => {
     expect(dxf).toMatch(/LAYER\r\n2\r\nFOUNDATION-PROJECTED\r\n70\r\n0\r\n62\r\n8\r\n6\r\nDASHED/);
   });
 
+  it("puts projected (off-plane) excavations on their own dashed layer", () => {
+    const { result } = transverseResult();
+    const withProjected = {
+      ...result,
+      excavations: [
+        {
+          excavationId: "guy-pit",
+          colour: "#c9a227",
+          truncated: false,
+          bottomElevationM: -1,
+          projected: true,
+          segments: [{ a: { s: 2, z: -1 }, b: { s: 3, z: -1 } }],
+        },
+      ],
+    };
+    const dxf = buildSectionDxf(withProjected, { elevationOffsetM: 0, title: "t" });
+    const layers = dxfEntities(dxf).filter((e) => e.type === "LINE").map((l) => l.codes.get("8")![0]);
+    expect(layers).toContain("EXCAVATION-PROJECTED");
+    expect(layers).not.toContain("EXCAVATION");
+    expect(dxf).toMatch(/LAYER\r\n2\r\nEXCAVATION-PROJECTED\r\n70\r\n0\r\n62\r\n30\r\n6\r\nDASHED/);
+  });
+
+  it("puts projected (off-plane) fill and uplift fill on their own layers", () => {
+    const { result } = transverseResult();
+    const outline = (fillId: string) => ({
+      fillId,
+      colour: "#8a6d3b",
+      truncated: false,
+      topElevationM: 1,
+      projected: true,
+      segments: [{ a: { s: 2, z: 0 }, b: { s: 3, z: 1 } }],
+    });
+    const dxf = buildSectionDxf(
+      { ...result, fillOutlines: [outline("f")], upliftFillOutlines: [outline("u")] },
+      { elevationOffsetM: 0, title: "t" }
+    );
+    const layers = dxfEntities(dxf).filter((e) => e.type === "LINE").map((l) => l.codes.get("8")![0]);
+    expect(layers).toContain("FILL-PROJECTED");
+    expect(layers).toContain("UPLIFT-FILL-PROJECTED");
+    expect(layers).not.toContain("FILL");
+    expect(layers).not.toContain("UPLIFT-FILL");
+  });
+
   it("puts truncated excavations on their own layer", () => {
     const { result } = transverseResult();
     const truncated = {

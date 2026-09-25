@@ -336,6 +336,26 @@ export function SectionView({
 
   const memberCategories = POLE_MEMBER_CATEGORY_ORDER.filter((c) => result.poleMembers.some((m) => m.category === c));
   const legendItems = [
+    ...(
+      [
+        ["fill-projected", "Fill beyond section (faint)", result.fillOutlines],
+        ["uplift-fill-projected", "Uplift fill beyond section (faint)", result.upliftFillOutlines],
+      ] as const
+    ).flatMap(([id, name, outlines]) => {
+      const first = outlines.find((o) => o.projected && o.segments.length > 0);
+      return first ? [{ id, name, colour: first.colour, status: "n/a", hatch: false }] : [];
+    }),
+    ...(result.excavations.some((e) => e.projected && e.segments.length > 0)
+      ? [
+          {
+            id: "excavation-projected",
+            name: "Excavation beyond section (dashed)",
+            colour: result.excavations.find((e) => e.projected)!.colour,
+            status: "n/a",
+            hatch: false,
+          },
+        ]
+      : []),
     ...(result.foundations.some((f) => f.projected && f.segments.length > 0)
       ? [
           {
@@ -484,18 +504,20 @@ export function SectionView({
             </g>
           ))}
           {result.excavations.map((e) => (
-            <g key={e.excavationId}>
-              {renderSegments(e.segments, e.truncated ? ACCENT : e.colour, e.excavationId, 1)}
+            <g key={e.excavationId} opacity={e.projected ? 0.7 : 1}>
+              {renderSegments(e.segments, e.truncated ? ACCENT : e.colour, e.excavationId, e.projected ? 0.8 : 1, e.projected)}
             </g>
           ))}
           {result.fillOutlines.map((fl) => (
-            <g key={fl.fillId}>
-              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, 1, true)}
+            // Fill is already dashed when cut; a projected (beyond-the-cut) fill is told apart by being fainter.
+            <g key={fl.fillId} opacity={fl.projected ? 0.45 : 1}>
+              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, fl.projected ? 0.8 : 1, true)}
             </g>
           ))}
           {result.upliftFillOutlines.map((fl) => (
-            <g key={fl.fillId}>
-              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, 1, true)}
+            // Fill is already dashed when cut; a projected (beyond-the-cut) fill is told apart by being fainter.
+            <g key={fl.fillId} opacity={fl.projected ? 0.45 : 1}>
+              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, fl.projected ? 0.8 : 1, true)}
             </g>
           ))}
 
