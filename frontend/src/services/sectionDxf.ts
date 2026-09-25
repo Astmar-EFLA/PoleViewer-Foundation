@@ -6,6 +6,10 @@
  * SectionResult directly rather than the on-screen SVG, so it works for
  * a section that was never rendered (batch export).
  *
+ * The tower itself (poleModel.visualGeometry members) is projected onto the
+ * plane rather than cut, so the drawing shows the whole structure standing
+ * on its foundations.
+ *
  * Every intersection segment is written as its own LINE: SectionResult
  * segments are unordered triangle/plane cuts, so writing them 1:1 is exact
  * and needs no polyline-chaining heuristics -- CAD draws abutting LINEs
@@ -30,7 +34,7 @@ const ANCHOR_TEXT_HEIGHT_M = 0.2;
 const TITLE_TEXT_HEIGHT_M = 0.4;
 
 // AutoCAD Colour Index values.
-const ACI = { red: 1, yellow: 2, green: 3, cyan: 4, blue: 5, magenta: 6, white: 7, grey: 8, lightGrey: 9, orange: 30, brown: 34, olive: 52 };
+const ACI = { red: 1, yellow: 2, green: 3, cyan: 4, blue: 5, magenta: 6, white: 7, grey: 8, lightGrey: 9, orange: 30, brown: 34, olive: 52, darkGreen: 84 };
 
 export function buildSectionDxf(result: SectionResult, options: SectionDxfOptions): string {
   const doc = createDxfDocument();
@@ -81,6 +85,17 @@ export function buildSectionDxf(result: SectionResult, options: SectionDxfOption
 
   if (result.groundwater) {
     writeSegments(doc.addLayer("GROUNDWATER", ACI.blue, "DASHED"), result.groundwater.segments);
+  }
+
+  // The whole tower projected onto the section plane (an elevation view), one
+  // layer per member category so cables/insulators can be switched off in CAD.
+  for (const [category, layerName, colour] of [
+    ["structure", "TOWER", ACI.blue],
+    ["insulator", "TOWER-INSULATOR", ACI.darkGreen],
+    ["cable", "TOWER-CABLE", ACI.red],
+  ] as const) {
+    const members = result.poleMembers.filter((m) => m.category === category);
+    if (members.length > 0) writeSegments(doc.addLayer(layerName, colour), members);
   }
 
   const anchorLayer = doc.addLayer("ANCHORS", ACI.magenta);

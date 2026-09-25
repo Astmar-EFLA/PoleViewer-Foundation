@@ -14,6 +14,7 @@ import type { LocalCoordinate } from "../domain/coordinates";
 import type { ExcavationInstance } from "../domain/excavation";
 import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
+import type { PoleMemberCategory } from "../domain/poleModel";
 import type { Project } from "../domain/project";
 import type { SectionDefinition, SectionPlane } from "../domain/section";
 import type { IndexedTriangle, XYZ } from "./barycentric";
@@ -296,6 +297,17 @@ export interface SectionFillOutline {
   readonly segments: readonly SectionSegment[];
 }
 
+/**
+ * One tower member (poleModel.visualGeometry) projected orthographically onto
+ * the section plane -- an elevation view of the whole structure, not a cut:
+ * every member is included regardless of its distance from the plane, the
+ * way a section drawing shows the tower standing behind the cut ground.
+ * Rendering-only, like the members themselves (ADR-005).
+ */
+export interface SectionPoleMember extends SectionSegment {
+  readonly category: PoleMemberCategory;
+}
+
 export interface SectionBoundaryLine {
   readonly id: string;
   readonly name: string;
@@ -310,6 +322,8 @@ export interface SectionResult {
   readonly terrainSegments: readonly SectionSegment[];
   readonly terrainSourcePoints: readonly SectionXZ[];
   readonly anchors: readonly SectionAnchorMark[];
+  /** Empty when the pole model has no visual geometry (e.g. a hand-authored JSON model). */
+  readonly poleMembers: readonly SectionPoleMember[];
   readonly foundations: readonly SectionFoundationOutline[];
   readonly excavations: readonly SectionExcavationOutline[];
   readonly fillOutlines: readonly SectionFillOutline[];
@@ -415,6 +429,12 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
     }
   }
 
+  const poleMembers: SectionPoleMember[] = (project.poleModel.visualGeometry?.members ?? []).map((m) => {
+    const a = sectionCoordinateOf(placePoleModelPoint(m.a, project.poleModel), plane);
+    const b = sectionCoordinateOf(placePoleModelPoint(m.b, project.poleModel), plane);
+    return { category: m.category, a: { s: a.s, z: a.z }, b: { s: b.s, z: b.z } };
+  });
+
   const foundations = project.foundationInstances.map((f) => foundationOutline(f, plane));
 
   const excavations = project.excavationInstances
@@ -491,6 +511,7 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
     terrainSegments,
     terrainSourcePoints,
     anchors,
+    poleMembers,
     foundations,
     excavations,
     fillOutlines,

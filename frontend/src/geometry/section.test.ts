@@ -21,9 +21,11 @@ import {
   intersectTriangleWithPlane,
   orientedBoxTriangles,
   orientedFrustumTriangles,
+  sectionCoordinateOf,
   trianglesFromIndexedSurface,
   type Triangle3,
 } from "./section";
+import { placePoleModelPoint } from "./polePlacement";
 import { generateExcavationGeometry } from "./excavationGeometry";
 import { generateFillGeometry } from "./fillGeometry";
 import { generateTin } from "./terrain";
@@ -358,6 +360,57 @@ describe("generateSectionResult", () => {
 
     expect(result.foundations).toHaveLength(1);
     expect(result.foundations[0]!.segments.length).toBeGreaterThan(0);
+  });
+
+  it("projects every tower member onto the plane, including ones well off it", () => {
+    const base = projectWithFoundationAtOrigin();
+    const members = [
+      // A leg rising on the plane, and a cross-arm member 3 m off it.
+      { a: localCoordinate(0, -1.5, 0), b: localCoordinate(0, -1.5, 20), category: "structure" as const, component: "leg" },
+      { a: localCoordinate(3, -2, 18), b: localCoordinate(3, 2, 18), category: "structure" as const, component: "arm" },
+      { a: localCoordinate(0, 2, 18), b: localCoordinate(0, 2, 16.5), category: "insulator" as const, component: "string" },
+    ];
+    const project: Project = {
+      ...base,
+      poleModel: { ...base.poleModel, visualGeometry: { members, source: PROVENANCE } },
+    };
+    const section: SectionDefinition = {
+      id: "s-tower",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+
+    expect(result.poleMembers).toHaveLength(members.length);
+    expect(result.poleMembers.map((m) => m.category)).toEqual(["structure", "structure", "insulator"]);
+    members.forEach((member, i) => {
+      const expectA = sectionCoordinateOf(placePoleModelPoint(member.a, project.poleModel), section.plane);
+      const expectB = sectionCoordinateOf(placePoleModelPoint(member.b, project.poleModel), section.plane);
+      expect(result.poleMembers[i]!.a.s).toBeCloseTo(expectA.s, 9);
+      expect(result.poleMembers[i]!.a.z).toBeCloseTo(expectA.z, 9);
+      expect(result.poleMembers[i]!.b.s).toBeCloseTo(expectB.s, 9);
+      expect(result.poleMembers[i]!.b.z).toBeCloseTo(expectB.z, 9);
+    });
+  });
+
+  it("has no tower members when the pole model carries no visual geometry", () => {
+    // The hand-authored lattice fixture has no imported member geometry.
+    const project = projectWithFoundationAtOrigin();
+    expect(project.poleModel.visualGeometry).toBeUndefined();
+    const section: SectionDefinition = {
+      id: "s-no-tower",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    expect(generateSectionResult(project, section).poleMembers).toEqual([]);
   });
 
   it("includes fill and uplift-fill outlines for a foundation above terrain", () => {

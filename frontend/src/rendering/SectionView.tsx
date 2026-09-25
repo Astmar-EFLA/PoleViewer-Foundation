@@ -1,5 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import type { PoleMemberCategory } from "../domain/poleModel";
+import { POLE_MEMBER_COLOURS } from "../domain/poleModel";
 import type { SectionBoundaryLine, SectionResult, SectionSegment, SectionXZ } from "../geometry/section";
 
 interface SectionViewProps {
@@ -80,6 +82,14 @@ function pairGeotechLayers(boundaries: readonly SectionBoundaryLine[]): GeotechL
   return pairs;
 }
 
+const POLE_MEMBER_CATEGORY_ORDER: readonly PoleMemberCategory[] = ["structure", "insulator", "cable"];
+
+const POLE_MEMBER_LEGEND_LABELS: Record<PoleMemberCategory, string> = {
+  structure: "Tower (projected)",
+  insulator: "Insulators",
+  cable: "Cables",
+};
+
 function clamp(value: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, value));
 }
@@ -159,6 +169,11 @@ export function SectionView({
   for (const fl of result.upliftFillOutlines) collect(fl.segments);
   for (const b of result.geotechBoundaries) collect(b.segments);
   if (result.groundwater) collect(result.groundwater.segments);
+  // The projected tower counts toward the full extent (so zooming out always
+  // reaches its top), but not the default structure fit below -- a tower is
+  // several times taller than its foundations, and fitting it would shrink
+  // the foundation detail this view opens on.
+  collect(result.poleMembers);
 
   if (allS.length === 0) {
     return (
@@ -319,7 +334,15 @@ export function SectionView({
   const scaleBarPx = scaleBarMetres * scale;
   const clipId = `section-clip-${resetViewKey ?? "default"}`;
 
+  const memberCategories = POLE_MEMBER_CATEGORY_ORDER.filter((c) => result.poleMembers.some((m) => m.category === c));
   const legendItems = [
+    ...memberCategories.map((c) => ({
+      id: `tower-${c}`,
+      name: POLE_MEMBER_LEGEND_LABELS[c],
+      colour: POLE_MEMBER_COLOURS[c],
+      status: "n/a",
+      hatch: false,
+    })),
     ...layerPairs.map((p) => ({ id: p.layerId, name: p.name, colour: p.colour, status: p.verificationState, hatch: true })),
     ...(result.groundwater
       ? [{ id: result.groundwater.id, name: result.groundwater.name, colour: result.groundwater.colour, status: "n/a", hatch: false }]
@@ -431,6 +454,17 @@ export function SectionView({
             </g>
           ))}
           {result.groundwater && renderSegments(result.groundwater.segments, result.groundwater.colour, "groundwater", 1.1, true)}
+
+          {memberCategories.map((c) => (
+            <g key={`tower-${c}`}>
+              {renderSegments(
+                result.poleMembers.filter((m) => m.category === c),
+                POLE_MEMBER_COLOURS[c],
+                `tower-${c}`,
+                c === "structure" ? 1 : 0.8
+              )}
+            </g>
+          ))}
 
           {result.foundations.map((f) => (
             <g key={f.instanceId}>{renderSegments(f.segments, f.colour, f.instanceId, 1.2)}</g>

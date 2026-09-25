@@ -2,17 +2,11 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import type { ViewerFrameDefinition } from "../domain/coordinates";
 import type { PoleMember, PoleMemberCategory, PoleModel } from "../domain/poleModel";
+import { POLE_MEMBER_COLOURS } from "../domain/poleModel";
 import { localToViewer } from "../geometry/coordinateTransform";
 import { placePoleModelPoint } from "../geometry/polePlacement";
 import { toThreeVector3 } from "./threeAdapters";
 import { useAutoDispose } from "./useAutoDispose";
-
-/** Matches the colour legend of the reference PLS-POLE viewer this geometry was imported via, so the same structure reads the same way in both tools. */
-const CATEGORY_COLOUR: Record<PoleMemberCategory, string> = {
-  structure: "#0C2A59",
-  cable: "#F00000",
-  insulator: "#586E2F",
-};
 
 interface PoleMembersMeshProps {
   readonly poleModel: PoleModel;
@@ -71,13 +65,13 @@ export function PoleMembersMesh({ poleModel, viewerFrame, visible, opacity }: Po
   return (
     <group>
       <lineSegments geometry={structureGeometry}>
-        <lineBasicMaterial color={CATEGORY_COLOUR.structure} transparent opacity={opacity} />
+        <lineBasicMaterial color={POLE_MEMBER_COLOURS.structure} transparent opacity={opacity} />
       </lineSegments>
       <lineSegments geometry={cableGeometry}>
-        <lineBasicMaterial color={CATEGORY_COLOUR.cable} transparent opacity={opacity} />
+        <lineBasicMaterial color={POLE_MEMBER_COLOURS.cable} transparent opacity={opacity} />
       </lineSegments>
       <lineSegments geometry={insulatorGeometry}>
-        <lineBasicMaterial color={CATEGORY_COLOUR.insulator} transparent opacity={opacity} />
+        <lineBasicMaterial color={POLE_MEMBER_COLOURS.insulator} transparent opacity={opacity} />
       </lineSegments>
     </group>
   );

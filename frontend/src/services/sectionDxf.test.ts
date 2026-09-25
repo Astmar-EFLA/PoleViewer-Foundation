@@ -49,6 +49,35 @@ describe("buildSectionDxf", () => {
     expect(dxfEntities(dxf).filter((e) => e.type === "POINT")).toHaveLength(result.anchors.length);
   });
 
+  it("draws the projected tower on one layer per member category", () => {
+    const { result } = transverseResult();
+    const withTower = {
+      ...result,
+      poleMembers: [
+        { category: "structure" as const, a: { s: -1.5, z: 0 }, b: { s: -1.5, z: 20 } },
+        { category: "structure" as const, a: { s: 1.5, z: 0 }, b: { s: 1.5, z: 20 } },
+        { category: "insulator" as const, a: { s: 2, z: 18 }, b: { s: 2, z: 16.5 } },
+        { category: "cable" as const, a: { s: -4, z: 0 }, b: { s: -1.5, z: 15 } },
+      ],
+    };
+    const dxf = buildSectionDxf(withTower, { elevationOffsetM: 100, title: "t" });
+    const lines = dxfEntities(dxf).filter((e) => e.type === "LINE");
+    const count = (layer: string) => lines.filter((l) => l.codes.get("8")![0] === layer).length;
+
+    expect(count("TOWER")).toBe(2);
+    expect(count("TOWER-INSULATOR")).toBe(1);
+    expect(count("TOWER-CABLE")).toBe(1);
+    // The mast-centre line now reaches the tower's top (z 20 + 100).
+    const centre = lines.find((l) => l.codes.get("8")![0] === "MAST-CENTRE")!;
+    expect(Number(centre.codes.get("21")![0])).toBeCloseTo(120, 6);
+  });
+
+  it("writes no tower layers when there are no tower members", () => {
+    const { result } = transverseResult();
+    const dxf = buildSectionDxf({ ...result, poleMembers: [] }, { elevationOffsetM: 0, title: "t" });
+    expect(dxf).not.toContain("TOWER");
+  });
+
   it("puts truncated excavations on their own layer", () => {
     const { result } = transverseResult();
     const truncated = {
