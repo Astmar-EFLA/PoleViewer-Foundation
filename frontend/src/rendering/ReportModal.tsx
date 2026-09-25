@@ -6,6 +6,10 @@ import type { ExcavationMaterialQuantities } from "../services/excavationMateria
 import { computeExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
 import type { FillMaterialQuantities } from "../services/fillMaterialQuantities";
 import { computeFillMaterialQuantities } from "../services/fillMaterialQuantities";
+import type { FoundationMaterialQuantities } from "../services/foundationMaterialQuantities";
+import { computeFoundationMaterialQuantities } from "../services/foundationMaterialQuantities";
+import type { PerFoundationVolumeTable } from "../services/perFoundationVolumeTable";
+import { buildPerFoundationVolumeTable } from "../services/perFoundationVolumeTable";
 import { validateUpliftFillInstance } from "../validation/fillValidation";
 import { downloadText } from "../services/browserDownload";
 import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
@@ -31,6 +35,39 @@ const SEVERITY_COLOUR: Record<ValidationSeverity, string> = {
   warning: "#c98a12",
   information: "#3070e0",
 };
+
+const GROSS_VOLUME_NOTE = "Excavation and fill volumes are gross -- foundation concrete is not deducted from them.";
+
+function formatVolume(volumeM3: number | null): string {
+  return volumeM3 === null ? "-" : volumeM3.toFixed(2);
+}
+
+function formatPerFoundationVolumesAsText(
+  table: PerFoundationVolumeTable,
+  concrete: FoundationMaterialQuantities
+): string[] {
+  const lines: string[] = ["## Volumes per foundation (m3)"];
+  if (table.rows.length === 0) {
+    lines.push("Not calculated -- no foundations.");
+    lines.push("");
+    return lines;
+  }
+  lines.push("Foundation | Concrete | Excavation | Fill | Uplift fill");
+  for (const r of table.rows) {
+    lines.push(
+      `${r.label} | ${formatVolume(r.concreteM3)} | ${formatVolume(r.excavationM3)} | ${formatVolume(r.fillM3)} | ${formatVolume(r.upliftFillM3)}`
+    );
+  }
+  const t = table.totals;
+  lines.push(
+    `Total | ${formatVolume(t.concreteM3)} | ${formatVolume(t.excavationM3)} | ${formatVolume(t.fillM3)} | ${formatVolume(t.upliftFillM3)}`
+  );
+  lines.push("(- = not calculated, or no instance of that kind for this foundation)");
+  lines.push(`(${GROSS_VOLUME_NOTE})`);
+  for (const l of concrete.limitations) lines.push(`(${l})`);
+  lines.push("");
+  return lines;
+}
 
 function formatMaterialQuantitiesAsText(quantities: ExcavationMaterialQuantities): string[] {
   const lines: string[] = ["## Material quantities (excavation)"];
@@ -76,6 +113,8 @@ function formatFillQuantitiesAsText(quantities: FillMaterialQuantities, title: s
 function formatSummaryAsText(
   summary: EngineeringSummary,
   validation: ValidationResult[],
+  perFoundationVolumes: PerFoundationVolumeTable,
+  foundationQuantities: FoundationMaterialQuantities,
   materialQuantities: ExcavationMaterialQuantities,
   fillQuantities: FillMaterialQuantities,
   upliftFillQuantities: FillMaterialQuantities,
@@ -86,6 +125,7 @@ function formatSummaryAsText(
   lines.push("This is a design-support summary, not an approved design or certified quantity.");
   lines.push("");
 
+  lines.push(...formatPerFoundationVolumesAsText(perFoundationVolumes, foundationQuantities));
   lines.push(...formatMaterialQuantitiesAsText(materialQuantities));
   lines.push(...formatFillQuantitiesAsText(fillQuantities, "fill"));
   lines.push(...formatFillQuantitiesAsText(upliftFillQuantities, "uplift fill"));
@@ -153,6 +193,68 @@ function FillQuantitiesSection({ title, quantities }: { title: string; quantitie
   );
 }
 
+const cellStyle: CSSProperties = { padding: "2px 8px", textAlign: "right", borderBottom: "1px solid #eee" };
+const labelCellStyle: CSSProperties = { ...cellStyle, textAlign: "left" };
+
+function PerFoundationVolumesSection({
+  table,
+  concrete,
+}: {
+  table: PerFoundationVolumeTable;
+  concrete: FoundationMaterialQuantities;
+}) {
+  const t = table.totals;
+  return (
+    <>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Volumes per foundation</div>
+      {table.rows.length === 0 ? (
+        <div style={{ opacity: 0.7, marginBottom: 16 }}>Not calculated -- no foundations.</div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <table style={{ borderCollapse: "collapse", marginBottom: 4 }}>
+            <thead>
+              <tr>
+                <th style={labelCellStyle}>Foundation</th>
+                <th style={cellStyle}>Concrete (m³)</th>
+                <th style={cellStyle}>Excavation (m³)</th>
+                <th style={cellStyle}>Fill (m³)</th>
+                <th style={cellStyle}>Uplift fill (m³)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {table.rows.map((r) => (
+                <tr key={r.foundationInstanceId}>
+                  <td style={labelCellStyle}>{r.label}</td>
+                  <td style={cellStyle}>{formatVolume(r.concreteM3)}</td>
+                  <td style={cellStyle}>{formatVolume(r.excavationM3)}</td>
+                  <td style={cellStyle}>{formatVolume(r.fillM3)}</td>
+                  <td style={cellStyle}>{formatVolume(r.upliftFillM3)}</td>
+                </tr>
+              ))}
+              <tr style={{ fontWeight: 600 }}>
+                <td style={labelCellStyle}>Total</td>
+                <td style={cellStyle}>{formatVolume(t.concreteM3)}</td>
+                <td style={cellStyle}>{formatVolume(t.excavationM3)}</td>
+                <td style={cellStyle}>{formatVolume(t.fillM3)}</td>
+                <td style={cellStyle}>{formatVolume(t.upliftFillM3)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
+            "-" = not calculated, or no instance of that kind for this foundation.
+          </div>
+          <div style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>{GROSS_VOLUME_NOTE}</div>
+          {concrete.limitations.map((l, i) => (
+            <div key={i} style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
+              {l}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 const overlayStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -210,7 +312,34 @@ export function ReportModal() {
     [project]
   );
 
-  if (!reportOpen || !project || !summary || !materialQuantities || !fillQuantities || !upliftFillQuantities)
+  const foundationQuantities = useMemo(
+    () => (project ? computeFoundationMaterialQuantities(project) : null),
+    [project]
+  );
+  const perFoundationVolumes = useMemo(
+    () =>
+      project && foundationQuantities && materialQuantities && fillQuantities && upliftFillQuantities
+        ? buildPerFoundationVolumeTable(
+            project,
+            foundationQuantities,
+            materialQuantities,
+            fillQuantities,
+            upliftFillQuantities
+          )
+        : null,
+    [project, foundationQuantities, materialQuantities, fillQuantities, upliftFillQuantities]
+  );
+
+  if (
+    !reportOpen ||
+    !project ||
+    !summary ||
+    !materialQuantities ||
+    !fillQuantities ||
+    !upliftFillQuantities ||
+    !foundationQuantities ||
+    !perFoundationVolumes
+  )
     return null;
 
   const buckets: SummaryBucket[] = ["imported", "user-entered", "assumed", "calculated"];
@@ -234,7 +363,16 @@ export function ReportModal() {
             onClick={() =>
               downloadText(
                 JSON.stringify(
-                  { generatedAt: nowIso, summary, materialQuantities, fillQuantities, upliftFillQuantities, validation },
+                  {
+                    generatedAt: nowIso,
+                    summary,
+                    perFoundationVolumes,
+                    foundationQuantities,
+                    materialQuantities,
+                    fillQuantities,
+                    upliftFillQuantities,
+                    validation,
+                  },
                   null,
                   2
                 ),
@@ -249,7 +387,16 @@ export function ReportModal() {
             style={buttonStyle}
             onClick={() =>
               downloadText(
-                formatSummaryAsText(summary, validation, materialQuantities, fillQuantities, upliftFillQuantities, nowIso),
+                formatSummaryAsText(
+                  summary,
+                  validation,
+                  perFoundationVolumes,
+                  foundationQuantities,
+                  materialQuantities,
+                  fillQuantities,
+                  upliftFillQuantities,
+                  nowIso
+                ),
                 `${project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-report.txt`,
                 "text/plain"
               )
@@ -278,6 +425,8 @@ export function ReportModal() {
         {htmlExportStatus === "error" && (
           <div style={{ color: "#c02020", marginTop: -8, marginBottom: 16 }}>{htmlExportError}</div>
         )}
+
+        <PerFoundationVolumesSection table={perFoundationVolumes} concrete={foundationQuantities} />
 
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Material quantities (excavation)</div>
         {materialQuantities.status === "no-terrain-surface" && (

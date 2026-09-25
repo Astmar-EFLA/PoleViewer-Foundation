@@ -32,6 +32,19 @@ describe("computeExcavationMaterialQuantities", () => {
     }
   });
 
+  it("breaks the total out per foundation, one entry per excavation, summing back to the total", () => {
+    const project = buildSyntheticDemoProject();
+    const result = computeExcavationMaterialQuantities(project);
+
+    expect(result.byFoundation).toHaveLength(project.excavationInstances.length);
+    for (const entry of result.byFoundation) {
+      expect(entry.volumeM3).not.toBeNull();
+      expect(entry.volumeM3!).toBeGreaterThan(0);
+    }
+    const sum = result.byFoundation.reduce((s, f) => s + (f.volumeM3 ?? 0), 0);
+    expect(sum).toBeCloseTo(result.totalVolumeM3!, 6);
+  });
+
   it("reports no-terrain-surface when the project has no terrain", () => {
     const project = { ...buildSyntheticDemoProject(), terrainSurface: null };
     const result = computeExcavationMaterialQuantities(project);

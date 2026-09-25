@@ -14,6 +14,8 @@
  */
 
 import type { Project } from "../domain/project";
+import type { VolumeByFoundation } from "./foundationMaterialQuantities";
+import { addVolumeByFoundation } from "./foundationMaterialQuantities";
 import { boundaryLocalZ } from "../geometry/geotechBoundary";
 import { generateExcavationGeometry } from "../geometry/excavationGeometry";
 import { computeApproximateVolume } from "../geometry/excavationVolume";
@@ -35,6 +37,8 @@ export interface ExcavationMaterialQuantities {
   readonly totalVolumeM3: number | null;
   /** Sorted by descending volume. Empty when status != "calculated" or every excavation was blocked. */
   readonly byCategory: readonly MaterialQuantityByCategory[];
+  /** One entry per foundation that has an excavation, in excavation order; volumeM3 null if that excavation was blocked. Excavations with no matching foundation appear only in excavationsBlocked. */
+  readonly byFoundation: readonly VolumeByFoundation[];
   readonly excavationsCalculated: number;
   readonly excavationsBlocked: number;
   readonly limitations: readonly string[];
@@ -49,6 +53,7 @@ const EMPTY_RESULT = (status: MaterialQuantitiesStatus): ExcavationMaterialQuant
   status,
   totalVolumeM3: null,
   byCategory: [],
+  byFoundation: [],
   excavationsCalculated: 0,
   excavationsBlocked: 0,
   limitations: [],
@@ -61,6 +66,7 @@ export function computeExcavationMaterialQuantities(project: Project): Excavatio
 
   const nowIso = project.modifiedAt;
   const categoryTotals = new Map<string, number>();
+  const foundationVolumes = new Map<string, VolumeByFoundation>();
   let totalVolumeM3 = 0;
   let excavationsCalculated = 0;
   let excavationsBlocked = 0;
@@ -82,9 +88,11 @@ export function computeExcavationMaterialQuantities(project: Project): Excavatio
     const volume = computeApproximateVolume(excavation, geometry, terrainSurface, geometryValid);
 
     if (volume.status !== "calculated" || volume.approximateVolumeM3 === null) {
+      addVolumeByFoundation(foundationVolumes, foundation.instanceId, foundation.displayLabel, null);
       excavationsBlocked += 1;
       continue;
     }
+    addVolumeByFoundation(foundationVolumes, foundation.instanceId, foundation.displayLabel, volume.approximateVolumeM3);
     excavationsCalculated += 1;
     totalVolumeM3 += volume.approximateVolumeM3;
 
@@ -126,6 +134,7 @@ export function computeExcavationMaterialQuantities(project: Project): Excavatio
     status: "calculated",
     totalVolumeM3,
     byCategory,
+    byFoundation: Array.from(foundationVolumes.values()),
     excavationsCalculated,
     excavationsBlocked,
     limitations: METHOD_LIMITATIONS,

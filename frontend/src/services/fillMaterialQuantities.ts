@@ -17,6 +17,8 @@ import type { FillGeometry } from "../geometry/fillGeometry";
 import { generateFillGeometry } from "../geometry/fillGeometry";
 import { computeApproximateFillVolume } from "../geometry/fillVolume";
 import type { ValidationResult } from "../domain/validation";
+import type { VolumeByFoundation } from "./foundationMaterialQuantities";
+import { addVolumeByFoundation } from "./foundationMaterialQuantities";
 import { hasBlockingFillGeometryError, validateFillInstance } from "../validation/fillValidation";
 
 export type FillMaterialQuantitiesStatus = "calculated" | "no-terrain-surface" | "no-fills";
@@ -25,6 +27,8 @@ export interface FillMaterialQuantities {
   readonly status: FillMaterialQuantitiesStatus;
   /** Sum of every calculable fill's own approximate volume. Null when status != "calculated". */
   readonly totalVolumeM3: number | null;
+  /** One entry per foundation that has a fill, in fill order; volumeM3 null if that fill was blocked. Fills with no matching foundation appear only in fillsBlocked. */
+  readonly byFoundation: readonly VolumeByFoundation[];
   readonly fillsCalculated: number;
   readonly fillsBlocked: number;
   readonly limitations: readonly string[];
@@ -38,6 +42,7 @@ const METHOD_LIMITATIONS: readonly string[] = [
 const EMPTY_RESULT = (status: FillMaterialQuantitiesStatus): FillMaterialQuantities => ({
   status,
   totalVolumeM3: null,
+  byFoundation: [],
   fillsCalculated: 0,
   fillsBlocked: 0,
   limitations: [],
@@ -66,6 +71,7 @@ export function computeFillMaterialQuantities(
 
   const nowIso = project.modifiedAt;
   let totalVolumeM3 = 0;
+  const foundationVolumes = new Map<string, VolumeByFoundation>();
   let fillsCalculated = 0;
   let fillsBlocked = 0;
 
@@ -82,9 +88,11 @@ export function computeFillMaterialQuantities(
     const volume = computeApproximateFillVolume(fill, geometry, terrainSurface, geometryValid);
 
     if (volume.status !== "calculated" || volume.approximateVolumeM3 === null) {
+      addVolumeByFoundation(foundationVolumes, foundation.instanceId, foundation.displayLabel, null);
       fillsBlocked += 1;
       continue;
     }
+    addVolumeByFoundation(foundationVolumes, foundation.instanceId, foundation.displayLabel, volume.approximateVolumeM3);
     fillsCalculated += 1;
     totalVolumeM3 += volume.approximateVolumeM3;
   }
@@ -92,6 +100,7 @@ export function computeFillMaterialQuantities(
   return {
     status: "calculated",
     totalVolumeM3,
+    byFoundation: Array.from(foundationVolumes.values()),
     fillsCalculated,
     fillsBlocked,
     limitations: METHOD_LIMITATIONS,
