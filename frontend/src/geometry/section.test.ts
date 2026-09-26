@@ -21,9 +21,11 @@ import {
   intersectTriangleWithPlane,
   orientedBoxTriangles,
   orientedFrustumTriangles,
+  sectionCoordinateOf,
   trianglesFromIndexedSurface,
   type Triangle3,
 } from "./section";
+import { placePoleModelPoint } from "./polePlacement";
 import { generateExcavationGeometry } from "./excavationGeometry";
 import { generateFillGeometry } from "./fillGeometry";
 import { generateTin } from "./terrain";
@@ -360,6 +362,211 @@ describe("generateSectionResult", () => {
     expect(result.foundations[0]!.segments.length).toBeGreaterThan(0);
   });
 
+  it("marks a cut foundation as not projected", () => {
+    const project = projectWithFoundationAtOrigin();
+    const section: SectionDefinition = {
+      id: "s-cut",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    expect(generateSectionResult(project, section).foundations[0]!.projected).toBe(false);
+  });
+
+  it("projects a foundation the plane misses (e.g. a guy-anchor block) as one closed silhouette per part", () => {
+    const base = projectWithFoundationAtOrigin();
+    // 12 m off a transverse (along-Y) plane, like a guy-anchor block.
+    const offPlane = { ...base.foundationInstances[0]!, position: { x: 12, y: 2 } };
+    const project: Project = { ...base, foundationInstances: [offPlane] };
+    const section: SectionDefinition = {
+      id: "s-proj",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const outline = generateSectionResult(project, section).foundations[0]!;
+    expect(outline.projected).toBe(true);
+
+    // Each axis-aligned box part projects to a rectangle: 4 edges per part,
+    // spanning the part's own width about the foundation's s (= y = 2) and
+    // its own height.
+    const geometry = generateFoundationGeometry(offPlane);
+    expect(outline.segments).toHaveLength(4 * geometry.parts.length);
+    const ss = outline.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+    const zs = outline.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
+    const pad = geometry.parts[0]!;
+    if (pad.kind !== "box") throw new Error("expected a box pad");
+    expect(Math.min(...ss)).toBeCloseTo(2 - pad.halfExtents.y, 9);
+    expect(Math.max(...ss)).toBeCloseTo(2 + pad.halfExtents.y, 9);
+    expect(Math.min(...zs)).toBeCloseTo(offPlane.baseElevation, 9);
+    expect(Math.max(...zs)).toBeCloseTo(geometry.topConnectionPoint.z, 9);
+  });
+
+  it("projects an excavation the plane misses (e.g. a guy-anchor pit) as its silhouette, and keeps cut ones cut", () => {
+    const base = projectWithFoundationAtOrigin();
+    const offPlane = { ...base.foundationInstances[0]!, instanceId: "foundation-off", position: { x: 12, y: 2 } };
+    const project: Project = {
+      ...base,
+      foundationInstances: [base.foundationInstances[0]!, offPlane],
+      excavationInstances: [
+        excavation({ id: "exc-cut", foundationInstanceId: base.foundationInstances[0]!.instanceId, bottomElevationM: -1 }),
+        excavation({ id: "exc-off", foundationInstanceId: offPlane.instanceId, bottomElevationM: -1 }),
+      ],
+    };
+    const section: SectionDefinition = {
+      id: "s-exc-proj",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+    const cut = result.excavations.find((e) => e.excavationId === "exc-cut")!;
+    const projected = result.excavations.find((e) => e.excavationId === "exc-off")!;
+
+    expect(cut.projected).toBe(false);
+    expect(projected.projected).toBe(true);
+    expect(projected.segments.length).toBeGreaterThanOrEqual(3);
+
+    // A closed silhouette from the dig floor up to the (flat, z = 0) terrain,
+    // centred on the pit's own s (= y = 2), wider at the top than the floor
+    // because of the side slopes.
+    const ss = projected.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+    const zs = projected.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
+    expect(Math.min(...zs)).toBeCloseTo(-1, 6);
+    expect(Math.max(...zs)).toBeCloseTo(0, 6);
+    expect((Math.min(...ss) + Math.max(...ss)) / 2).toBeCloseTo(2, 6);
+    const widthAt = (z: number) => {
+      const atZ = projected.segments.flatMap((seg) => [seg.a, seg.b]).filter((p) => Math.abs(p.z - z) < 1e-6);
+      return Math.max(...atZ.map((p) => p.s)) - Math.min(...atZ.map((p) => p.s));
+    };
+    expect(widthAt(0)).toBeGreaterThan(widthAt(-1));
+    const edgeKeys = projected.segments.map((seg) => `${seg.a.s.toFixed(6)},${seg.a.z.toFixed(6)}`);
+    expect(new Set(edgeKeys).size).toBe(projected.segments.length);
+  });
+
+  it("projects fill and uplift fill the plane misses as their silhouettes, and keeps cut ones cut", () => {
+    const base = projectWithFoundationAtOrigin();
+    const onPlane = { ...base.foundationInstances[0]!, baseElevation: 2.0 };
+    const offPlane = { ...onPlane, instanceId: "foundation-off", position: { x: 12, y: 2 } };
+    const project: Project = {
+      ...base,
+      foundationInstances: [onPlane, offPlane],
+      fillInstances: [
+        fill({ id: "fill-cut", foundationInstanceId: onPlane.instanceId, topElevationM: 2.0 }),
+        fill({ id: "fill-off", foundationInstanceId: offPlane.instanceId, topElevationM: 2.0 }),
+      ],
+      upliftFillInstances: [
+        fill({ id: "uplift-off", foundationInstanceId: offPlane.instanceId, topElevationM: 3.3 }),
+      ],
+    };
+    const section: SectionDefinition = {
+      id: "s-fill-proj",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+    const byId = (outlines: typeof result.fillOutlines, id: string) => outlines.find((o) => o.fillId === id)!;
+
+    expect(byId(result.fillOutlines, "fill-cut").projected).toBe(false);
+    for (const outline of [byId(result.fillOutlines, "fill-off"), byId(result.upliftFillOutlines, "uplift-off")]) {
+      expect(outline.projected).toBe(true);
+      expect(outline.segments.length).toBeGreaterThanOrEqual(3);
+      // From the (flat, z = 0) terrain up to the fill's own top, centred on the fill's s (= y = 2).
+      const ss = outline.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+      const zs = outline.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
+      expect(Math.min(...zs)).toBeCloseTo(0, 6);
+      expect(Math.max(...zs)).toBeCloseTo(outline.topElevationM, 6);
+      expect((Math.min(...ss) + Math.max(...ss)) / 2).toBeCloseTo(2, 6);
+    }
+  });
+
+  it("draws a zero-height projected fill as a single line, not a doubled edge", () => {
+    const base = projectWithFoundationAtOrigin();
+    const offPlane = { ...base.foundationInstances[0]!, instanceId: "foundation-off", position: { x: 12, y: 2 } };
+    const project: Project = {
+      ...base,
+      foundationInstances: [offPlane],
+      // Top at the flat terrain (z = 0): nothing to fill, so the solid is flat.
+      fillInstances: [fill({ id: "fill-flat", foundationInstanceId: offPlane.instanceId, topElevationM: 0 })],
+    };
+    const section: SectionDefinition = {
+      id: "s-fill-flat",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const outline = generateSectionResult(project, section).fillOutlines[0]!;
+    expect(outline.projected).toBe(true);
+    expect(outline.segments).toHaveLength(1);
+  });
+
+  it("projects every tower member onto the plane, including ones well off it", () => {
+    const base = projectWithFoundationAtOrigin();
+    const members = [
+      // A leg rising on the plane, and a cross-arm member 3 m off it.
+      { a: localCoordinate(0, -1.5, 0), b: localCoordinate(0, -1.5, 20), category: "structure" as const, component: "leg" },
+      { a: localCoordinate(3, -2, 18), b: localCoordinate(3, 2, 18), category: "structure" as const, component: "arm" },
+      { a: localCoordinate(0, 2, 18), b: localCoordinate(0, 2, 16.5), category: "insulator" as const, component: "string" },
+    ];
+    const project: Project = {
+      ...base,
+      poleModel: { ...base.poleModel, visualGeometry: { members, source: PROVENANCE } },
+    };
+    const section: SectionDefinition = {
+      id: "s-tower",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    const result = generateSectionResult(project, section);
+
+    expect(result.poleMembers).toHaveLength(members.length);
+    expect(result.poleMembers.map((m) => m.category)).toEqual(["structure", "structure", "insulator"]);
+    members.forEach((member, i) => {
+      const expectA = sectionCoordinateOf(placePoleModelPoint(member.a, project.poleModel), section.plane);
+      const expectB = sectionCoordinateOf(placePoleModelPoint(member.b, project.poleModel), section.plane);
+      expect(result.poleMembers[i]!.a.s).toBeCloseTo(expectA.s, 9);
+      expect(result.poleMembers[i]!.a.z).toBeCloseTo(expectA.z, 9);
+      expect(result.poleMembers[i]!.b.s).toBeCloseTo(expectB.s, 9);
+      expect(result.poleMembers[i]!.b.z).toBeCloseTo(expectB.z, 9);
+    });
+  });
+
+  it("has no tower members when the pole model carries no visual geometry", () => {
+    // The hand-authored lattice fixture has no imported member geometry.
+    const project = projectWithFoundationAtOrigin();
+    expect(project.poleModel.visualGeometry).toBeUndefined();
+    const section: SectionDefinition = {
+      id: "s-no-tower",
+      name: "Transverse",
+      mode: "transverse",
+      legId: null,
+      plane: { originX: 0, originY: 0, directionRadians: Math.PI / 2 },
+      pointToleranceM: 1,
+      visible: true,
+    };
+    expect(generateSectionResult(project, section).poleMembers).toEqual([]);
+  });
+
   it("includes fill and uplift-fill outlines for a foundation above terrain", () => {
     const base = projectWithFoundationAtOrigin();
     const raisedFoundation = { ...base.foundationInstances[0]!, baseElevation: 2.0 };
@@ -425,7 +632,7 @@ describe("generateSectionResult", () => {
     expect(new Set(widths.map((w) => w.toFixed(3))).size).toBeGreaterThan(1);
   });
 
-  it("a plane far from every object produces empty content", () => {
+  it("a plane far from every object cuts nothing -- the foundation only comes through projected", () => {
     const project = projectWithFoundationAtOrigin();
     const section: SectionDefinition = {
       id: "s2",
@@ -441,7 +648,9 @@ describe("generateSectionResult", () => {
     };
     const result = generateSectionResult(project, section);
     expect(result.terrainSegments).toHaveLength(0);
-    expect(result.foundations[0]!.segments).toHaveLength(0);
+    // Nothing is cut; the foundation (like the tower) is still shown as the
+    // structure's projected elevation, never as cut section.
+    expect(result.foundations[0]!.projected).toBe(true);
   });
 
   it("terrain source points are only included within the point tolerance", () => {

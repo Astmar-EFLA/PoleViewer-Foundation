@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildSyntheticDemoProject } from "../services/buildSyntheticDemoProject";
 import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
+import { exportSectionAsDxf } from "../services/sectionDxf";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
 import { useProjectStore } from "./projectStore";
 
@@ -12,6 +13,11 @@ import { useProjectStore } from "./projectStore";
 // here since only the new batch-export tests below call it.
 vi.mock("../services/exportProjectHtml", () => ({
   exportProjectAsStandaloneHtml: vi.fn().mockResolvedValue(undefined),
+}));
+// Same reason: the DXF export ends in a browser download. Its pure DXF
+// building is covered by sectionDxf.test.ts.
+vi.mock("../services/sectionDxf", () => ({
+  exportSectionAsDxf: vi.fn(),
 }));
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -39,6 +45,7 @@ function hangingFetchThatRejectsOnAbort() {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(exportProjectAsStandaloneHtml).mockClear();
+  vi.mocked(exportSectionAsDxf).mockClear();
 });
 
 describe("checkPointCloudAssetStatus cancellation", () => {
@@ -628,6 +635,15 @@ describe("batch export", () => {
     // Export was only actually attempted for the one mast that made it
     // all the way through -- never for the skipped or terrain-failed ones.
     expect(vi.mocked(exportProjectAsStandaloneHtml)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(exportSectionAsDxf)).toHaveBeenCalledTimes(1);
+
+    // Both files are named after the mast, not the (shared) project name;
+    // the DXF is the mast's transverse section.
+    const [, dxfSection, dxfBaseName, dxfLabel] = vi.mocked(exportSectionAsDxf).mock.calls[0]!;
+    expect(dxfSection.mode).toBe("transverse");
+    expect(dxfBaseName).toBe("mast-good");
+    expect(dxfLabel).toBe("mast-good");
+    expect(vi.mocked(exportProjectAsStandaloneHtml).mock.calls[0]![1]).toBe("mast-good-viewer");
   });
 
   it("resetBatchExport returns to idle with no results", async () => {

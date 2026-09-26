@@ -5,6 +5,8 @@ import { generateSectionResult } from "../geometry/section";
 import { radiansToDegrees, degreesToRadians } from "../geometry/angles";
 import { measureSync } from "../geometry/perf";
 import { downloadSectionSvg, openSectionInNewWindow } from "../services/exportImage";
+import { fileSafeName } from "../services/fileNames";
+import { exportSectionAsDxf } from "../services/sectionDxf";
 import { useProjectStore } from "../state/projectStore";
 import { SectionView } from "./SectionView";
 
@@ -50,6 +52,10 @@ export function SectionPanel() {
   const setSectionVisible = useProjectStore((s) => s.setSectionVisible);
   const removeSection = useProjectStore((s) => s.removeSection);
 
+  const selectedMastName = useProjectStore((s) =>
+    s.lineImport.selectedMastIndex === null ? null : (s.lineImport.masts[s.lineImport.selectedMastIndex]?.mastName ?? null)
+  );
+
   const activeSection = project?.sections.find((s) => s.id === activeSectionId) ?? null;
   const sectionContainerRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +72,14 @@ export function SectionPanel() {
     const svg = sectionContainerRef.current?.querySelector("svg");
     if (!svg || !activeSection) return;
     downloadSectionSvg(svg, activeSection.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  }
+
+  function handleExportSectionDxf() {
+    if (!activeSection || !project) return;
+    // Named after the selected line mast when one is loaded (the same name
+    // the batch export uses), otherwise after the project.
+    const label = selectedMastName ?? project.name;
+    exportSectionAsDxf(project, activeSection, fileSafeName(`${label}-${activeSection.name}`, "section"), label);
   }
 
   function handleOpenInNewWindow() {
@@ -138,6 +152,9 @@ export function SectionPanel() {
               </button>
               <button style={smallButtonStyle} onClick={handleExportSectionImage}>
                 Export image
+              </button>
+              <button style={smallButtonStyle} onClick={handleExportSectionDxf}>
+                Export DXF
               </button>
               {(activeSection.mode === "custom" || activeSection.mode === "leg") && (
                 <button style={smallButtonStyle} onClick={() => removeSection(activeSection.id)}>

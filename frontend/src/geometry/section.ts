@@ -14,6 +14,7 @@ import type { LocalCoordinate } from "../domain/coordinates";
 import type { ExcavationInstance } from "../domain/excavation";
 import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
+import type { PoleMemberCategory } from "../domain/poleModel";
 import type { Project } from "../domain/project";
 import type { SectionDefinition, SectionPlane } from "../domain/section";
 import type { IndexedTriangle, XYZ } from "./barycentric";
@@ -277,6 +278,13 @@ export interface SectionFoundationOutline {
   readonly legId: string | null;
   readonly colour: string;
   readonly segments: readonly SectionSegment[];
+  /**
+   * True when the plane misses this foundation entirely (e.g. a guy-anchor
+   * block well off a transverse section), so `segments` is instead its
+   * silhouette projected onto the plane -- drawn as a "beyond the cut"
+   * outline, the way a section drawing shows structure behind the plane.
+   */
+  readonly projected: boolean;
 }
 
 export interface SectionExcavationOutline {
@@ -285,6 +293,8 @@ export interface SectionExcavationOutline {
   readonly truncated: boolean;
   readonly bottomElevationM: number;
   readonly segments: readonly SectionSegment[];
+  /** True when the plane misses this excavation (e.g. a guy-anchor pit off a transverse section) and `segments` is its projected silhouette instead -- see SectionFoundationOutline.projected. */
+  readonly projected: boolean;
 }
 
 /** Shared by both fill layers (fillInstances/upliftFillInstances) -- same FillInstance shape either way, so one outline type and one builder function serve both. */
@@ -294,6 +304,19 @@ export interface SectionFillOutline {
   readonly truncated: boolean;
   readonly topElevationM: number;
   readonly segments: readonly SectionSegment[];
+  /** True when the plane misses this fill (e.g. around a guy-anchor block off a transverse section) and `segments` is its projected silhouette instead -- see SectionFoundationOutline.projected. */
+  readonly projected: boolean;
+}
+
+/**
+ * One tower member (poleModel.visualGeometry) projected orthographically onto
+ * the section plane -- an elevation view of the whole structure, not a cut:
+ * every member is included regardless of its distance from the plane, the
+ * way a section drawing shows the tower standing behind the cut ground.
+ * Rendering-only, like the members themselves (ADR-005).
+ */
+export interface SectionPoleMember extends SectionSegment {
+  readonly category: PoleMemberCategory;
 }
 
 export interface SectionBoundaryLine {
@@ -310,6 +333,8 @@ export interface SectionResult {
   readonly terrainSegments: readonly SectionSegment[];
   readonly terrainSourcePoints: readonly SectionXZ[];
   readonly anchors: readonly SectionAnchorMark[];
+  /** Empty when the pole model has no visual geometry (e.g. a hand-authored JSON model). */
+  readonly poleMembers: readonly SectionPoleMember[];
   readonly foundations: readonly SectionFoundationOutline[];
   readonly excavations: readonly SectionExcavationOutline[];
   readonly fillOutlines: readonly SectionFillOutline[];
@@ -322,17 +347,52 @@ function withinTolerance(perpendicularM: number, toleranceM: number): boolean {
   return Math.abs(perpendicularM) <= toleranceM / 2;
 }
 
+/** Andrew's monotone chain -- counter-clockwise hull, no repeated end point. */
+function convexHull(points: readonly SectionXZ[]): SectionXZ[] {
+  const sorted = [...points].sort((p, q) => p.s - q.s || p.z - q.z);
+  if (sorted.length <= 2) return sorted;
+  const cross = (o: SectionXZ, a: SectionXZ, b: SectionXZ) => (a.s - o.s) * (b.z - o.z) - (a.z - o.z) * (b.s - o.s);
+  const lower: SectionXZ[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= EPS) lower.pop();
+    lower.push(p);
+  }
+  const upper: SectionXZ[] = [];
+  for (const p of [...sorted].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= EPS) upper.pop();
+    upper.push(p);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+/**
+ * The silhouette of a solid projected onto the plane, as the convex hull of
+ * its projected vertices. Exact for a convex solid -- each foundation part
+ * (box/frustum), one closed outline per part so a stepped foundation's steps
+ * stay visible -- and a close outline for an excavation or fill, each a
+ * frustum apart from its terrain-following edge.
+ */
+function projectedOutline(triangles: readonly Triangle3[], plane: SectionPlane): SectionSegment[] {
+  const points = triangles.flatMap((t) => [t.a, t.b, t.c]).map((p) => {
+    const coord = sectionCoordinateOf(p, plane);
+    return { s: coord.s, z: coord.z };
+  });
+  const hull = convexHull(points);
+  if (hull.length < 2) return [];
+  // A zero-height solid (e.g. a fill whose top sits at terrain) collapses to one line, not a there-and-back pair.
+  if (hull.length === 2) return [{ a: hull[0]!, b: hull[1]! }];
+  return hull.map((a, i) => ({ a, b: hull[(i + 1) % hull.length]! }));
+}
+
 function foundationOutline(foundation: FoundationInstance, plane: SectionPlane): SectionFoundationOutline {
   const geometry = generateFoundationGeometry(foundation);
-  const triangles = geometry.parts.flatMap((part) =>
+  const partTriangles = geometry.parts.map((part) =>
     part.kind === "box" ? orientedBoxTriangles(part) : orientedFrustumTriangles(part)
   );
-  return {
-    instanceId: foundation.instanceId,
-    legId: foundation.legId,
-    colour: foundation.colour,
-    segments: intersectTrianglesWithPlane(triangles, plane),
-  };
+  const cut = intersectTrianglesWithPlane(partTriangles.flat(), plane);
+  const base = { instanceId: foundation.instanceId, legId: foundation.legId, colour: foundation.colour };
+  if (cut.length > 0) return { ...base, segments: cut, projected: false };
+  return { ...base, segments: partTriangles.flatMap((t) => projectedOutline(t, plane)), projected: true };
 }
 
 function excavationOutline(
@@ -344,12 +404,14 @@ function excavationOutline(
   if (!terrainSurface) return null;
   const geometry = generateExcavationGeometry(excavation, foundation, terrainSurface);
   const triangles = excavationGeometryTriangles(geometry);
+  const cut = intersectTrianglesWithPlane(triangles, plane);
   return {
     excavationId: excavation.id,
     colour: excavation.colour,
     truncated: geometry.truncated,
     bottomElevationM: excavation.bottomElevationM,
-    segments: intersectTrianglesWithPlane(triangles, plane),
+    segments: cut.length > 0 ? cut : projectedOutline(triangles, plane),
+    projected: cut.length === 0,
   };
 }
 
@@ -363,12 +425,14 @@ function fillOutline(
   if (!terrainSurface) return null;
   const geometry = generateFillGeometry(fill, foundation, terrainSurface);
   const triangles = fillGeometryTriangles(geometry);
+  const cut = intersectTrianglesWithPlane(triangles, plane);
   return {
     fillId: fill.id,
     colour: fill.colour,
     truncated: geometry.truncated,
     topElevationM: fill.topElevationM,
-    segments: intersectTrianglesWithPlane(triangles, plane),
+    segments: cut.length > 0 ? cut : projectedOutline(triangles, plane),
+    projected: cut.length === 0,
   };
 }
 
@@ -414,6 +478,12 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
       anchors.push({ anchorId: anchor.id, name: anchor.name, s: coord.s, z: coord.z });
     }
   }
+
+  const poleMembers: SectionPoleMember[] = (project.poleModel.visualGeometry?.members ?? []).map((m) => {
+    const a = sectionCoordinateOf(placePoleModelPoint(m.a, project.poleModel), plane);
+    const b = sectionCoordinateOf(placePoleModelPoint(m.b, project.poleModel), plane);
+    return { category: m.category, a: { s: a.s, z: a.z }, b: { s: b.s, z: b.z } };
+  });
 
   const foundations = project.foundationInstances.map((f) => foundationOutline(f, plane));
 
@@ -491,6 +561,7 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
     terrainSegments,
     terrainSourcePoints,
     anchors,
+    poleMembers,
     foundations,
     excavations,
     fillOutlines,

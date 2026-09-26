@@ -73,6 +73,14 @@ describe("computeFillMaterialQuantities", () => {
     expect(result.status).toBe("calculated");
     expect(result.fillsBlocked).toBe(1);
     expect(result.fillsCalculated).toBe(brokenFillInstances.length - 1);
+
+    // The blocked fill still gets a per-foundation entry, marked not calculated
+    // (null) rather than silently reported as zero.
+    expect(result.byFoundation).toHaveLength(brokenFillInstances.length);
+    const blocked = result.byFoundation.find((f) => f.foundationInstanceId === brokenFillInstances[0]!.foundationInstanceId);
+    expect(blocked?.volumeM3).toBeNull();
+    const sum = result.byFoundation.reduce((s, f) => s + (f.volumeM3 ?? 0), 0);
+    expect(sum).toBeCloseTo(result.totalVolumeM3!, 6);
   });
 
   it("computes a calculated total for uplift-fill instances, passed explicitly with validateUpliftFillInstance", () => {

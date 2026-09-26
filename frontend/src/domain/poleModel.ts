@@ -46,6 +46,13 @@ export interface StructuralLeg {
 
 export type PoleMemberCategory = "structure" | "cable" | "insulator";
 
+/** Matches the colour legend of the reference PLS-POLE viewer this geometry is imported via, so the same structure reads the same way in the 3D view, the section view and the tools it came from. */
+export const POLE_MEMBER_COLOURS: Readonly<Record<PoleMemberCategory, string>> = {
+  structure: "#0C2A59",
+  cable: "#F00000",
+  insulator: "#586E2F",
+};
+
 /**
  * One structural/cable/insulator segment of an imported pole/tower's real
  * geometry (e.g. from a PLS-POLE .pol import -- see
