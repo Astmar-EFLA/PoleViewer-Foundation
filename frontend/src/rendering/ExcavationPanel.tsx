@@ -1,3 +1,4 @@
+import { gravelPadThicknessFor } from "../domain/fill";
 import { generateExcavationGeometry } from "../geometry/excavationGeometry";
 import { computeApproximateVolume } from "../geometry/excavationVolume";
 import { useProjectStore } from "../state/projectStore";
@@ -22,7 +23,13 @@ export function ExcavationPanel() {
         const geometry = project.terrainSurface
           ? generateExcavationGeometry(excavation, foundation, project.terrainSurface)
           : null;
-        const validationResults = validateExcavationInstance(excavation, foundation, geometry, nowIso);
+        const validationResults = validateExcavationInstance(
+          excavation,
+          foundation,
+          geometry,
+          nowIso,
+          gravelPadThicknessFor(foundation.instanceId, project.fillInstances)
+        );
         const geometryValid = !hasBlockingExcavationGeometryError(validationResults);
         const volume =
           geometry && project.terrainSurface

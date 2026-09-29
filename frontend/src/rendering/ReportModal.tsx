@@ -5,7 +5,7 @@ import { buildEngineeringSummary } from "../services/engineeringSummary";
 import type { ExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
 import { computeExcavationMaterialQuantities } from "../services/excavationMaterialQuantities";
 import type { FillMaterialQuantities } from "../services/fillMaterialQuantities";
-import { computeFillMaterialQuantities } from "../services/fillMaterialQuantities";
+import { computeFillMaterialQuantities, computeGravelPadMaterialQuantities } from "../services/fillMaterialQuantities";
 import type { FoundationMaterialQuantities } from "../services/foundationMaterialQuantities";
 import { computeFoundationMaterialQuantities } from "../services/foundationMaterialQuantities";
 import type { PerFoundationVolumeTable } from "../services/perFoundationVolumeTable";
@@ -36,7 +36,8 @@ const SEVERITY_COLOUR: Record<ValidationSeverity, string> = {
   information: "#3070e0",
 };
 
-const GROSS_VOLUME_NOTE = "Excavation and fill volumes are gross -- foundation concrete is not deducted from them.";
+const GROSS_VOLUME_NOTE =
+  "Excavation and uplift-fill volumes are gross -- foundation concrete and the gravel pad are not deducted from them.";
 
 function formatVolume(volumeM3: number | null): string {
   return volumeM3 === null ? "-" : volumeM3.toFixed(2);
@@ -52,7 +53,7 @@ function formatPerFoundationVolumesAsText(
     lines.push("");
     return lines;
   }
-  lines.push("Foundation | Concrete | Excavation | Fill | Uplift fill");
+  lines.push("Foundation | Concrete | Excavation | Gravel pad | Uplift fill");
   for (const r of table.rows) {
     lines.push(
       `${r.label} | ${formatVolume(r.concreteM3)} | ${formatVolume(r.excavationM3)} | ${formatVolume(r.fillM3)} | ${formatVolume(r.upliftFillM3)}`
@@ -98,7 +99,7 @@ function formatFillQuantitiesAsText(quantities: FillMaterialQuantities, title: s
   } else if (quantities.status === "no-fills") {
     lines.push("Not calculated -- no fills.");
   } else {
-    lines.push(`Total fill: ${quantities.totalVolumeM3?.toFixed(1) ?? "-"} m3`);
+    lines.push(`Total ${title}: ${quantities.totalVolumeM3?.toFixed(1) ?? "-"} m3`);
     if (quantities.fillsBlocked > 0) {
       lines.push(
         `${quantities.fillsBlocked} of ${quantities.fillsCalculated + quantities.fillsBlocked} fill(s) could not be calculated and are excluded from this total.`
@@ -127,7 +128,7 @@ function formatSummaryAsText(
 
   lines.push(...formatPerFoundationVolumesAsText(perFoundationVolumes, foundationQuantities));
   lines.push(...formatMaterialQuantitiesAsText(materialQuantities));
-  lines.push(...formatFillQuantitiesAsText(fillQuantities, "fill"));
+  lines.push(...formatFillQuantitiesAsText(fillQuantities, "gravel pad"));
   lines.push(...formatFillQuantitiesAsText(upliftFillQuantities, "uplift fill"));
 
   (["imported", "user-entered", "assumed", "calculated"] as SummaryBucket[]).forEach((bucket) => {
@@ -217,7 +218,7 @@ function PerFoundationVolumesSection({
                 <th style={labelCellStyle}>Foundation</th>
                 <th style={cellStyle}>Concrete (m³)</th>
                 <th style={cellStyle}>Excavation (m³)</th>
-                <th style={cellStyle}>Fill (m³)</th>
+                <th style={cellStyle}>Gravel pad (m³)</th>
                 <th style={cellStyle}>Uplift fill (m³)</th>
               </tr>
             </thead>
@@ -303,7 +304,7 @@ export function ReportModal() {
     () => (project ? computeExcavationMaterialQuantities(project) : null),
     [project]
   );
-  const fillQuantities = useMemo(() => (project ? computeFillMaterialQuantities(project) : null), [project]);
+  const fillQuantities = useMemo(() => (project ? computeGravelPadMaterialQuantities(project) : null), [project]);
   const upliftFillQuantities = useMemo(
     () =>
       project
@@ -462,7 +463,7 @@ export function ReportModal() {
           </div>
         )}
 
-        <FillQuantitiesSection title="fill" quantities={fillQuantities} />
+        <FillQuantitiesSection title="gravel pad" quantities={fillQuantities} />
         <FillQuantitiesSection title="uplift fill" quantities={upliftFillQuantities} />
 
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Engineering parameters</div>

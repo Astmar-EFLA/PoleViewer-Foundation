@@ -1,4 +1,5 @@
 import type { FillInstance } from "../domain/fill";
+import { gravelPadThickness } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import { CALCULATION_VERSION, type ValidationResult } from "../domain/validation";
 import type { FillGeometry } from "../geometry/fillGeometry";
@@ -80,16 +81,73 @@ export function hasBlockingFillGeometryError(results: readonly ValidationResult[
       (r.ruleId === "fill.invalid-slope-ratio" ||
         r.ruleId === "fill.negative-working-space" ||
         r.ruleId === "fill.top-below-foundation-base" ||
-        r.ruleId === "fill.top-below-foundation-top")
+        r.ruleId === "fill.top-below-pedestal-base")
+  );
+}
+
+/**
+ * The gravel pad (the fill layer, project.fillInstances): a positive
+ * thickness, and its top at the foundation base it supports. No slope or
+ * terrain checks -- a pad is a flat slab filling the excavation floor
+ * (geometry/gravelPadGeometry.ts), independent of terrain.
+ */
+export function validateGravelPadInstance(
+  pad: FillInstance,
+  foundation: FoundationInstance,
+  nowIso: string
+): ValidationResult[] {
+  const results: ValidationResult[] = [];
+  const thickness = gravelPadThickness(pad);
+
+  if (!(thickness > 0)) {
+    results.push({
+      ruleId: "gravel-pad.invalid-thickness",
+      severity: "blocking",
+      affectedObjectIds: [pad.id],
+      title: "Gravel pad thickness must be positive",
+      detail: `Gravel pad "${pad.id}" has a thickness of ${thickness} m; it must be greater than 0.`,
+      timestamp: nowIso,
+      dataVersion: CALCULATION_VERSION,
+      status: "open",
+    });
+  }
+
+  if (Math.abs(pad.topElevationM - foundation.baseElevation) > 1e-6) {
+    results.push({
+      ruleId: "gravel-pad.top-not-at-foundation-base",
+      severity: "warning",
+      affectedObjectIds: [pad.id, foundation.instanceId],
+      title: "Gravel pad top is not at the foundation base",
+      detail: `Gravel pad "${pad.id}" top (${pad.topElevationM.toFixed(3)} m) differs from foundation "${foundation.instanceId}"'s base (${foundation.baseElevation.toFixed(3)} m); the foundation is modelled on the pad at its base regardless.`,
+      timestamp: nowIso,
+      dataVersion: CALCULATION_VERSION,
+      status: "open",
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Top of a foundation's wide, uplift-resisting parts: every geometry part
+ * except the topmost (the pedestal/column, or the top step) -- the pad and
+ * tapered transition whose cover weight resists uplift. A single-part
+ * foundation falls back to its base.
+ */
+function upliftResistingPartsTopZ(foundation: FoundationInstance): number {
+  const parts = generateFoundationGeometry(foundation).parts;
+  if (parts.length < 2) return foundation.baseElevation;
+  return Math.max(
+    ...parts.slice(0, -1).map((part) => part.centre.z + (part.kind === "box" ? part.halfExtents.z : part.halfHeight))
   );
 }
 
 /**
  * The uplift-fill counterpart of validateFillInstance: same slope/working-
- * space checks, but the elevation check is against the foundation's own
- * *top* (topConnectionPoint.z -- pad + pedestal/column) rather than its
- * base, since an uplift-fill is meant to cover the whole foundation body,
- * not just reach its base.
+ * space checks, but the elevation check is against the top of the
+ * foundation's wide parts (pad / tapered transition) rather than its base:
+ * an uplift fill must at least bury those. It may stop short of the
+ * pedestal top -- by default it does, by DEFAULT_UPLIFT_FILL_BELOW_TOP_M.
  */
 export function validateUpliftFillInstance(
   upliftFill: FillInstance,
@@ -125,18 +183,18 @@ export function validateUpliftFillInstance(
     });
   }
 
-  const topConnectionZ = generateFoundationGeometry(foundation).topConnectionPoint.z;
-  if (upliftFill.topElevationM < topConnectionZ - ELEVATION_TOLERANCE_M) {
+  const wideTopZ = upliftResistingPartsTopZ(foundation);
+  if (upliftFill.topElevationM < wideTopZ - ELEVATION_TOLERANCE_M) {
     results.push({
-      ruleId: "fill.top-below-foundation-top",
+      ruleId: "fill.top-below-pedestal-base",
       severity: "blocking",
       affectedObjectIds: [upliftFill.id, foundation.instanceId],
-      title: "Uplift fill does not reach the top of the foundation",
+      title: "Uplift fill does not cover the foundation's pad",
       detail: `Fill "${upliftFill.id}" top elevation (${upliftFill.topElevationM.toFixed(
         3
-      )} m) is below foundation "${foundation.instanceId}"'s own top (pad + pedestal/column, ${topConnectionZ.toFixed(
+      )} m) is below the top of foundation "${foundation.instanceId}"'s pad / tapered transition (${wideTopZ.toFixed(
         3
-      )} m); it would not cover the whole foundation body.`,
+      )} m), the part whose cover resists uplift.`,
       timestamp: nowIso,
       dataVersion: CALCULATION_VERSION,
       status: "open",

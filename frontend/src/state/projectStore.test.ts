@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_GRAVEL_PAD_THICKNESS_M } from "../domain/fill";
 import { buildSyntheticDemoProject } from "../services/buildSyntheticDemoProject";
 import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
 import { exportSectionAsDxf } from "../services/sectionDxf";
@@ -165,8 +166,8 @@ describe("regenerateTerrainFromPointCloud cancellation", () => {
   });
 });
 
-describe("excavation bottom / foundation base elevation stay locked together", () => {
-  it("editing an excavation's bottom elevation pulls its own foundation's base to match", () => {
+describe("excavation floor / gravel pad / foundation base stay locked together", () => {
+  it("editing an excavation's bottom elevation lifts its own foundation's base to the top of the gravel pad on that floor", () => {
     useProjectStore.getState().setProject(buildSyntheticDemoProject());
     const excavation = useProjectStore.getState().project!.excavationInstances[0]!;
     const newBottom = excavation.bottomElevationM - 0.7;
@@ -179,7 +180,36 @@ describe("excavation bottom / foundation base elevation stay locked together", (
       (f) => f.instanceId === updatedExcavation.foundationInstanceId
     )!;
     expect(updatedExcavation.bottomElevationM).toBe(newBottom);
-    expect(updatedFoundation.baseElevation).toBe(newBottom);
+    expect(updatedFoundation.baseElevation).toBeCloseTo(newBottom + DEFAULT_GRAVEL_PAD_THICKNESS_M, 9);
+    // The pad follows its foundation.
+    const pad = project.fillInstances.find((f) => f.foundationInstanceId === updatedFoundation.instanceId)!;
+    expect(pad.topElevationM).toBe(updatedFoundation.baseElevation);
+  });
+
+  it("the default excavation is dug 1H:1V to the bottom of a 0.2 m gravel pad", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const project = useProjectStore.getState().project!;
+    for (const excavation of project.excavationInstances) {
+      const foundation = project.foundationInstances.find((f) => f.instanceId === excavation.foundationInstanceId)!;
+      expect(excavation.sideSlope).toEqual({ h: 1, v: 1 });
+      expect(excavation.bottomElevationM).toBeCloseTo(foundation.baseElevation - DEFAULT_GRAVEL_PAD_THICKNESS_M, 9);
+    }
+  });
+
+  it("editing the gravel pad's thickness moves the excavation floor, not the foundation", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const pad = useProjectStore.getState().project!.fillInstances[0]!;
+    const baseBefore = useProjectStore
+      .getState()
+      .project!.foundationInstances.find((f) => f.instanceId === pad.foundationInstanceId)!.baseElevation;
+
+    useProjectStore.getState().setFillParameters(pad.id, { padThicknessM: 0.5 });
+
+    const project = useProjectStore.getState().project!;
+    const foundation = project.foundationInstances.find((f) => f.instanceId === pad.foundationInstanceId)!;
+    const excavation = project.excavationInstances.find((e) => e.foundationInstanceId === pad.foundationInstanceId)!;
+    expect(foundation.baseElevation).toBe(baseBefore);
+    expect(excavation.bottomElevationM).toBeCloseTo(baseBefore - 0.5, 9);
   });
 
   it("editing an excavation's working space (not bottom elevation) leaves the foundation's base untouched", () => {
@@ -215,7 +245,7 @@ describe("excavation bottom / foundation base elevation stay locked together", (
     // The type change re-solves baseElevation for the new geometry -- confirm it actually
     // changed (otherwise this test would pass trivially), then confirm the excavation followed it.
     expect(updatedFoundation.baseElevation).not.toBe(foundation.baseElevation);
-    expect(updatedExcavation.bottomElevationM).toBe(updatedFoundation.baseElevation);
+    expect(updatedExcavation.bottomElevationM).toBeCloseTo(updatedFoundation.baseElevation - DEFAULT_GRAVEL_PAD_THICKNESS_M, 9);
   });
 });
 
@@ -364,7 +394,8 @@ describe("setPoleModelHeightOffset", () => {
       expect(foundationAfter.foundationTypeId).toBe(foundationBefore.foundationTypeId);
 
       const excavationAfter = after.excavationInstances.find((e) => e.foundationInstanceId === foundationAfter.instanceId);
-      if (excavationAfter) expect(excavationAfter.bottomElevationM).toBe(foundationAfter.baseElevation);
+      if (excavationAfter)
+        expect(excavationAfter.bottomElevationM).toBeCloseTo(foundationAfter.baseElevation - DEFAULT_GRAVEL_PAD_THICKNESS_M, 9);
 
       const fillAfter = after.fillInstances.find((fl) => fl.foundationInstanceId === foundationAfter.instanceId);
       if (fillAfter) expect(fillAfter.topElevationM).toBe(foundationAfter.baseElevation);

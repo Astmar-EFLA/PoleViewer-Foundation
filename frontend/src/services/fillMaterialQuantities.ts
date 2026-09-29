@@ -19,7 +19,8 @@ import { computeApproximateFillVolume } from "../geometry/fillVolume";
 import type { ValidationResult } from "../domain/validation";
 import type { VolumeByFoundation } from "./foundationMaterialQuantities";
 import { addVolumeByFoundation } from "./foundationMaterialQuantities";
-import { hasBlockingFillGeometryError, validateFillInstance } from "../validation/fillValidation";
+import { excavationForPad, generateGravelPadBox, gravelPadVolumeM3 } from "../geometry/gravelPadGeometry";
+import { hasBlockingFillGeometryError, validateFillInstance, validateGravelPadInstance } from "../validation/fillValidation";
 
 export type FillMaterialQuantitiesStatus = "calculated" | "no-terrain-surface" | "no-fills";
 
@@ -104,5 +105,52 @@ export function computeFillMaterialQuantities(
     fillsCalculated,
     fillsBlocked,
     limitations: METHOD_LIMITATIONS,
+  };
+}
+
+const GRAVEL_PAD_LIMITATIONS: readonly string[] = [
+  "Gravel pad volume is the flat slab under each foundation: excavation floor area x pad thickness (compacted, in place) -- no bulking or compaction factor applied.",
+];
+
+/**
+ * The gravel pad layer (project.fillInstances) -- same result shape as
+ * computeFillMaterialQuantities so the report treats both layers alike, but
+ * exact (floor area x thickness, geometry/gravelPadGeometry.ts) and needing
+ * no terrain. A pad with a blocking validation error (e.g. zero thickness)
+ * is counted as blocked.
+ */
+export function computeGravelPadMaterialQuantities(project: Project): FillMaterialQuantities {
+  if (project.fillInstances.length === 0) return EMPTY_RESULT("no-fills");
+
+  const nowIso = project.modifiedAt;
+  let totalVolumeM3 = 0;
+  const foundationVolumes = new Map<string, VolumeByFoundation>();
+  let fillsCalculated = 0;
+  let fillsBlocked = 0;
+
+  for (const pad of project.fillInstances) {
+    const foundation = project.foundationInstances.find((f) => f.instanceId === pad.foundationInstanceId);
+    if (!foundation) {
+      fillsBlocked += 1;
+      continue;
+    }
+    if (validateGravelPadInstance(pad, foundation, nowIso).some((r) => r.severity === "blocking")) {
+      addVolumeByFoundation(foundationVolumes, foundation.instanceId, foundation.displayLabel, null);
+      fillsBlocked += 1;
+      continue;
+    }
+    const volume = gravelPadVolumeM3(generateGravelPadBox(pad, foundation, excavationForPad(pad, project.excavationInstances)));
+    addVolumeByFoundation(foundationVolumes, foundation.instanceId, foundation.displayLabel, volume);
+    totalVolumeM3 += volume;
+    fillsCalculated += 1;
+  }
+
+  return {
+    status: "calculated",
+    totalVolumeM3,
+    byFoundation: Array.from(foundationVolumes.values()),
+    fillsCalculated,
+    fillsBlocked,
+    limitations: GRAVEL_PAD_LIMITATIONS,
   };
 }

@@ -94,8 +94,8 @@ export function Toolbar() {
           <ExcavationPanel />
         </ErrorBoundary>
       </DropdownButton>
-      <DropdownButton label="Fill" width={300} maxHeight="55vh">
-        <ErrorBoundary label="Fill panel">
+      <DropdownButton label="Gravel pad" width={300} maxHeight="55vh">
+        <ErrorBoundary label="Gravel pad panel">
           <FillPanel />
         </ErrorBoundary>
       </DropdownButton>

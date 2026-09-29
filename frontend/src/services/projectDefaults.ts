@@ -1,5 +1,6 @@
 import type { ExcavationInstance } from "../domain/excavation";
 import type { FillInstance } from "../domain/fill";
+import { DEFAULT_GRAVEL_PAD_THICKNESS_M, DEFAULT_UPLIFT_FILL_BELOW_TOP_M } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import type { SectionDefinition } from "../domain/section";
 import { generateFoundationGeometry } from "../geometry/foundationGeometry";
@@ -38,8 +39,8 @@ export function buildDefaultSections(): SectionDefinition[] {
 
 /**
  * One excavation per foundation, using the same default assumptions
- * throughout the app (0.5m working space, 1.5H:1V slope, dug to the
- * foundation's own base level) -- shared so a freshly-(re)built foundation
+ * throughout the app (0.5m working space, 1H:1V slope, dug to the bottom of
+ * the default gravel pad under the foundation) -- shared so a freshly-(re)built foundation
  * set gets the same sensible starting point wherever it happens (the demo
  * project, or a foundation set rebuilt after a pole-model import).
  */
@@ -49,11 +50,11 @@ export function buildDefaultExcavationInstances(
   return foundationInstances.map((foundation) => ({
     id: `excavation-${foundation.instanceId}`,
     foundationInstanceId: foundation.instanceId,
-    bottomElevationM: foundation.baseElevation,
+    // Dug to the bottom of the gravel pad the foundation sits on (buildDefaultFillInstances).
+    bottomElevationM: foundation.baseElevation - DEFAULT_GRAVEL_PAD_THICKNESS_M,
     workingSpaceOffsetM: 0.5,
-    // 1.5H:1V, matching ADR-009's default convention (unconfirmed against
-    // a real EFLA reference document -- see the ADR).
-    sideSlope: { h: 1.5, v: 1 },
+    // 1H:1V -- the project default (was ADR-009's 1.5H:1V).
+    sideSlope: { h: 1, v: 1 },
     colour: "#c9a227",
     opacity: 0.35,
     visible: true,
@@ -61,19 +62,17 @@ export function buildDefaultExcavationInstances(
     provenance: {
       originType: "assumed",
       verificationState: "unverified",
-      notes: "Default assumption: bottom elevation set to the foundation base, 0.5m working space, 1.5H:1V slope.",
+      notes: "Default assumption: bottom elevation at the bottom of a 0.2m gravel pad under the foundation, 0.5m working space, 1H:1V slope.",
     },
   }));
 }
 
 /**
- * One fill per foundation, the vertical mirror of
- * buildDefaultExcavationInstances -- for a foundation whose base sits above
- * existing terrain and needs material added to reach it, instead of ground
- * dug away. Visible by default, same as excavation -- the geometry always
- * degrades gracefully (near-zero height/volume) for a leg where it isn't
- * the relevant case, so there's no reason to hide it and make a user find
- * the toggle first.
+ * One gravel pad (malarpúði) per foundation: a DEFAULT_GRAVEL_PAD_THICKNESS_M
+ * slab under the foundation's pad, filling the whole excavation floor (see
+ * geometry/gravelPadGeometry.ts). Its top is the foundation base; the
+ * excavation floor sits at its bottom (buildDefaultExcavationInstances).
+ * `sideSlope` is kept for the shared FillInstance shape but unused by a pad.
  */
 export function buildDefaultFillInstances(foundationInstances: readonly FoundationInstance[]): FillInstance[] {
   return foundationInstances.map((foundation) => ({
@@ -81,9 +80,8 @@ export function buildDefaultFillInstances(foundationInstances: readonly Foundati
     foundationInstanceId: foundation.instanceId,
     topElevationM: foundation.baseElevation,
     workingSpaceOffsetM: 0.5,
-    // 2H:1V, a common fill/embankment default -- unconfirmed against a real
-    // EFLA reference document, same caveat as excavation's own ADR-009 note.
     sideSlope: { h: 2, v: 1 },
+    padThicknessM: DEFAULT_GRAVEL_PAD_THICKNESS_M,
     colour: "#8a6d3b",
     opacity: 0.35,
     visible: true,
@@ -91,16 +89,16 @@ export function buildDefaultFillInstances(foundationInstances: readonly Foundati
     provenance: {
       originType: "assumed",
       verificationState: "unverified",
-      notes: "Default assumption: top elevation set to the foundation base, 0.5m working space, 2H:1V slope.",
+      notes: "Default assumption: 0.2m gravel pad under the foundation, covering the whole excavation floor.",
     },
   }));
 }
 
 /**
- * A second, independent fill layer per foundation: instead of reaching up
- * to the foundation's base (buildDefaultFillInstances), this one covers the
- * *whole* foundation body -- pad and pedestal/column both -- up to
- * `topConnectionPoint.z` (geometry/foundationGeometry.ts), for backfill
+ * A second, independent fill layer per foundation: backfill over the
+ * foundation body -- pad and most of the pedestal/column -- up to
+ * DEFAULT_UPLIFT_FILL_BELOW_TOP_M below `topConnectionPoint.z`
+ * (geometry/foundationGeometry.ts), so the pedestal stands proud of it, for backfill
  * whose weight a geotechnician relies on for uplift resistance. Reuses the
  * exact same `FillInstance` shape, geometry, and volume math as the base
  * fill (its footprint -- the foundation's bottom/widest part -- already
@@ -113,7 +111,7 @@ export function buildDefaultUpliftFillInstances(foundationInstances: readonly Fo
   return foundationInstances.map((foundation) => ({
     id: `uplift-fill-${foundation.instanceId}`,
     foundationInstanceId: foundation.instanceId,
-    topElevationM: generateFoundationGeometry(foundation).topConnectionPoint.z,
+    topElevationM: generateFoundationGeometry(foundation).topConnectionPoint.z - DEFAULT_UPLIFT_FILL_BELOW_TOP_M,
     workingSpaceOffsetM: 0.5,
     sideSlope: { h: 2, v: 1 },
     colour: "#6b5a8a",
@@ -123,7 +121,7 @@ export function buildDefaultUpliftFillInstances(foundationInstances: readonly Fo
     provenance: {
       originType: "assumed",
       verificationState: "unverified",
-      notes: "Default assumption: top elevation set to the top of the foundation (pad + pedestal/column), 0.5m working space, 2H:1V slope.",
+      notes: "Default assumption: top elevation 0.2m below the top of the foundation, 0.5m working space, 2H:1V slope.",
     },
   }));
 }

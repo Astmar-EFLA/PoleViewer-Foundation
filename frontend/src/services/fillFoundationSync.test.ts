@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_UPLIFT_FILL_BELOW_TOP_M } from "../domain/fill";
 import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import { generateFoundationGeometry } from "../geometry/foundationGeometry";
@@ -90,12 +91,12 @@ describe("syncFoundationBaseToFill", () => {
 });
 
 describe("syncUpliftFillTopsToFoundations", () => {
-  it("pulls an uplift-fill's top elevation to the foundation's own top (pad + pedestal), not its base", () => {
-    // baseElevation 2.0 + padThickness 0.5 + pedestalHeight 0.8 = 3.3 (topConnectionPoint.z).
+  it("pulls an uplift-fill's top to 0.2 m below the foundation's own top (pad + pedestal), not its base", () => {
+    // baseElevation 2.0 + padThickness 0.5 + pedestalHeight 0.8 = 3.3 (topConnectionPoint.z); the pedestal stands 0.2 m proud.
     const foundations = [foundation({ baseElevation: 2.0 })];
     const upliftFills = [fill({ topElevationM: 0 })];
     const result = syncUpliftFillTopsToFoundations(upliftFills, foundations);
-    expect(result[0]!.topElevationM).toBeCloseTo(3.3, 9);
+    expect(result[0]!.topElevationM).toBeCloseTo(3.3 - DEFAULT_UPLIFT_FILL_BELOW_TOP_M, 9);
   });
 
   it("targets a different elevation than the base-fill sync for the same foundation", () => {
@@ -103,14 +104,14 @@ describe("syncUpliftFillTopsToFoundations", () => {
     const baseFillResult = syncFillTopsToFoundations([fill({ topElevationM: 0 })], foundations);
     const upliftFillResult = syncUpliftFillTopsToFoundations([fill({ topElevationM: 0 })], foundations);
     expect(baseFillResult[0]!.topElevationM).toBe(2.0);
-    expect(upliftFillResult[0]!.topElevationM).toBeCloseTo(3.3, 9);
+    expect(upliftFillResult[0]!.topElevationM).toBeCloseTo(3.3 - DEFAULT_UPLIFT_FILL_BELOW_TOP_M, 9);
     expect(upliftFillResult[0]!.topElevationM).not.toBe(baseFillResult[0]!.topElevationM);
   });
 
   it("returns the same instance (referential no-op) when already in sync", () => {
     const f = foundation({ baseElevation: 2.0 });
     const topConnectionZ = generateFoundationGeometry(f).topConnectionPoint.z;
-    const upliftFills = [fill({ topElevationM: topConnectionZ })];
+    const upliftFills = [fill({ topElevationM: topConnectionZ - DEFAULT_UPLIFT_FILL_BELOW_TOP_M })];
     const result = syncUpliftFillTopsToFoundations(upliftFills, [f]);
     expect(result[0]).toBe(upliftFills[0]);
   });

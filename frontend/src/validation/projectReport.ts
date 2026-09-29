@@ -1,3 +1,4 @@
+import { gravelPadThicknessFor } from "../domain/fill";
 import type { Project } from "../domain/project";
 import type { ValidationResult } from "../domain/validation";
 import { generateExcavationGeometry } from "../geometry/excavationGeometry";
@@ -51,7 +52,13 @@ export function buildProjectValidationSummary(project: Project, nowIso: string):
       const foundation = project.foundationInstances.find((f) => f.instanceId === excavation.foundationInstanceId);
       if (!foundation) continue;
       const geometry = generateExcavationGeometry(excavation, foundation, terrainSurface);
-      results.push(...validateExcavationInstance(excavation, foundation, geometry, nowIso));
+      results.push(...validateExcavationInstance(
+          excavation,
+          foundation,
+          geometry,
+          nowIso,
+          gravelPadThicknessFor(foundation.instanceId, project.fillInstances)
+        ));
     }
   }
 

@@ -338,7 +338,7 @@ export function SectionView({
   const legendItems = [
     ...(
       [
-        ["fill-projected", "Fill beyond section (faint)", result.fillOutlines],
+        ["fill-projected", "Gravel pad beyond section (dashed)", result.fillOutlines],
         ["uplift-fill-projected", "Uplift fill beyond section (faint)", result.upliftFillOutlines],
       ] as const
     ).flatMap(([id, name, outlines]) => {
@@ -508,10 +508,10 @@ export function SectionView({
               {renderSegments(e.segments, e.truncated ? ACCENT : e.colour, e.excavationId, e.projected ? 0.8 : 1, e.projected)}
             </g>
           ))}
-          {result.fillOutlines.map((fl) => (
-            // Fill is already dashed when cut; a projected (beyond-the-cut) fill is told apart by being fainter.
-            <g key={fl.fillId} opacity={fl.projected ? 0.45 : 1}>
-              {renderSegments(fl.segments, fl.truncated ? ACCENT : fl.colour, fl.fillId, fl.projected ? 0.8 : 1, true)}
+          {result.fillOutlines.map((pad) => (
+            // The gravel pad is a solid slab: solid when cut, dashed when projected (beyond the cut), like a foundation.
+            <g key={pad.fillId} opacity={pad.projected ? 0.7 : 1}>
+              {renderSegments(pad.segments, pad.colour, pad.fillId, pad.projected ? 0.8 : 1.1, pad.projected)}
             </g>
           ))}
           {result.upliftFillOutlines.map((fl) => (

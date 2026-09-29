@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_GRAVEL_PAD_THICKNESS_M, DEFAULT_UPLIFT_FILL_BELOW_TOP_M, gravelPadThickness } from "../domain/fill";
 import type { FillInstance } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import { generateFillGeometry } from "../geometry/fillGeometry";
 import { generateTin } from "../geometry/terrain";
 import { loadTerrainFixturePoints } from "../tests/terrainFixtures";
 import { generateFoundationGeometry } from "../geometry/foundationGeometry";
-import { hasBlockingFillGeometryError, validateFillInstance, validateUpliftFillInstance } from "./fillValidation";
+import { hasBlockingFillGeometryError, validateFillInstance, validateGravelPadInstance, validateUpliftFillInstance } from "./fillValidation";
 
 const NOW = "2026-09-15T00:00:00.000Z";
 const PROVENANCE = { originType: "assumed" as const, verificationState: "unverified" as const };
@@ -139,27 +140,40 @@ describe("validateUpliftFillInstance", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("flags an uplift-fill top below the foundation's own top (pad + pedestal) as blocking", () => {
+  it("flags an uplift-fill top below the top of the foundation's pad as blocking", () => {
     const foundationInstance = foundation();
     const topConnectionZ = generateFoundationGeometry(foundationInstance).topConnectionPoint.z;
-    // Reaches the foundation's *base* (2.0) but not its top (~3.3) -- would not cover the whole body.
+    // Reaches the foundation's *base* (2.0) but not the top of its 0.5 m pad (2.5) -- the uplift-resisting part is uncovered.
     const results = validateUpliftFillInstance(
       fill({ topElevationM: foundationInstance.baseElevation }),
       foundationInstance,
       null,
       NOW
     );
-    expect(results.some((r) => r.ruleId === "fill.top-below-foundation-top" && r.severity === "blocking")).toBe(
+    expect(results.some((r) => r.ruleId === "fill.top-below-pedestal-base" && r.severity === "blocking")).toBe(
       true
     );
     expect(foundationInstance.baseElevation).toBeLessThan(topConnectionZ);
   });
 
-  it("does not flag an uplift-fill top exactly at the foundation's own top", () => {
+  it("accepts an uplift-fill top at the foundation top, at the default 0.2 m below it, and right at the pad top", () => {
     const foundationInstance = foundation();
     const topConnectionZ = generateFoundationGeometry(foundationInstance).topConnectionPoint.z;
-    const results = validateUpliftFillInstance(fill({ topElevationM: topConnectionZ }), foundationInstance, null, NOW);
-    expect(results.some((r) => r.ruleId === "fill.top-below-foundation-top")).toBe(false);
+    for (const top of [topConnectionZ, topConnectionZ - DEFAULT_UPLIFT_FILL_BELOW_TOP_M, foundationInstance.baseElevation + 0.5]) {
+      const results = validateUpliftFillInstance(fill({ topElevationM: top }), foundationInstance, null, NOW);
+      expect(results.some((r) => r.ruleId === "fill.top-below-pedestal-base")).toBe(false);
+    }
+  });
+
+  it("flags an uplift-fill top just below the pad top", () => {
+    const foundationInstance = foundation();
+    const results = validateUpliftFillInstance(
+      fill({ topElevationM: foundationInstance.baseElevation + 0.49 }),
+      foundationInstance,
+      null,
+      NOW
+    );
+    expect(results.some((r) => r.ruleId === "fill.top-below-pedestal-base")).toBe(true);
   });
 
   it("shares the same slope/working-space checks as validateFillInstance", () => {
@@ -178,5 +192,34 @@ describe("hasBlockingFillGeometryError: recognizes the uplift-fill rule", () => 
       NOW
     );
     expect(hasBlockingFillGeometryError(results)).toBe(true);
+  });
+});
+
+describe("validateGravelPadInstance", () => {
+  it("accepts a default pad whose top is the foundation base", () => {
+    const foundationInstance = foundation();
+    const pad = fill({ topElevationM: foundationInstance.baseElevation, padThicknessM: 0.2 });
+    expect(validateGravelPadInstance(pad, foundationInstance, NOW)).toHaveLength(0);
+  });
+
+  it("treats a pad saved without a thickness as the 0.2 m default", () => {
+    const foundationInstance = foundation();
+    const { padThicknessM: _omit, ...legacy } = fill({ topElevationM: foundationInstance.baseElevation, padThicknessM: 0.2 });
+    expect(gravelPadThickness(legacy)).toBe(DEFAULT_GRAVEL_PAD_THICKNESS_M);
+    expect(validateGravelPadInstance(legacy, foundationInstance, NOW)).toHaveLength(0);
+  });
+
+  it("blocks a pad with no thickness", () => {
+    const foundationInstance = foundation();
+    const pad = fill({ topElevationM: foundationInstance.baseElevation, padThicknessM: 0 });
+    const results = validateGravelPadInstance(pad, foundationInstance, NOW);
+    expect(results.some((r) => r.ruleId === "gravel-pad.invalid-thickness" && r.severity === "blocking")).toBe(true);
+  });
+
+  it("warns when the pad top has drifted from the foundation base", () => {
+    const foundationInstance = foundation();
+    const pad = fill({ topElevationM: foundationInstance.baseElevation + 0.1, padThicknessM: 0.2 });
+    const results = validateGravelPadInstance(pad, foundationInstance, NOW);
+    expect(results.some((r) => r.ruleId === "gravel-pad.top-not-at-foundation-base" && r.severity === "warning")).toBe(true);
   });
 });
