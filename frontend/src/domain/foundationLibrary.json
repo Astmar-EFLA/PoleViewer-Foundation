@@ -94,5 +94,410 @@
       "verificationState": "unverified",
       "notes": "Placeholder library dimensions; not a verified design."
     }
+  },
+  {
+    "foundationTypeId": "C120-160x160",
+    "name": "Hólasandslína 3 C120-160x160",
+    "description": "Precast pad foundation with a tapered transition and a vertical, centred pedestal.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.6,
+      "padLength": 1.6,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.4,
+      "pedestalLength": 0.4,
+      "pedestalHeight": 0.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "C120-160x160 (page 1)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing C120-160x160 (V20-032, BM Vallá, 2020-05-20, page 1); title block 0.9 m³."
+    }
+  },
+  {
+    "foundationTypeId": "CA120-160x160",
+    "name": "Hólasandslína 3 CA120-160x160",
+    "description": "As the matching C type, plus a cast-in guy loop (Staglykkja 03); the concrete geometry is identical.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.6,
+      "padLength": 1.6,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.4,
+      "pedestalLength": 0.4,
+      "pedestalHeight": 0.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "CA120-160x160 (page 2)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing CA120-160x160 (V20-032, BM Vallá, 2020-05-20, page 2); title block 0.9 m³."
+    }
+  },
+  {
+    "foundationTypeId": "C180-160x160",
+    "name": "Hólasandslína 3 C180-160x160",
+    "description": "Precast pad foundation with a tapered transition and a vertical, centred pedestal.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.6,
+      "padLength": 1.6,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.4,
+      "pedestalLength": 0.4,
+      "pedestalHeight": 1.4
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "C180-160x160 (page 3)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing C180-160x160 (V20-032, BM Vallá, 2020-05-20, page 3); title block 1.1 m³."
+    }
+  },
+  {
+    "foundationTypeId": "CA180-160x160",
+    "name": "Hólasandslína 3 CA180-160x160",
+    "description": "As the matching C type, plus a cast-in guy loop (Staglykkja 03); the concrete geometry is identical.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.6,
+      "padLength": 1.6,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.4,
+      "pedestalLength": 0.4,
+      "pedestalHeight": 1.4
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "CA180-160x160 (page 4)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing CA180-160x160 (V20-032, BM Vallá, 2020-05-20, page 4); title block 1.1 m³."
+    }
+  },
+  {
+    "foundationTypeId": "C180-200x200",
+    "name": "Hólasandslína 3 C180-200x200",
+    "description": "Precast pad foundation with a tapered transition and a vertical, centred pedestal.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 2.0,
+      "padLength": 2.0,
+      "padThickness": 0.4,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.5,
+      "pedestalLength": 0.5,
+      "pedestalHeight": 1.2
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "C180-200x200 (page 5)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing C180-200x200 (V20-032, BM Vallá, 2020-05-20, page 5); title block 2.3 m³."
+    }
+  },
+  {
+    "foundationTypeId": "CA180-200x200",
+    "name": "Hólasandslína 3 CA180-200x200",
+    "description": "As the matching C type, plus a cast-in guy loop (Staglykkja 03); the concrete geometry is identical.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 2.0,
+      "padLength": 2.0,
+      "padThickness": 0.4,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.5,
+      "pedestalLength": 0.5,
+      "pedestalHeight": 1.2
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "CA180-200x200 (page 6)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing CA180-200x200 (V20-032, BM Vallá, 2020-05-20, page 6); title block 2.3 m³."
+    }
+  },
+  {
+    "foundationTypeId": "B120-135x135",
+    "name": "Hólasandslína 3 B120-135x135",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.35,
+      "padLength": 1.35,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.35,
+      "pedestalLength": 0.35,
+      "pedestalHeight": 0.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B120-135x135 (page 7)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B120-135x135 (V20-032, BM Vallá, 2020-05-20, page 7); title block 0.6 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B170-135x135",
+    "name": "Hólasandslína 3 B170-135x135",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.35,
+      "padLength": 1.35,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.35,
+      "pedestalLength": 0.35,
+      "pedestalHeight": 1.3
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B170-135x135 (page 8)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B170-135x135 (V20-032, BM Vallá, 2020-05-20, page 8); title block 0.7 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B220-135x135",
+    "name": "Hólasandslína 3 B220-135x135",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.35,
+      "padLength": 1.35,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.45,
+      "pedestalLength": 0.45,
+      "pedestalHeight": 1.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B220-135x135 (page 9)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B220-135x135 (V20-032, BM Vallá, 2020-05-20, page 9); title block 0.9 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B120-155x155",
+    "name": "Hólasandslína 3 B120-155x155",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.55,
+      "padLength": 1.55,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.35,
+      "pedestalLength": 0.35,
+      "pedestalHeight": 0.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B120-155x155 (page 10)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B120-155x155 (V20-032, BM Vallá, 2020-05-20, page 10); title block 0.7 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B170-155x155",
+    "name": "Hólasandslína 3 B170-155x155",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.55,
+      "padLength": 1.55,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.35,
+      "pedestalLength": 0.35,
+      "pedestalHeight": 1.3
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B170-155x155 (page 11)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B170-155x155 (V20-032, BM Vallá, 2020-05-20, page 11); title block 0.9 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B220-155x155",
+    "name": "Hólasandslína 3 B220-155x155",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.55,
+      "padLength": 1.55,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.45,
+      "pedestalLength": 0.45,
+      "pedestalHeight": 1.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B220-155x155 (page 12)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B220-155x155 (V20-032, BM Vallá, 2020-05-20, page 12); title block 1.1 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B220-250x250",
+    "name": "Hólasandslína 3 B220-250x250",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 2.5,
+      "padLength": 2.5,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.45,
+      "pedestalLength": 0.45,
+      "pedestalHeight": 1.8
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B220-250x250 (page 13)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B220-250x250 (V20-032, BM Vallá, 2020-05-20, page 13); title block 2.1 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "B270-250x250",
+    "name": "Hólasandslína 3 B270-250x250",
+    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 2.5,
+      "padLength": 2.5,
+      "padThickness": 0.2,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.45,
+      "pedestalLength": 0.45,
+      "pedestalHeight": 2.3
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "B270-250x250 (page 14)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing B270-250x250 (V20-032, BM Vallá, 2020-05-20, page 14); title block 2.4 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
+  },
+  {
+    "foundationTypeId": "F175-155x155",
+    "name": "Hólasandslína 3 F175-155x155",
+    "description": "Precast pad foundation (300 mm pad) with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "geometryType": "rectangular-pad-tapered-pedestal",
+    "units": "m",
+    "defaultParameters": {
+      "geometryType": "rectangular-pad-tapered-pedestal",
+      "padWidth": 1.55,
+      "padLength": 1.55,
+      "padThickness": 0.3,
+      "frustumHeight": 0.2,
+      "pedestalWidth": 0.4,
+      "pedestalLength": 0.4,
+      "pedestalHeight": 1.25
+    },
+    "defaultColour": "#9aa5b1",
+    "defaultOpacity": 1,
+    "verificationState": "unverified",
+    "provenance": {
+      "originType": "imported",
+      "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
+      "sourceRef": "F175-155x155 (page 15)",
+      "verificationState": "unverified",
+      "notes": "Dimensions from Hólasandslína 3 production drawing F175-155x155 (V20-032, BM Vallá, 2020-05-20, page 15); title block 2.4 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+    }
   }
 ]
