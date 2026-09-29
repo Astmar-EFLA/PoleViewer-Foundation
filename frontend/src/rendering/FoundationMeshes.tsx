@@ -36,19 +36,25 @@ interface FrustumPartProps {
  * can't call conditionally.
  */
 function FrustumPart({ frustum, position, rotationY, colour, opacity }: FrustumPartProps) {
+  const shearX = frustum.shear?.x ?? 0;
+  const shearY = frustum.shear?.y ?? 0;
   const geometry = useAutoDispose(
     useMemo(() => {
       const { bottomHalfExtents, topHalfExtents, halfHeight } = frustum;
+      // An oblique frustum (leaning pedestal) shifts its faces by -/+ shear/2;
+      // local Y maps to Three's -Z (rendering/threeAdapters.ts toThreeArrayXYZ).
+      const sx = shearX / 2;
+      const sz = -shearY / 2;
       const positions = new Float32Array(
         [
-          [-bottomHalfExtents.x, -halfHeight, -bottomHalfExtents.y],
-          [bottomHalfExtents.x, -halfHeight, -bottomHalfExtents.y],
-          [bottomHalfExtents.x, -halfHeight, bottomHalfExtents.y],
-          [-bottomHalfExtents.x, -halfHeight, bottomHalfExtents.y],
-          [-topHalfExtents.x, halfHeight, -topHalfExtents.y],
-          [topHalfExtents.x, halfHeight, -topHalfExtents.y],
-          [topHalfExtents.x, halfHeight, topHalfExtents.y],
-          [-topHalfExtents.x, halfHeight, topHalfExtents.y],
+          [-bottomHalfExtents.x - sx, -halfHeight, -bottomHalfExtents.y - sz],
+          [bottomHalfExtents.x - sx, -halfHeight, -bottomHalfExtents.y - sz],
+          [bottomHalfExtents.x - sx, -halfHeight, bottomHalfExtents.y - sz],
+          [-bottomHalfExtents.x - sx, -halfHeight, bottomHalfExtents.y - sz],
+          [-topHalfExtents.x + sx, halfHeight, -topHalfExtents.y + sz],
+          [topHalfExtents.x + sx, halfHeight, -topHalfExtents.y + sz],
+          [topHalfExtents.x + sx, halfHeight, topHalfExtents.y + sz],
+          [-topHalfExtents.x + sx, halfHeight, topHalfExtents.y + sz],
         ].flat()
       );
       // Bottom quad, top quad, then 4 side quads connecting corner i to i+1
@@ -73,6 +79,8 @@ function FrustumPart({ frustum, position, rotationY, colour, opacity }: FrustumP
       frustum.topHalfExtents.x,
       frustum.topHalfExtents.y,
       frustum.halfHeight,
+      shearX,
+      shearY,
     ])
   );
 

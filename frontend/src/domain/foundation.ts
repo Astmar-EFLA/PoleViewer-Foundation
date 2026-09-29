@@ -42,8 +42,27 @@ export interface RectangularPadTaperedPedestalParameters {
   readonly pedestalWidth: number;
   /** Pedestal length along local Y, m. */
   readonly pedestalLength: number;
-  /** Pedestal height, frustum top to pedestal top, m. */
+  /** Pedestal height, frustum top to pedestal top, m (vertical, even when the pedestal leans). */
   readonly pedestalHeight: number;
+  /**
+   * Angle of the pedestal's axis from vertical, degrees, leaning toward local
+   * +X -- a precast footing whose pedestal follows its leg's batter (e.g.
+   * Hólasandslína 3's B/F types, 1:8 = 7.125°). Absent or 0: vertical.
+   * The pedestal top (the leg connection) stays at the instance's
+   * `position`; the pad shifts the other way (see
+   * generateRectangularPadTaperedPedestalGeometry).
+   */
+  readonly pedestalLeanDegrees?: number;
+  /** Horizontal offset of the pedestal's base centre from the pad centre, toward local +X, m. Absent or 0: centred. */
+  readonly pedestalBaseOffset?: number;
+}
+
+/** True when a tapered-pedestal foundation's pedestal leans or sits off-centre -- the case that sets its orientation from the leg (services/buildFoundationInstances.ts). */
+export function hasInclinedPedestal(parameters: FoundationParameters): boolean {
+  return (
+    parameters.geometryType === "rectangular-pad-tapered-pedestal" &&
+    ((parameters.pedestalLeanDegrees ?? 0) !== 0 || (parameters.pedestalBaseOffset ?? 0) !== 0)
+  );
 }
 
 /** One rectangular tier of a stepped foundation, ordered bottom to top and centred on the same (x, y). */

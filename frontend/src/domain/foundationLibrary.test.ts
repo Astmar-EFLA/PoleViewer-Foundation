@@ -89,3 +89,20 @@ describe("Hólasandslína 3 foundation types", () => {
     }
   });
 });
+
+describe("Hólasandslína 3 inclined pedestals", () => {
+  it("gives every B and F type the drawings' 1:8 lean and a small base offset, and no C/CA type any lean", () => {
+    for (const type of HS3_TYPES) {
+      const p = type.defaultParameters;
+      if (p.geometryType !== "rectangular-pad-tapered-pedestal") throw new Error("unexpected geometry type");
+      if (/^(B|F)/.test(type.foundationTypeId)) {
+        expect(Math.tan(((p.pedestalLeanDegrees ?? 0) * Math.PI) / 180)).toBeCloseTo(1 / 8, 6);
+        expect(p.pedestalBaseOffset).toBeGreaterThan(0.04);
+        expect(p.pedestalBaseOffset).toBeLessThan(0.06);
+      } else {
+        expect(p.pedestalLeanDegrees ?? 0).toBe(0);
+        expect(p.pedestalBaseOffset ?? 0).toBe(0);
+      }
+    }
+  });
+});

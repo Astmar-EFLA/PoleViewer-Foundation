@@ -14,6 +14,7 @@
  */
 
 import type { FoundationInstance, FoundationParameters, FoundationType } from "../domain/foundation";
+import { hasInclinedPedestal } from "../domain/foundation";
 import type { PoleModel } from "../domain/poleModel";
 import { generateFoundationGeometryFromParameters } from "../geometry/foundationGeometry";
 import { placedAnchorPosition } from "../geometry/polePlacement";
@@ -33,6 +34,22 @@ function solveBaseElevationForConnection(
   return targetTopZ - heightFromBaseToTop;
 }
 
+/**
+ * An inclined pedestal leans toward its local +X, so it must be turned to
+ * follow its leg: H-frame legs batter inward, so +X points from the anchor
+ * toward the mast centre (the local frame's origin). Every other foundation
+ * keeps `current` -- orientation is otherwise left exactly as it was.
+ */
+export function orientationFor(
+  parameters: FoundationParameters,
+  anchorXY: { x: number; y: number },
+  current: number
+): number {
+  if (!hasInclinedPedestal(parameters)) return current;
+  if (Math.hypot(anchorXY.x, anchorXY.y) < 1e-9) return current;
+  return Math.atan2(-anchorXY.y, -anchorXY.x);
+}
+
 function buildFoundationInstance(
   poleModel: PoleModel,
   anchorId: string,
@@ -46,7 +63,8 @@ function buildFoundationInstance(
   const parameters = parametersOverride ?? foundationType.defaultParameters;
   const anchorPos = placedAnchorPosition(anchorId, poleModel);
   const position = { x: anchorPos.x, y: anchorPos.y };
-  const baseElevation = solveBaseElevationForConnection(parameters, position, 0, anchorPos.z);
+  const orientationRadians = orientationFor(parameters, position, 0);
+  const baseElevation = solveBaseElevationForConnection(parameters, position, orientationRadians, anchorPos.z);
 
   return {
     instanceId: `foundation-${instanceIdSuffix}`,
@@ -57,7 +75,7 @@ function buildFoundationInstance(
     foundationTypeId: foundationType.foundationTypeId,
     parameters,
     position,
-    orientationRadians: 0,
+    orientationRadians,
     baseElevation,
     visible: true,
     colour: foundationType.defaultColour,
@@ -162,13 +180,20 @@ export function resyncFoundationToAnchor(
 ): FoundationInstance {
   const anchorPos = placedAnchorPosition(instance.anchorId, poleModel);
   const position = { x: anchorPos.x, y: anchorPos.y };
-  const baseElevation = solveBaseElevationForConnection(instance.parameters, position, instance.orientationRadians, anchorPos.z);
-  if (position.x === instance.position.x && position.y === instance.position.y && baseElevation === instance.baseElevation) {
+  const orientationRadians = orientationFor(instance.parameters, position, instance.orientationRadians);
+  const baseElevation = solveBaseElevationForConnection(instance.parameters, position, orientationRadians, anchorPos.z);
+  if (
+    position.x === instance.position.x &&
+    position.y === instance.position.y &&
+    orientationRadians === instance.orientationRadians &&
+    baseElevation === instance.baseElevation
+  ) {
     return instance;
   }
   return {
     ...instance,
     position,
+    orientationRadians,
     baseElevation,
     provenance: { ...instance.provenance, modifiedAt: nowIso },
   };
@@ -189,17 +214,16 @@ export function withFoundationType(
 ): FoundationInstance {
   const parameters = parametersOverride ?? foundationType.defaultParameters;
   const anchorPos = placedAnchorPosition(instance.anchorId, poleModel);
-  const baseElevation = solveBaseElevationForConnection(
-    parameters,
-    instance.position,
-    instance.orientationRadians,
-    anchorPos.z
-  );
+  // Leaving an inclined type drops the rotation it set, back to the 0 every other type is built with.
+  const previousOrientation = hasInclinedPedestal(instance.parameters) ? 0 : instance.orientationRadians;
+  const orientationRadians = orientationFor(parameters, instance.position, previousOrientation);
+  const baseElevation = solveBaseElevationForConnection(parameters, instance.position, orientationRadians, anchorPos.z);
 
   return {
     ...instance,
     foundationTypeId: foundationType.foundationTypeId,
     parameters,
+    orientationRadians,
     baseElevation,
     provenance: {
       ...instance.provenance,

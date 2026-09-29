@@ -168,6 +168,16 @@ export function FoundationPanel() {
                 value={instance.parameters.pedestalHeight}
                 onChange={(v) => updateParameters({ ...instance.parameters, pedestalHeight: v } as FoundationParameters)}
               />
+              <NumberField
+                label="Pedestal lean (°)"
+                value={instance.parameters.pedestalLeanDegrees ?? 0}
+                onChange={(v) => updateParameters({ ...instance.parameters, pedestalLeanDegrees: v } as FoundationParameters)}
+              />
+              <NumberField
+                label="Pedestal base offset"
+                value={instance.parameters.pedestalBaseOffset ?? 0}
+                onChange={(v) => updateParameters({ ...instance.parameters, pedestalBaseOffset: v } as FoundationParameters)}
+              />
             </>
           )}
 

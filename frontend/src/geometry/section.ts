@@ -169,8 +169,10 @@ function frustumCorner(frustum: OrientedFrustum, bx: -1 | 1, by: -1 | 1, top: bo
   const cos = Math.cos(frustum.orientationRadians);
   const sin = Math.sin(frustum.orientationRadians);
   const halfExtents = top ? frustum.topHalfExtents : frustum.bottomHalfExtents;
-  const lx = bx * halfExtents.x;
-  const ly = by * halfExtents.y;
+  // An oblique frustum (leaning pedestal): faces shifted by +/- shear/2.
+  const shearSign = top ? 0.5 : -0.5;
+  const lx = bx * halfExtents.x + shearSign * (frustum.shear?.x ?? 0);
+  const ly = by * halfExtents.y + shearSign * (frustum.shear?.y ?? 0);
   const z = frustum.centre.z + (top ? frustum.halfHeight : -frustum.halfHeight);
   return {
     x: frustum.centre.x + lx * cos - ly * sin,

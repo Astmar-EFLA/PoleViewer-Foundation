@@ -237,3 +237,42 @@ describe("foundation library sanity", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+describe("inclined-pedestal foundations (Hólasandslína 3 B/F types)", () => {
+  const B170 = requireFoundationTypeById("B170-155x155");
+
+  it("turns each leg's pedestal to lean toward the mast centre and still connects to its anchor", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-portal-2leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const legs = buildDefaultFoundationInstances(parsed.data, B170, GUY_ANCHOR_BLOCK, NOW).filter((f) => f.legId !== null);
+    expect(legs.length).toBeGreaterThan(0);
+    for (const leg of legs) {
+      // Local +X (the lean) points from the anchor to the mast centre at the origin.
+      const inward = Math.atan2(-leg.position.y, -leg.position.x);
+      expect(leg.orientationRadians).toBeCloseTo(inward, 9);
+
+      const anchorPos = placedAnchorPosition(leg.anchorId, parsed.data);
+      const results = validateFoundationInstance(leg, anchorPos, NOW);
+      expect(results.filter((r) => r.ruleId === "foundation.connection-mismatch")).toHaveLength(0);
+      expect(results.filter((r) => r.severity === "blocking")).toHaveLength(0);
+
+      // The pad sits outboard of the anchor: further from the mast centre than the leg connection.
+      const pad = generateFoundationGeometry(leg).parts[0]!;
+      expect(Math.hypot(pad.centre.x, pad.centre.y)).toBeGreaterThan(Math.hypot(leg.position.x, leg.position.y));
+    }
+  });
+
+  it("drops the lean's rotation when a leg is switched back to a vertical type", () => {
+    const parsed = parsePoleModel(loadSyntheticFixtureJson("pole-portal-2leg.json"));
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+
+    const [plain] = buildDefaultFoundationInstances(parsed.data, PAD_PEDESTAL, GUY_ANCHOR_BLOCK, NOW);
+    expect(plain!.orientationRadians).toBe(0);
+    const inclined = withFoundationType(plain!, parsed.data, B170, NOW);
+    const back = withFoundationType(inclined, parsed.data, PAD_PEDESTAL, NOW);
+    expect(back.orientationRadians).toBe(0);
+  });
+});

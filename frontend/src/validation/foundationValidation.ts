@@ -41,7 +41,15 @@ function nonPositiveDimensionFields(params: FoundationParameters): string[] {
         pedestalHeight,
       })
         .filter(([, value]) => !(value > 0))
-        .map(([key]) => key);
+        .map(([key]) => key)
+        .concat(
+          // A lean is a batter of a few degrees; 30 degrees or more (or a negative angle -- lean the other way by
+          // turning the foundation instead) is a data-entry error, not a real precast pedestal.
+          params.pedestalLeanDegrees !== undefined && !(params.pedestalLeanDegrees >= 0 && params.pedestalLeanDegrees < 30)
+            ? ["pedestalLeanDegrees"]
+            : [],
+          params.pedestalBaseOffset !== undefined && !Number.isFinite(params.pedestalBaseOffset) ? ["pedestalBaseOffset"] : []
+        );
     }
   }
 }

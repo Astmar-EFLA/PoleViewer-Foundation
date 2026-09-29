@@ -684,3 +684,29 @@ describe("consistency with the main viewer's foundation geometry", () => {
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(bottomPart.halfExtents.x * 2, 9);
   });
 });
+
+describe("orientedFrustumTriangles: oblique (sheared) frustum", () => {
+  it("shifts the bottom face by -shear/2 and the top face by +shear/2, rotated with the part", () => {
+    const frustum: OrientedFrustum = {
+      kind: "frustum",
+      centre: localCoordinate(1, 2, 0.5),
+      bottomHalfExtents: { x: 0.2, y: 0.2 },
+      topHalfExtents: { x: 0.2, y: 0.2 },
+      halfHeight: 0.5,
+      orientationRadians: Math.PI / 2,
+      shear: { x: 0.4, y: 0 },
+    };
+    const points = orientedFrustumTriangles(frustum).flatMap((t) => [t.a, t.b, t.c]);
+    const centroidAt = (z: number) => {
+      // Midpoint of the face's extent -- triangle vertices repeat corners unevenly, so a plain average would be biased.
+      const face = points.filter((p) => Math.abs(p.z - z) < 1e-9);
+      const mid = (vals: number[]) => (Math.min(...vals) + Math.max(...vals)) / 2;
+      return { x: mid(face.map((p) => p.x)), y: mid(face.map((p) => p.y)) };
+    };
+    // Local +X rotated by 90 degrees is world +Y.
+    expect(centroidAt(0).x).toBeCloseTo(1, 9);
+    expect(centroidAt(0).y).toBeCloseTo(2 - 0.2, 9);
+    expect(centroidAt(1).x).toBeCloseTo(1, 9);
+    expect(centroidAt(1).y).toBeCloseTo(2 + 0.2, 9);
+  });
+});

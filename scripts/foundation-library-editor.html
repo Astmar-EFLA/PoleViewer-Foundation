@@ -248,6 +248,12 @@ const TAPERED_FIELDS = [
   ["pedestalHeight", "Pedestal height (m)"],
 ];
 
+// Optional -- absent (or 0) means a vertical, centred pedestal.
+const TAPERED_OPTIONAL_FIELDS = [
+  ["pedestalLeanDegrees", "Pedestal lean (°, toward +X)"],
+  ["pedestalBaseOffset", "Pedestal base offset (m, toward +X)"],
+];
+
 let fileHandle = null;   // FileSystemFileHandle, when the File System Access API is available
 let library = [];        // the array of foundation-type entries, live-edited in place
 let selectedIndex = -1;
@@ -562,6 +568,12 @@ function renderForm() {
     for (const [key, label] of TAPERED_FIELDS) {
       grid.appendChild(field(label, numberInput(entry.defaultParameters[key], (v) => entry.defaultParameters[key] = v, { step: "0.05", min: "0" })));
     }
+    for (const [key, label] of TAPERED_OPTIONAL_FIELDS) {
+      grid.appendChild(field(label, numberInput(entry.defaultParameters[key] ?? 0, (v) => {
+        if (v === 0 || Number.isNaN(v)) delete entry.defaultParameters[key];
+        else entry.defaultParameters[key] = v;
+      }, { step: "0.005" })));
+    }
     params.appendChild(grid);
   } else {
     params.appendChild(renderStepsTable(entry));
@@ -690,6 +702,16 @@ function validateLibrary() {
         if (typeof v !== "number" || !Number.isFinite(v)) {
           errors.push(`"${label}": ${fieldLabel} must be a number.`);
         }
+      }
+      for (const [key, fieldLabel] of TAPERED_OPTIONAL_FIELDS) {
+        const v = entry.defaultParameters[key];
+        if (v !== undefined && (typeof v !== "number" || !Number.isFinite(v))) {
+          errors.push(`"${label}": ${fieldLabel} must be a number.`);
+        }
+      }
+      const lean = entry.defaultParameters.pedestalLeanDegrees;
+      if (typeof lean === "number" && !(lean >= 0 && lean < 30)) {
+        errors.push(`"${label}": pedestal lean must be at least 0 and under 30 degrees.`);
       }
     } else if (entry.geometryType === "stepped-rectangular") {
       const steps = entry.defaultParameters.steps || [];

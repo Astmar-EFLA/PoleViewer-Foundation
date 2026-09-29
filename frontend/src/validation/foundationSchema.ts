@@ -35,6 +35,8 @@ export const rectangularPadTaperedPedestalParametersSchema = z.object({
   pedestalWidth: z.number().finite(),
   pedestalLength: z.number().finite(),
   pedestalHeight: z.number().finite(),
+  pedestalLeanDegrees: z.number().finite().optional(),
+  pedestalBaseOffset: z.number().finite().optional(),
 });
 
 export const foundationParametersSchema = z.discriminatedUnion("geometryType", [
