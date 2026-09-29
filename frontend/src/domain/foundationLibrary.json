@@ -260,7 +260,7 @@
   {
     "foundationTypeId": "B120-135x135",
     "name": "Hólasandslína 3 B120-135x135",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -271,7 +271,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.35,
       "pedestalLength": 0.35,
-      "pedestalHeight": 0.8
+      "pedestalHeight": 0.8,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -281,13 +283,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B120-135x135 (page 7)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B120-135x135 (V20-032, BM Vallá, 2020-05-20, page 7); title block 0.6 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B120-135x135 (V20-032, BM Vallá, 2020-05-20, page 7); title block 0.6 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B170-135x135",
     "name": "Hólasandslína 3 B170-135x135",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -298,7 +300,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.35,
       "pedestalLength": 0.35,
-      "pedestalHeight": 1.3
+      "pedestalHeight": 1.3,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -308,13 +312,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B170-135x135 (page 8)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B170-135x135 (V20-032, BM Vallá, 2020-05-20, page 8); title block 0.7 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B170-135x135 (V20-032, BM Vallá, 2020-05-20, page 8); title block 0.7 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B220-135x135",
     "name": "Hólasandslína 3 B220-135x135",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -325,7 +329,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.45,
       "pedestalLength": 0.45,
-      "pedestalHeight": 1.8
+      "pedestalHeight": 1.8,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -335,13 +341,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B220-135x135 (page 9)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B220-135x135 (V20-032, BM Vallá, 2020-05-20, page 9); title block 0.9 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B220-135x135 (V20-032, BM Vallá, 2020-05-20, page 9); title block 0.9 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B120-155x155",
     "name": "Hólasandslína 3 B120-155x155",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -352,7 +358,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.35,
       "pedestalLength": 0.35,
-      "pedestalHeight": 0.8
+      "pedestalHeight": 0.8,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -362,13 +370,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B120-155x155 (page 10)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B120-155x155 (V20-032, BM Vallá, 2020-05-20, page 10); title block 0.7 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B120-155x155 (V20-032, BM Vallá, 2020-05-20, page 10); title block 0.7 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B170-155x155",
     "name": "Hólasandslína 3 B170-155x155",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -379,7 +387,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.35,
       "pedestalLength": 0.35,
-      "pedestalHeight": 1.3
+      "pedestalHeight": 1.3,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -389,13 +399,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B170-155x155 (page 11)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B170-155x155 (V20-032, BM Vallá, 2020-05-20, page 11); title block 0.9 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B170-155x155 (V20-032, BM Vallá, 2020-05-20, page 11); title block 0.9 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B220-155x155",
     "name": "Hólasandslína 3 B220-155x155",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -406,7 +416,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.45,
       "pedestalLength": 0.45,
-      "pedestalHeight": 1.8
+      "pedestalHeight": 1.8,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -416,13 +428,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B220-155x155 (page 12)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B220-155x155 (V20-032, BM Vallá, 2020-05-20, page 12); title block 1.1 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B220-155x155 (V20-032, BM Vallá, 2020-05-20, page 12); title block 1.1 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B220-250x250",
     "name": "Hólasandslína 3 B220-250x250",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -433,7 +445,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.45,
       "pedestalLength": 0.45,
-      "pedestalHeight": 1.8
+      "pedestalHeight": 1.8,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -443,13 +457,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B220-250x250 (page 13)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B220-250x250 (V20-032, BM Vallá, 2020-05-20, page 13); title block 2.1 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B220-250x250 (V20-032, BM Vallá, 2020-05-20, page 13); title block 2.1 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "B270-250x250",
     "name": "Hólasandslína 3 B270-250x250",
-    "description": "Precast pad foundation with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -460,7 +474,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.45,
       "pedestalLength": 0.45,
-      "pedestalHeight": 2.3
+      "pedestalHeight": 2.3,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.05
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -470,13 +486,13 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "B270-250x250 (page 14)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing B270-250x250 (V20-032, BM Vallá, 2020-05-20, page 14); title block 2.4 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing B270-250x250 (V20-032, BM Vallá, 2020-05-20, page 14); title block 2.4 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 50 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   },
   {
     "foundationTypeId": "F175-155x155",
     "name": "Hólasandslína 3 F175-155x155",
-    "description": "Precast pad foundation (300 mm pad) with a tapered transition; the pedestal is inclined and off-centre on the drawing.",
+    "description": "Precast pad foundation (300 mm pad) with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
@@ -487,7 +503,9 @@
       "frustumHeight": 0.2,
       "pedestalWidth": 0.4,
       "pedestalLength": 0.4,
-      "pedestalHeight": 1.25
+      "pedestalHeight": 1.25,
+      "pedestalLeanDegrees": 7.125,
+      "pedestalBaseOffset": 0.056
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -497,7 +515,7 @@
       "sourceFile": "Hólasandslína 3 - undirstöður - til samþykktar.pdf",
       "sourceRef": "F175-155x155 (page 15)",
       "verificationState": "unverified",
-      "notes": "Dimensions from Hólasandslína 3 production drawing F175-155x155 (V20-032, BM Vallá, 2020-05-20, page 15); title block 2.4 m³. Simplified: the drawing's inclined, off-centre pedestal is modelled vertical and centred, with the same cross-section and vertical height."
+      "notes": "Dimensions from Hólasandslína 3 production drawing F175-155x155 (V20-032, BM Vallá, 2020-05-20, page 15); title block 2.4 m³. Pedestal leans 1:8 (7.125°) toward the tower and its base sits 56 mm off the pad centre, from the drawing's plan dimensions; its top and base are modelled horizontal (on the drawing the top is square to the pedestal axis, <1% difference in cross-section)."
     }
   }
 ]

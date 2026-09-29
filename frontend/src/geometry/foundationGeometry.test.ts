@@ -304,3 +304,60 @@ describe("independent per-leg foundations (4-leg lattice fixture)", () => {
     expect(generateFoundationGeometry(steppedInstance).topConnectionPoint.z).toBeCloseTo(anchorSe.z, 9);
   });
 });
+
+describe("generateFoundationGeometry: inclined pedestal (rectangular-pad-tapered-pedestal with a lean)", () => {
+  // Hólasandslína 3 B170-155x155: pedestal leans 1:8 toward the tower, base 50 mm off the pad centre.
+  const leaning: RectangularPadTaperedPedestalParameters = {
+    geometryType: "rectangular-pad-tapered-pedestal",
+    padWidth: 1.55,
+    padLength: 1.55,
+    padThickness: 0.2,
+    frustumHeight: 0.2,
+    pedestalWidth: 0.35,
+    pedestalLength: 0.35,
+    pedestalHeight: 1.3,
+    pedestalLeanDegrees: 7.125,
+    pedestalBaseOffset: 0.05,
+  };
+  // An LP leg at local (0, -8.28), turned so local +X points at the mast centre (+Y).
+  const placement = { position: { x: 0, y: -8.28 }, orientationRadians: Math.PI / 2, baseElevation: -2 };
+  const tan = Math.tan((7.125 * Math.PI) / 180);
+
+  function geometryFor(params: RectangularPadTaperedPedestalParameters, p = placement) {
+    return generateFoundationGeometry({
+      ...instanceFor("lp", "lp-anchor", p.position, p.baseElevation, params),
+      orientationRadians: p.orientationRadians,
+    });
+  }
+
+  it("keeps the pedestal top (the leg connection) exactly at the instance position", () => {
+    const g = geometryFor(leaning);
+    expect(g.topConnectionPoint.x).toBeCloseTo(0, 9);
+    expect(g.topConnectionPoint.y).toBeCloseTo(-8.28, 9);
+    expect(g.topConnectionPoint.z).toBeCloseTo(-2 + 0.2 + 0.2 + 1.3, 9);
+  });
+
+  it("shifts the pad away from the lean by the base offset plus the lean over the pedestal height", () => {
+    const pad = geometryFor(leaning).parts[0]!;
+    const d = 0.05 + tan * 1.3;
+    expect(pad.kind).toBe("box");
+    expect(pad.centre.x).toBeCloseTo(0, 9);
+    expect(pad.centre.y).toBeCloseTo(-8.28 - d, 9);
+  });
+
+  it("builds the transition and pedestal as sheared (oblique) parts", () => {
+    const [, transition, pedestal] = geometryFor(leaning).parts;
+    if (transition?.kind !== "frustum" || pedestal?.kind !== "frustum") throw new Error("expected frustum parts");
+    expect(transition.shear).toEqual({ x: 0.05, y: 0 });
+    expect(pedestal.shear!.x).toBeCloseTo(tan * 1.3, 9);
+    expect(pedestal.topHalfExtents).toEqual(pedestal.bottomHalfExtents);
+    expect(pedestal.halfHeight).toBeCloseTo(0.65, 9);
+  });
+
+  it("with no lean and no offset, is exactly the vertical tapered pedestal", () => {
+    const { pedestalLeanDegrees: _lean, pedestalBaseOffset: _offset, ...vertical } = leaning;
+    const zeroed = { ...leaning, pedestalLeanDegrees: 0, pedestalBaseOffset: 0 };
+    expect(geometryFor(zeroed)).toEqual(geometryFor(vertical));
+    expect(geometryFor(vertical).parts.map((p) => p.kind)).toEqual(["box", "frustum", "box"]);
+  });
+});

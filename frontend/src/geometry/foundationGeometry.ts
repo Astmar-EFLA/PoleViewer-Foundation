@@ -21,6 +21,13 @@ export interface OrientedBox {
  * top and bottom faces have independent half-extents; `centre.z` is the
  * vertical midpoint (bottomZ = centre.z - halfHeight, topZ = centre.z +
  * halfHeight).
+ *
+ * `shear`, when present, makes it oblique: the top face's centre minus the
+ * bottom face's, in the part's own (unrotated) frame -- the bottom face sits
+ * at centre - shear/2 and the top face at centre + shear/2. Used for a
+ * leaning pedestal (equal top/bottom extents: a sheared prism) and the
+ * off-centre transition beneath it. Faces stay horizontal; volume is the
+ * same as the unsheared frustum (Cavalieri's principle).
  */
 export interface OrientedFrustum {
   readonly kind: "frustum";
@@ -29,6 +36,7 @@ export interface OrientedFrustum {
   readonly topHalfExtents: { readonly x: number; readonly y: number };
   readonly halfHeight: number;
   readonly orientationRadians: number;
+  readonly shear?: { readonly x: number; readonly y: number };
 }
 
 export type FoundationGeometryPart = OrientedBox | OrientedFrustum;
@@ -123,27 +131,71 @@ export function generateRectangularPadTaperedPedestalGeometry(
   const pedestalCentreZ = frustumTopZ + pedestalHeight / 2;
   const topConnectionZ = frustumTopZ + pedestalHeight;
 
+  const leanShift = Math.tan(((params.pedestalLeanDegrees ?? 0) * Math.PI) / 180) * pedestalHeight;
+  const baseOffset = params.pedestalBaseOffset ?? 0;
+
+  if (leanShift === 0 && baseOffset === 0) {
+    return {
+      parts: [
+        {
+          kind: "box",
+          centre: localCoordinate(position.x, position.y, padCentreZ),
+          halfExtents: { x: padWidth / 2, y: padLength / 2, z: padThickness / 2 },
+          orientationRadians,
+        },
+        {
+          kind: "frustum",
+          centre: localCoordinate(position.x, position.y, frustumCentreZ),
+          bottomHalfExtents: { x: padWidth / 2, y: padLength / 2 },
+          topHalfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2 },
+          halfHeight: frustumHeight / 2,
+          orientationRadians,
+        },
+        {
+          kind: "box",
+          centre: localCoordinate(position.x, position.y, pedestalCentreZ),
+          halfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2, z: pedestalHeight / 2 },
+          orientationRadians,
+        },
+      ],
+      topConnectionPoint: localCoordinate(position.x, position.y, topConnectionZ),
+    };
+  }
+
+  // Inclined pedestal: the top (the leg connection) stays at `position`, so
+  // the pad sits `baseOffset + leanShift` back along local -X. `along(u)` is
+  // the point u metres along local +X from the pad centre.
+  const topFromPad = baseOffset + leanShift;
+  const cos = Math.cos(orientationRadians);
+  const sin = Math.sin(orientationRadians);
+  const along = (u: number, z: number) =>
+    localCoordinate(position.x + (u - topFromPad) * cos, position.y + (u - topFromPad) * sin, z);
+
   return {
     parts: [
       {
         kind: "box",
-        centre: localCoordinate(position.x, position.y, padCentreZ),
+        centre: along(0, padCentreZ),
         halfExtents: { x: padWidth / 2, y: padLength / 2, z: padThickness / 2 },
         orientationRadians,
       },
       {
         kind: "frustum",
-        centre: localCoordinate(position.x, position.y, frustumCentreZ),
+        centre: along(baseOffset / 2, frustumCentreZ),
         bottomHalfExtents: { x: padWidth / 2, y: padLength / 2 },
         topHalfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2 },
         halfHeight: frustumHeight / 2,
         orientationRadians,
+        shear: { x: baseOffset, y: 0 },
       },
       {
-        kind: "box",
-        centre: localCoordinate(position.x, position.y, pedestalCentreZ),
-        halfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2, z: pedestalHeight / 2 },
+        kind: "frustum",
+        centre: along(baseOffset + leanShift / 2, pedestalCentreZ),
+        bottomHalfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2 },
+        topHalfExtents: { x: pedestalWidth / 2, y: pedestalLength / 2 },
+        halfHeight: pedestalHeight / 2,
         orientationRadians,
+        shear: { x: leanShift, y: 0 },
       },
     ],
     topConnectionPoint: localCoordinate(position.x, position.y, topConnectionZ),

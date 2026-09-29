@@ -88,3 +88,21 @@ describe("computeFoundationConcreteVolume", () => {
     expect(volumeOf(parameters, moved)).toBeCloseTo(volumeOf(parameters), 9);
   });
 });
+
+describe("computeFoundationConcreteVolume: inclined pedestal", () => {
+  it("is unchanged by the lean and the base offset (sheared solids keep their volume)", () => {
+    const vertical: FoundationParameters = {
+      geometryType: "rectangular-pad-tapered-pedestal",
+      padWidth: 1.55,
+      padLength: 1.55,
+      padThickness: 0.2,
+      frustumHeight: 0.2,
+      pedestalWidth: 0.35,
+      pedestalLength: 0.35,
+      pedestalHeight: 1.3,
+    };
+    const leaning: FoundationParameters = { ...vertical, pedestalLeanDegrees: 7.125, pedestalBaseOffset: 0.05 };
+    const turned = { position: { x: 3, y: -8 }, orientationRadians: 1.2, baseElevation: 5 };
+    expect(volumeOf(leaning, turned)).toBeCloseTo(volumeOf(vertical), 9);
+  });
+});
