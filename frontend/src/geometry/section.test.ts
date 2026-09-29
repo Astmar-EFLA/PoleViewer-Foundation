@@ -453,7 +453,7 @@ describe("generateSectionResult", () => {
     expect(new Set(edgeKeys).size).toBe(projected.segments.length);
   });
 
-  it("projects fill and uplift fill the plane misses as their silhouettes, and keeps cut ones cut", () => {
+  it("draws the gravel pad as a slab under the foundation (cut or projected), and projects a missed uplift fill down to terrain", () => {
     const base = projectWithFoundationAtOrigin();
     const onPlane = { ...base.foundationInstances[0]!, baseElevation: 2.0 };
     const offPlane = { ...onPlane, instanceId: "foundation-off", position: { x: 12, y: 2 } };
@@ -461,8 +461,8 @@ describe("generateSectionResult", () => {
       ...base,
       foundationInstances: [onPlane, offPlane],
       fillInstances: [
-        fill({ id: "fill-cut", foundationInstanceId: onPlane.instanceId, topElevationM: 2.0 }),
-        fill({ id: "fill-off", foundationInstanceId: offPlane.instanceId, topElevationM: 2.0 }),
+        fill({ id: "pad-cut", foundationInstanceId: onPlane.instanceId, topElevationM: 2.0, padThicknessM: 0.2 }),
+        fill({ id: "pad-off", foundationInstanceId: offPlane.instanceId, topElevationM: 2.0, padThicknessM: 0.2 }),
       ],
       upliftFillInstances: [
         fill({ id: "uplift-off", foundationInstanceId: offPlane.instanceId, topElevationM: 3.3 }),
@@ -479,28 +479,38 @@ describe("generateSectionResult", () => {
     };
     const result = generateSectionResult(project, section);
     const byId = (outlines: typeof result.fillOutlines, id: string) => outlines.find((o) => o.fillId === id)!;
-
-    expect(byId(result.fillOutlines, "fill-cut").projected).toBe(false);
-    for (const outline of [byId(result.fillOutlines, "fill-off"), byId(result.upliftFillOutlines, "uplift-off")]) {
-      expect(outline.projected).toBe(true);
-      expect(outline.segments.length).toBeGreaterThanOrEqual(3);
-      // From the (flat, z = 0) terrain up to the fill's own top, centred on the fill's s (= y = 2).
-      const ss = outline.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+    const zRange = (outline: (typeof result.fillOutlines)[number]) => {
       const zs = outline.segments.flatMap((seg) => [seg.a.z, seg.b.z]);
-      expect(Math.min(...zs)).toBeCloseTo(0, 6);
-      expect(Math.max(...zs)).toBeCloseTo(outline.topElevationM, 6);
-      expect((Math.min(...ss) + Math.max(...ss)) / 2).toBeCloseTo(2, 6);
+      return [Math.min(...zs), Math.max(...zs)];
+    };
+
+    // Gravel pads: from the foundation base (2.0) down by the pad thickness, whether cut or projected.
+    const cutPad = byId(result.fillOutlines, "pad-cut");
+    const offPad = byId(result.fillOutlines, "pad-off");
+    expect(cutPad.projected).toBe(false);
+    expect(offPad.projected).toBe(true);
+    for (const pad of [cutPad, offPad]) {
+      expect(zRange(pad)[0]).toBeCloseTo(1.8, 6);
+      expect(zRange(pad)[1]).toBeCloseTo(2.0, 6);
     }
+    const padS = offPad.segments.flatMap((seg) => [seg.a.s, seg.b.s]);
+    expect((Math.min(...padS) + Math.max(...padS)) / 2).toBeCloseTo(2, 6);
+
+    // The uplift fill is still sloped down to the (flat, z = 0) terrain.
+    const uplift = byId(result.upliftFillOutlines, "uplift-off");
+    expect(uplift.projected).toBe(true);
+    expect(zRange(uplift)[0]).toBeCloseTo(0, 6);
+    expect(zRange(uplift)[1]).toBeCloseTo(3.3, 6);
   });
 
-  it("draws a zero-height projected fill as a single line, not a doubled edge", () => {
+  it("draws a zero-height projected uplift fill as a single line, not a doubled edge", () => {
     const base = projectWithFoundationAtOrigin();
     const offPlane = { ...base.foundationInstances[0]!, instanceId: "foundation-off", position: { x: 12, y: 2 } };
     const project: Project = {
       ...base,
       foundationInstances: [offPlane],
       // Top at the flat terrain (z = 0): nothing to fill, so the solid is flat.
-      fillInstances: [fill({ id: "fill-flat", foundationInstanceId: offPlane.instanceId, topElevationM: 0 })],
+      upliftFillInstances: [fill({ id: "fill-flat", foundationInstanceId: offPlane.instanceId, topElevationM: 0 })],
     };
     const section: SectionDefinition = {
       id: "s-fill-flat",
@@ -511,7 +521,7 @@ describe("generateSectionResult", () => {
       pointToleranceM: 1,
       visible: true,
     };
-    const outline = generateSectionResult(project, section).fillOutlines[0]!;
+    const outline = generateSectionResult(project, section).upliftFillOutlines[0]!;
     expect(outline.projected).toBe(true);
     expect(outline.segments).toHaveLength(1);
   });

@@ -9,7 +9,9 @@ export function validateExcavationInstance(
   excavation: ExcavationInstance,
   foundation: FoundationInstance,
   geometry: ExcavationGeometry | null,
-  nowIso: string
+  nowIso: string,
+  /** Thickness of the gravel pad under this foundation, when it has one -- the floor belongs at the pad's bottom. */
+  gravelPadThicknessM?: number
 ): ValidationResult[] {
   const results: ValidationResult[] = [];
 
@@ -50,6 +52,27 @@ export function validateExcavationInstance(
       )} m) is above foundation "${foundation.instanceId}"'s base elevation (${foundation.baseElevation.toFixed(
         3
       )} m); the foundation would not fit in the excavation.`,
+      timestamp: nowIso,
+      dataVersion: CALCULATION_VERSION,
+      status: "open",
+    });
+  }
+
+  if (
+    gravelPadThicknessM !== undefined &&
+    excavation.bottomElevationM > foundation.baseElevation - gravelPadThicknessM + ELEVATION_TOLERANCE_M &&
+    !(excavation.bottomElevationM > foundation.baseElevation + ELEVATION_TOLERANCE_M)
+  ) {
+    results.push({
+      ruleId: "excavation.floor-above-gravel-pad",
+      severity: "warning",
+      affectedObjectIds: [excavation.id, foundation.instanceId],
+      title: "Excavation floor is above the gravel pad bottom",
+      detail: `Excavation "${excavation.id}" bottom (${excavation.bottomElevationM.toFixed(
+        3
+      )} m) is above the bottom of the ${gravelPadThicknessM.toFixed(2)} m gravel pad under foundation "${foundation.instanceId}" (${(
+        foundation.baseElevation - gravelPadThicknessM
+      ).toFixed(3)} m); the pad would not fit. Editing the foundation, pad or excavation floor re-aligns them.`,
       timestamp: nowIso,
       dataVersion: CALCULATION_VERSION,
       status: "open",

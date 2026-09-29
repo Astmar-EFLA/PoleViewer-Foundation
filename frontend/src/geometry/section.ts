@@ -20,6 +20,7 @@ import type { SectionDefinition, SectionPlane } from "../domain/section";
 import type { IndexedTriangle, XYZ } from "./barycentric";
 import { generateExcavationGeometry, type ExcavationGeometry } from "./excavationGeometry";
 import { generateFillGeometry, type FillGeometry } from "./fillGeometry";
+import { excavationForPad, generateGravelPadBox } from "./gravelPadGeometry";
 import { generateFoundationGeometry, type OrientedBox, type OrientedFrustum } from "./foundationGeometry";
 import { generateBoundarySurface } from "./geotechBoundary";
 import { placePoleModelPoint } from "./polePlacement";
@@ -339,6 +340,7 @@ export interface SectionResult {
   readonly poleMembers: readonly SectionPoleMember[];
   readonly foundations: readonly SectionFoundationOutline[];
   readonly excavations: readonly SectionExcavationOutline[];
+  /** Gravel pads (the fill layer, project.fillInstances) -- flat slabs under each foundation. */
   readonly fillOutlines: readonly SectionFillOutline[];
   readonly upliftFillOutlines: readonly SectionFillOutline[];
   readonly geotechBoundaries: readonly SectionBoundaryLine[];
@@ -438,6 +440,25 @@ function fillOutline(
   };
 }
 
+/** The gravel pad under a foundation (the fill layer): a flat box, cut like concrete or projected when the plane misses it. Needs no terrain. */
+function gravelPadOutline(
+  pad: FillInstance,
+  foundation: FoundationInstance,
+  excavationInstances: Project["excavationInstances"],
+  plane: SectionPlane
+): SectionFillOutline {
+  const triangles = orientedBoxTriangles(generateGravelPadBox(pad, foundation, excavationForPad(pad, excavationInstances)));
+  const cut = intersectTrianglesWithPlane(triangles, plane);
+  return {
+    fillId: pad.id,
+    colour: pad.colour,
+    truncated: false,
+    topElevationM: pad.topElevationM,
+    segments: cut.length > 0 ? cut : projectedOutline(triangles, plane),
+    projected: cut.length === 0,
+  };
+}
+
 function boundaryLine(
   id: string,
   name: string,
@@ -498,10 +519,10 @@ export function generateSectionResult(project: Project, section: SectionDefiniti
     .filter((e): e is SectionExcavationOutline => e !== null);
 
   const fillOutlines = project.fillInstances
-    .map((fill) => {
-      const foundation = project.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
+    .map((pad) => {
+      const foundation = project.foundationInstances.find((f) => f.instanceId === pad.foundationInstanceId);
       if (!foundation) return null;
-      return fillOutline(fill, foundation, terrainSurface, plane);
+      return gravelPadOutline(pad, foundation, project.excavationInstances, plane);
     })
     .filter((f): f is SectionFillOutline => f !== null);
 

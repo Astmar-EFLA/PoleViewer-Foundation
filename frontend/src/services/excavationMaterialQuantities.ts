@@ -13,6 +13,7 @@
  * category.
  */
 
+import { gravelPadThicknessFor } from "../domain/fill";
 import type { Project } from "../domain/project";
 import type { VolumeByFoundation } from "./foundationMaterialQuantities";
 import { addVolumeByFoundation } from "./foundationMaterialQuantities";
@@ -83,7 +84,13 @@ export function computeExcavationMaterialQuantities(project: Project): Excavatio
     }
 
     const geometry = generateExcavationGeometry(excavation, foundation, terrainSurface);
-    const validationResults = validateExcavationInstance(excavation, foundation, geometry, nowIso);
+    const validationResults = validateExcavationInstance(
+      excavation,
+      foundation,
+      geometry,
+      nowIso,
+      gravelPadThicknessFor(foundation.instanceId, project.fillInstances)
+    );
     const geometryValid = !hasBlockingExcavationGeometryError(validationResults);
     const volume = computeApproximateVolume(excavation, geometry, terrainSurface, geometryValid);
 

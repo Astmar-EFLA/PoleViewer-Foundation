@@ -1,14 +1,14 @@
 /**
- * A fill's top plate and its own foundation's base face must always be the
- * same elevation -- a foundation is built to rest exactly on top of its own
- * fill, never independently above or below it (mirrors
- * excavationFoundationSync.ts's rationale; see
- * validateFillInstance's "fill.top-below-foundation-base" rule). These two
+ * The fill layer is the gravel pad a foundation sits on: its top and the
+ * foundation's base face must always be the same elevation (see
+ * validateFillInstance's "fill.top-below-foundation-base" rule). These
  * helpers are called from both directions in projectStore.ts so editing
- * either value always pulls the other one to match.
+ * either value always pulls the other one to match; the excavation floor
+ * then follows the pad's bottom (excavationFoundationSync.ts).
  */
 
 import type { FillInstance } from "../domain/fill";
+import { DEFAULT_UPLIFT_FILL_BELOW_TOP_M } from "../domain/fill";
 import type { FoundationInstance } from "../domain/foundation";
 import { generateFoundationGeometry } from "../geometry/foundationGeometry";
 
@@ -39,8 +39,9 @@ export function syncFoundationBaseToFill(
 /**
  * Called after a foundation changes (base elevation, type/parameters --
  * anything that can move `topConnectionPoint.z`) -- pulls every linked
- * uplift-fill's top elevation to match the foundation's own top (pad +
- * pedestal/column), the same way syncFillTopsToFoundations pulls the base
+ * uplift-fill's top elevation to DEFAULT_UPLIFT_FILL_BELOW_TOP_M below the
+ * foundation's own top (so the pedestal stands proud of the backfill), the
+ * same way syncFillTopsToFoundations pulls the base
  * fill's top to match the foundation's *base*. One-directional only: unlike
  * the base fill, there is no `syncFoundationTopToUpliftFill` counterpart --
  * a foundation has no single stored field corresponding to "top of
@@ -56,7 +57,7 @@ export function syncUpliftFillTopsToFoundations(
   return upliftFillInstances.map((fill) => {
     const foundation = foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
     if (!foundation) return fill;
-    const topElevationM = generateFoundationGeometry(foundation).topConnectionPoint.z;
+    const topElevationM = generateFoundationGeometry(foundation).topConnectionPoint.z - DEFAULT_UPLIFT_FILL_BELOW_TOP_M;
     if (topElevationM === fill.topElevationM) return fill;
     return { ...fill, topElevationM };
   });

@@ -77,10 +77,15 @@ export function buildSectionDxf(result: SectionResult, options: SectionDxfOption
     writeSegments(layer, e.segments);
   }
 
-  for (const [baseName, outlines, colour] of [
-    ["FILL", result.fillOutlines, ACI.green],
-    ["UPLIFT-FILL", result.upliftFillOutlines, ACI.olive],
-  ] as const) {
+  // The gravel pad under each foundation: a solid slab, continuous when cut, dashed when projected.
+  for (const pad of result.fillOutlines) {
+    const layer = pad.projected
+      ? doc.addLayer("GRAVEL-PAD-PROJECTED", ACI.green, "DASHED")
+      : doc.addLayer("GRAVEL-PAD", ACI.green);
+    writeSegments(layer, pad.segments);
+  }
+
+  for (const [baseName, outlines, colour] of [["UPLIFT-FILL", result.upliftFillOutlines, ACI.olive]] as const) {
     for (const f of outlines) {
       const suffix = f.projected ? "-PROJECTED" : "";
       const layer = f.truncated

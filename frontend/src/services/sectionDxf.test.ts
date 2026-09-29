@@ -121,7 +121,7 @@ describe("buildSectionDxf", () => {
     expect(dxf).toMatch(/LAYER\r\n2\r\nEXCAVATION-PROJECTED\r\n70\r\n0\r\n62\r\n30\r\n6\r\nDASHED/);
   });
 
-  it("puts projected (off-plane) fill and uplift fill on their own layers", () => {
+  it("puts the gravel pad and uplift fill on their own layers, projected ones separately", () => {
     const { result } = transverseResult();
     const outline = (fillId: string) => ({
       fillId,
@@ -136,10 +136,11 @@ describe("buildSectionDxf", () => {
       { elevationOffsetM: 0, title: "t" }
     );
     const layers = dxfEntities(dxf).filter((e) => e.type === "LINE").map((l) => l.codes.get("8")![0]);
-    expect(layers).toContain("FILL-PROJECTED");
+    expect(layers).toContain("GRAVEL-PAD-PROJECTED");
     expect(layers).toContain("UPLIFT-FILL-PROJECTED");
-    expect(layers).not.toContain("FILL");
+    expect(layers).not.toContain("GRAVEL-PAD");
     expect(layers).not.toContain("UPLIFT-FILL");
+    expect(dxf).toMatch(/LAYER\r\n2\r\nGRAVEL-PAD-PROJECTED\r\n70\r\n0\r\n62\r\n3\r\n6\r\nDASHED/);
   });
 
   it("puts truncated excavations on their own layer", () => {

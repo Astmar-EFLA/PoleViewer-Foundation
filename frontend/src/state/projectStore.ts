@@ -291,7 +291,7 @@ interface ProjectStoreState {
   setFillStyle(fillId: string, style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
   setFillParameters(
     fillId: string,
-    params: Partial<{ topElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope }>
+    params: Partial<{ topElevationM: number; workingSpaceOffsetM: number; sideSlope: SideSlope; padThicknessM: number }>
   ): void;
   setUpliftFillStyle(fillId: string, style: Partial<{ visible: boolean; opacity: number; wireframe: boolean }>): void;
   setUpliftFillParameters(
@@ -812,7 +812,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           ...state.project,
           poleModel,
           foundationInstances,
-          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances, state.project.fillInstances),
           fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
           upliftFillInstances: syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
@@ -1089,7 +1089,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
           // elevation) -- its excavation's floor, its fill's top plate, and
           // its uplift-fill's top (which also follows the foundation's own
           // top, not just its base) must always stay in sync, never drift.
-          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances, state.project.fillInstances),
           fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
           upliftFillInstances: syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
@@ -1120,7 +1120,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         project: {
           ...state.project,
           foundationInstances,
-          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances),
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances, state.project.fillInstances),
           fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
           upliftFillInstances: syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances),
           geometryVersion: state.project.geometryVersion + 1,
@@ -1155,7 +1155,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         project: {
           ...project,
           foundationInstances,
-          excavationInstances: syncExcavationBottomsToFoundations(project.excavationInstances, foundationInstances),
+          excavationInstances: syncExcavationBottomsToFoundations(project.excavationInstances, foundationInstances, project.fillInstances),
           fillInstances: syncFillTopsToFoundations(project.fillInstances, foundationInstances),
           upliftFillInstances: syncUpliftFillTopsToFoundations(project.upliftFillInstances, foundationInstances),
           geometryVersion: project.geometryVersion + 1,
@@ -1287,16 +1287,25 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       // no longer reaches its anchor, validateFoundationInstance's
       // connection-mismatch rule is what surfaces that, not a silent block
       // here.
+      // The foundation sits on the gravel pad on that floor, so its base
+      // lands a pad thickness above it; the pad and uplift fill then follow
+      // the moved foundation.
       const updatedExcavation = excavationInstances.find((e) => e.id === excavationId);
       const foundationInstances =
         params.bottomElevationM !== undefined && updatedExcavation
-          ? syncFoundationBaseToExcavation(state.project.foundationInstances, updatedExcavation)
+          ? syncFoundationBaseToExcavation(state.project.foundationInstances, updatedExcavation, state.project.fillInstances)
           : state.project.foundationInstances;
       return {
         project: {
           ...state.project,
           excavationInstances,
           foundationInstances,
+          fillInstances: syncFillTopsToFoundations(state.project.fillInstances, foundationInstances),
+          // Only a moved foundation re-pulls its uplift fill -- otherwise a hand-edited uplift top is left alone.
+          upliftFillInstances:
+            params.bottomElevationM !== undefined
+              ? syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances)
+              : state.project.upliftFillInstances,
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: new Date().toISOString(),
         },
@@ -1325,11 +1334,19 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         params.topElevationM !== undefined && updatedFill
           ? syncFoundationBaseToFill(state.project.foundationInstances, updatedFill)
           : state.project.foundationInstances;
+      // The fill layer is the gravel pad the foundation sits on: a new pad
+      // top (foundation base) or thickness moves the excavation floor to the
+      // pad's new bottom, and a moved foundation carries its uplift fill.
       return {
         project: {
           ...state.project,
           fillInstances,
           foundationInstances,
+          excavationInstances: syncExcavationBottomsToFoundations(state.project.excavationInstances, foundationInstances, fillInstances),
+          upliftFillInstances:
+            params.topElevationM !== undefined
+              ? syncUpliftFillTopsToFoundations(state.project.upliftFillInstances, foundationInstances)
+              : state.project.upliftFillInstances,
           geometryVersion: state.project.geometryVersion + 1,
           modifiedAt: new Date().toISOString(),
         },

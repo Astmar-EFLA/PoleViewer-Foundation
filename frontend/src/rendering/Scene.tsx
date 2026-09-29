@@ -11,6 +11,8 @@ import type { FixedViewPreset } from "../state/projectStore";
 import { useProjectStore } from "../state/projectStore";
 import { ExcavationMesh } from "./ExcavationMesh";
 import { FillMesh } from "./FillMesh";
+import { GravelPadMesh } from "./GravelPadMesh";
+import { excavationForPad } from "../geometry/gravelPadGeometry";
 import { FoundationMeshes } from "./FoundationMeshes";
 import { GeotechLayers } from "./GeotechLayers";
 import { GroundPointsCloud } from "./GroundPointsCloud";
@@ -227,21 +229,20 @@ export function Scene({ project }: SceneProps) {
           );
         })}
 
-      {terrainSurface &&
-        project.fillInstances.map((fill) => {
-          const foundation = project.foundationInstances.find((f) => f.instanceId === fill.foundationInstanceId);
-          if (!foundation) return null;
-          return (
-            <FillMesh
-              key={fill.id}
-              fill={fill}
-              foundation={foundation}
-              terrainSurface={terrainSurface}
-              viewerFrame={viewerFrame}
-              selected={foundation.instanceId === selectedInstanceId}
-            />
-          );
-        })}
+      {project.fillInstances.map((pad) => {
+        const foundation = project.foundationInstances.find((f) => f.instanceId === pad.foundationInstanceId);
+        if (!foundation) return null;
+        return (
+          <GravelPadMesh
+            key={pad.id}
+            pad={pad}
+            foundation={foundation}
+            excavation={excavationForPad(pad, project.excavationInstances)}
+            viewerFrame={viewerFrame}
+            selected={foundation.instanceId === selectedInstanceId}
+          />
+        );
+      })}
 
       {terrainSurface &&
         project.upliftFillInstances.map((fill) => {
