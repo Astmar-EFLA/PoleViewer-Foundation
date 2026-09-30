@@ -84,8 +84,28 @@ const REQUIRED_COLUMNS = [
 
 const LEG_AXIS_COLUMNS = ["legAEasting", "legANorthing", "legBEasting", "legBNorthing"] as const;
 
-/** Splits one CSV line into fields, honouring double-quoted fields that may contain commas or escaped ("") quotes -- anything beyond that (embedded newlines, alternate delimiters) is out of scope. */
-function splitCsvLine(line: string): string[] {
+export type CsvDelimiter = "," | ";";
+
+/**
+ * Comma, or semicolon for a CSV saved by Excel under Icelandic (and most
+ * other European) regional settings -- which also writes a decimal comma.
+ * Decided from the header row: whichever of the two appears more often
+ * outside quotes.
+ */
+export function detectCsvDelimiter(headerLine: string): CsvDelimiter {
+  let commas = 0;
+  let semicolons = 0;
+  let inQuotes = false;
+  for (const ch of headerLine) {
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (!inQuotes && ch === ",") commas += 1;
+    else if (!inQuotes && ch === ";") semicolons += 1;
+  }
+  return semicolons > commas ? ";" : ",";
+}
+
+/** Splits one CSV line into fields, honouring double-quoted fields that may contain the delimiter or escaped ("") quotes -- anything beyond that (embedded newlines) is out of scope. */
+function splitCsvLine(line: string, delimiter: CsvDelimiter = ","): string[] {
   const fields: string[] = [];
   let field = "";
   let inQuotes = false;
@@ -104,7 +124,7 @@ function splitCsvLine(line: string): string[] {
       }
     } else if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ",") {
+    } else if (ch === delimiter) {
       fields.push(field);
       field = "";
     } else {
@@ -115,16 +135,31 @@ function splitCsvLine(line: string): string[] {
   return fields.map((f) => f.trim());
 }
 
-function parseRequiredNumber(value: string | undefined, columnName: string, rowNumber: number): number | string {
+/** In a semicolon CSV the decimal mark is a comma ("537012,4"); a dot is still accepted. Thousands separators are not -- they surface as an invalid number. */
+function numberText(value: string, delimiter: CsvDelimiter): string {
+  return delimiter === ";" ? value.replace(",", ".") : value;
+}
+
+function parseRequiredNumber(
+  value: string | undefined,
+  columnName: string,
+  rowNumber: number,
+  delimiter: CsvDelimiter
+): number | string {
   if (value === undefined || value.trim() === "") return `row ${rowNumber}: "${columnName}" is required`;
-  const parsed = Number(value);
+  const parsed = Number(numberText(value, delimiter));
   return Number.isFinite(parsed) ? parsed : `row ${rowNumber}: "${columnName}" is not a valid number ("${value}")`;
 }
 
 /** Unlike parseRequiredNumber, a blank/missing value is valid here (returns null) -- these columns are optional per row. */
-function parseOptionalNumber(value: string | undefined, columnName: string, rowNumber: number): number | null | string {
+function parseOptionalNumber(
+  value: string | undefined,
+  columnName: string,
+  rowNumber: number,
+  delimiter: CsvDelimiter
+): number | null | string {
   if (value === undefined || value.trim() === "") return null;
-  const parsed = Number(value);
+  const parsed = Number(numberText(value, delimiter));
   return Number.isFinite(parsed) ? parsed : `row ${rowNumber}: "${columnName}" is not a valid number ("${value}")`;
 }
 
@@ -134,14 +169,15 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
     return { success: false, errors: ["The CSV file is empty."] };
   }
 
-  const header = splitCsvLine(lines[0]!);
+  const delimiter = detectCsvDelimiter(lines[0]!);
+  const header = splitCsvLine(lines[0]!, delimiter);
   const columnIndex = new Map(header.map((name, i) => [name, i]));
   const missingColumns = REQUIRED_COLUMNS.filter((c) => !columnIndex.has(c));
   if (missingColumns.length > 0) {
     return {
       success: false,
       errors: [
-        `Missing required column(s): ${missingColumns.join(", ")}. Expected header: ${REQUIRED_COLUMNS.join(",")}`,
+        `Missing required column(s): ${missingColumns.join(", ")}. Expected header: ${REQUIRED_COLUMNS.join(",")} (comma- or semicolon-separated).`,
       ],
     };
   }
@@ -151,7 +187,7 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
 
   for (let i = 1; i < lines.length; i += 1) {
     const rowNumber = i + 1; // 1-based, matching what a spreadsheet would show
-    const fields = splitCsvLine(lines[i]!);
+    const fields = splitCsvLine(lines[i]!, delimiter);
     const get = (column: string): string | undefined => {
       const idx = columnIndex.get(column);
       return idx === undefined ? undefined : fields[idx];
@@ -167,20 +203,20 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
       errors.push(`row ${rowNumber}: "foundationTypeId" ("${foundationTypeId}") is not a known foundation type`);
     }
 
-    const easting = parseRequiredNumber(get("easting"), "easting", rowNumber);
-    const northing = parseRequiredNumber(get("northing"), "northing", rowNumber);
-    const elevation = parseRequiredNumber(get("elevation"), "elevation", rowNumber);
-    const bearingLayerDepthM = parseRequiredNumber(get("bearingLayerDepthM"), "bearingLayerDepthM", rowNumber);
-    const groundwaterDepthM = parseRequiredNumber(get("groundwaterDepthM"), "groundwaterDepthM", rowNumber);
+    const easting = parseRequiredNumber(get("easting"), "easting", rowNumber, delimiter);
+    const northing = parseRequiredNumber(get("northing"), "northing", rowNumber, delimiter);
+    const elevation = parseRequiredNumber(get("elevation"), "elevation", rowNumber, delimiter);
+    const bearingLayerDepthM = parseRequiredNumber(get("bearingLayerDepthM"), "bearingLayerDepthM", rowNumber, delimiter);
+    const groundwaterDepthM = parseRequiredNumber(get("groundwaterDepthM"), "groundwaterDepthM", rowNumber, delimiter);
 
     for (const v of [easting, northing, elevation, bearingLayerDepthM, groundwaterDepthM]) {
       if (typeof v === "string") errors.push(v);
     }
 
-    const legAEasting = parseOptionalNumber(get("legAEasting"), "legAEasting", rowNumber);
-    const legANorthing = parseOptionalNumber(get("legANorthing"), "legANorthing", rowNumber);
-    const legBEasting = parseOptionalNumber(get("legBEasting"), "legBEasting", rowNumber);
-    const legBNorthing = parseOptionalNumber(get("legBNorthing"), "legBNorthing", rowNumber);
+    const legAEasting = parseOptionalNumber(get("legAEasting"), "legAEasting", rowNumber, delimiter);
+    const legANorthing = parseOptionalNumber(get("legANorthing"), "legANorthing", rowNumber, delimiter);
+    const legBEasting = parseOptionalNumber(get("legBEasting"), "legBEasting", rowNumber, delimiter);
+    const legBNorthing = parseOptionalNumber(get("legBNorthing"), "legBNorthing", rowNumber, delimiter);
 
     for (const v of [legAEasting, legANorthing, legBEasting, legBNorthing]) {
       if (typeof v === "string") errors.push(v);
@@ -233,3 +269,10 @@ export function parseLineMastCsv(text: string): ParseResult<LineMastRow[]> {
   }
   return { success: true, data: rows };
 }
+
+/**
+ * The shipped example line CSV (docs/line-csv-template.csv, every column,
+ * three example masts) -- offered as a download in the Line panel, and
+ * parsed by a test so it never drifts from this parser.
+ */
+export { default as LINE_CSV_TEMPLATE } from "../../../docs/line-csv-template.csv?raw";

@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
+import { downloadText } from "../services/browserDownload";
+import { LINE_CSV_TEMPLATE } from "../services/csvParsing";
 import type { BatchExportMastStatus } from "../state/projectStore";
 import { useProjectStore } from "../state/projectStore";
 
@@ -102,10 +104,22 @@ export function LinePanel() {
           without it falls back to whichever point cloud is currently registered on the project). Also optional:
           foundationTypeId -- overrides this mast's leg foundation type (e.g. "stepped-rectangular-v1"), matching
           an id in the foundation library; a mast without it uses the app's default leg foundation type.
+          Comma- or semicolon-separated; a semicolon file (Excel with Icelandic regional settings) may use a
+          decimal comma.
         </div>
-        <button type="button" style={buttonStyle} onClick={() => csvInputRef.current?.click()}>
-          Choose line CSV...
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button type="button" style={buttonStyle} onClick={() => csvInputRef.current?.click()}>
+            Choose line CSV...
+          </button>
+          <button
+            type="button"
+            style={buttonStyle}
+            title="An example line CSV with every column filled in for one mast (docs/line-csv-template.csv)"
+            onClick={() => downloadText(LINE_CSV_TEMPLATE, "line-csv-template.csv", "text/csv")}
+          >
+            Download template
+          </button>
+        </div>
         <input
           ref={csvInputRef}
           type="file"

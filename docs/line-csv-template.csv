@@ -1,0 +1,4 @@
+mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM,legAEasting,legANorthing,legBEasting,legBNorthing,pointCloudPath,foundationTypeId
+10,537012.40,578291.75,251.30,BS/10-BS-19_21.pol,1.5,3.0,537004.21,578285.07,537020.59,578298.43,LAS/mastur-10.las,B170-155x155
+11,537190.10,578402.30,248.85,BS/11-BS-21_21.pol,2.0,2.5,,,,,LAS/mastur-11.las,C120-160x160
+12,537366.90,578513.60,246.10,BS/12-BS-19_21.pol,1.2,4.0,,,,,,

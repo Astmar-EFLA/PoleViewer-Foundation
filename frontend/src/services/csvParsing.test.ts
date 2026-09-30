@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLineMastCsv } from "./csvParsing";
+import { LINE_CSV_TEMPLATE, parseLineMastCsv } from "./csvParsing";
 
 const VALID_CSV = [
   "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM",
@@ -169,5 +169,61 @@ describe("parseLineMastCsv", () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.errors.some((e) => e.includes("row 2") && e.includes("foundationTypeId"))).toBe(true);
+  });
+});
+
+describe("parseLineMastCsv: semicolon CSV (Excel with Icelandic regional settings)", () => {
+  const SEMICOLON_CSV = [
+    "mastName;easting;northing;elevation;modelPath;bearingLayerDepthM;groundwaterDepthM;legAEasting;legANorthing;legBEasting;legBNorthing;pointCloudPath;foundationTypeId",
+    "10;537012,4;578291,75;251,3;BS/10-BS-19_21.pol;1,5;3;537004,21;578285,07;537020,59;578298,43;LAS/mastur-10.las;B170-155x155",
+    // A dot decimal is still accepted in a semicolon file, and optional columns may be blank.
+    "11;537190.1;578402.3;248.85;BS/11-BS-21_21.pol;2;2.5;;;;;;",
+  ].join("\r\n");
+
+  it("detects the delimiter from the header and reads decimal commas", () => {
+    const result = parseLineMastCsv(SEMICOLON_CSV);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const [ten, eleven] = result.data;
+    expect(ten!.position).toEqual({ space: "project", easting: 537012.4, northing: 578291.75, elevation: 251.3 });
+    expect(ten!.bearingLayerDepthM).toBe(1.5);
+    expect(ten!.legAxis).toEqual({ a: { easting: 537004.21, northing: 578285.07 }, b: { easting: 537020.59, northing: 578298.43 } });
+    expect(ten!.pointCloudPath).toBe("LAS/mastur-10.las");
+    expect(ten!.foundationTypeId).toBe("B170-155x155");
+    expect(eleven!.position.easting).toBe(537190.1);
+    expect(eleven!.legAxis).toBeNull();
+  });
+
+  it("reports a thousands-separated number as invalid rather than misreading it", () => {
+    const csv = [
+      "mastName;easting;northing;elevation;modelPath;bearingLayerDepthM;groundwaterDepthM",
+      "10;537.012,4;578291,75;251,3;BS/10.pol;1,5;3",
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.errors.join(" ")).toContain('"easting" is not a valid number');
+  });
+
+  it("still reads a comma CSV whose quoted field contains a semicolon", () => {
+    const csv = [
+      "mastName,easting,northing,elevation,modelPath,bearingLayerDepthM,groundwaterDepthM",
+      '"10; LP",537012.4,578291.75,251.3,BS/10.pol,1.5,3',
+    ].join("\n");
+    const result = parseLineMastCsv(csv);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]!.mastName).toBe("10; LP");
+  });
+});
+
+describe("docs/line-csv-template.csv", () => {
+  it("is a valid line CSV with every column (so the shipped template never drifts from the parser)", () => {
+    const result = parseLineMastCsv(LINE_CSV_TEMPLATE);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.length).toBeGreaterThan(0);
+    expect(result.data.some((m) => m.legAxis && m.pointCloudPath && m.foundationTypeId)).toBe(true);
   });
 });
