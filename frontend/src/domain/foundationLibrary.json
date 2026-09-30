@@ -32,9 +32,21 @@
     "defaultParameters": {
       "geometryType": "stepped-rectangular",
       "steps": [
-        { "width": 2.2, "length": 2.2, "height": 0.4 },
-        { "width": 1.4, "length": 1.4, "height": 0.4 },
-        { "width": 0.6, "length": 0.6, "height": 0.6 }
+        {
+          "width": 2.2,
+          "length": 2.2,
+          "height": 0.4
+        },
+        {
+          "width": 1.4,
+          "length": 1.4,
+          "height": 0.4
+        },
+        {
+          "width": 0.6,
+          "length": 0.6,
+          "height": 0.6
+        }
       ]
     },
     "defaultColour": "#9aa5b1",
@@ -60,7 +72,7 @@
       "frustumHeight": 0.5,
       "pedestalWidth": 0.4,
       "pedestalLength": 0.4,
-      "pedestalHeight": 1.0
+      "pedestalHeight": 1
     },
     "defaultColour": "#9aa5b1",
     "defaultOpacity": 1,
@@ -79,8 +91,8 @@
     "units": "m",
     "defaultParameters": {
       "geometryType": "rectangular-pad-pedestal",
-      "padWidth": 1.0,
-      "padLength": 1.0,
+      "padWidth": 1,
+      "padLength": 1,
       "padThickness": 0.6,
       "pedestalWidth": 0.4,
       "pedestalLength": 0.4,
@@ -97,7 +109,7 @@
   },
   {
     "foundationTypeId": "C120-160x160",
-    "name": "Hólasandslína 3 C120-160x160",
+    "name": "C120-160x160",
     "description": "Precast pad foundation with a tapered transition and a vertical, centred pedestal.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -124,7 +136,7 @@
   },
   {
     "foundationTypeId": "CA120-160x160",
-    "name": "Hólasandslína 3 CA120-160x160",
+    "name": "CA120-160x160",
     "description": "As the matching C type, plus a cast-in guy loop (Staglykkja 03); the concrete geometry is identical.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -151,7 +163,7 @@
   },
   {
     "foundationTypeId": "C180-160x160",
-    "name": "Hólasandslína 3 C180-160x160",
+    "name": "C180-160x160",
     "description": "Precast pad foundation with a tapered transition and a vertical, centred pedestal.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -178,7 +190,7 @@
   },
   {
     "foundationTypeId": "CA180-160x160",
-    "name": "Hólasandslína 3 CA180-160x160",
+    "name": "CA180-160x160",
     "description": "As the matching C type, plus a cast-in guy loop (Staglykkja 03); the concrete geometry is identical.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -205,14 +217,14 @@
   },
   {
     "foundationTypeId": "C180-200x200",
-    "name": "Hólasandslína 3 C180-200x200",
+    "name": "C180-200x200",
     "description": "Precast pad foundation with a tapered transition and a vertical, centred pedestal.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
       "geometryType": "rectangular-pad-tapered-pedestal",
-      "padWidth": 2.0,
-      "padLength": 2.0,
+      "padWidth": 2,
+      "padLength": 2,
       "padThickness": 0.4,
       "frustumHeight": 0.2,
       "pedestalWidth": 0.5,
@@ -232,14 +244,14 @@
   },
   {
     "foundationTypeId": "CA180-200x200",
-    "name": "Hólasandslína 3 CA180-200x200",
+    "name": "CA180-200x200",
     "description": "As the matching C type, plus a cast-in guy loop (Staglykkja 03); the concrete geometry is identical.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
     "defaultParameters": {
       "geometryType": "rectangular-pad-tapered-pedestal",
-      "padWidth": 2.0,
-      "padLength": 2.0,
+      "padWidth": 2,
+      "padLength": 2,
       "padThickness": 0.4,
       "frustumHeight": 0.2,
       "pedestalWidth": 0.5,
@@ -259,7 +271,7 @@
   },
   {
     "foundationTypeId": "B120-135x135",
-    "name": "Hólasandslína 3 B120-135x135",
+    "name": "B120-135x135",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -288,7 +300,7 @@
   },
   {
     "foundationTypeId": "B170-135x135",
-    "name": "Hólasandslína 3 B170-135x135",
+    "name": "B170-135x135",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -317,7 +329,7 @@
   },
   {
     "foundationTypeId": "B220-135x135",
-    "name": "Hólasandslína 3 B220-135x135",
+    "name": "B220-135x135",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -346,7 +358,7 @@
   },
   {
     "foundationTypeId": "B120-155x155",
-    "name": "Hólasandslína 3 B120-155x155",
+    "name": "B120-155x155",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -375,7 +387,7 @@
   },
   {
     "foundationTypeId": "B170-155x155",
-    "name": "Hólasandslína 3 B170-155x155",
+    "name": "B170-155x155",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -404,7 +416,7 @@
   },
   {
     "foundationTypeId": "B220-155x155",
-    "name": "Hólasandslína 3 B220-155x155",
+    "name": "B220-155x155",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -433,7 +445,7 @@
   },
   {
     "foundationTypeId": "B220-250x250",
-    "name": "Hólasandslína 3 B220-250x250",
+    "name": "B220-250x250",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -462,7 +474,7 @@
   },
   {
     "foundationTypeId": "B270-250x250",
-    "name": "Hólasandslína 3 B270-250x250",
+    "name": "B270-250x250",
     "description": "Precast pad foundation with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
@@ -491,7 +503,7 @@
   },
   {
     "foundationTypeId": "F175-155x155",
-    "name": "Hólasandslína 3 F175-155x155",
+    "name": "F175-155x155",
     "description": "Precast pad foundation (300 mm pad) with a tapered transition; the pedestal leans 1:8 toward the tower and sits off-centre.",
     "geometryType": "rectangular-pad-tapered-pedestal",
     "units": "m",
