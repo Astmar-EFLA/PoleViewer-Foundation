@@ -5,6 +5,9 @@ export const pointCloudSourceReferenceSchema = z.object({
   filePath: z.string().min(1),
   crs: crsSchema,
   contentHash: z.string().nullable(),
+  kind: z.enum(["point-cloud", "dem"]).optional(),
+  heightReference: z.enum(["orthometric", "ellipsoidal"]).optional(),
+  geoidHeightM: z.number().finite().optional(),
 });
 
 const rectangularClipBoundarySettingsSchema = z.object({

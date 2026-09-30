@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.schemas.workspace import FileStatusRequest, FileStatusResult, UploadResult
 from app.services.limits import (
     ProcessingLimitError,
+    check_dem_extension,
     check_file_size,
     check_line_centreline_extension,
     check_orthophoto_image_extension,
@@ -51,6 +52,7 @@ _EXTENSION_CHECK_BY_KIND = {
     "line-centreline": check_line_centreline_extension,
     "orthophoto-image": check_orthophoto_image_extension,
     "orthophoto-world-file": check_orthophoto_world_file_extension,
+    "dem": check_dem_extension,
 }
 
 
@@ -58,7 +60,7 @@ _EXTENSION_CHECK_BY_KIND = {
 async def upload(
     file: UploadFile = File(...),
     kind: Literal[
-        "pole-model", "point-cloud", "line-centreline", "orthophoto-image", "orthophoto-world-file"
+        "pole-model", "point-cloud", "line-centreline", "orthophoto-image", "orthophoto-world-file", "dem"
     ] = Form(...),
 ) -> UploadResult:
     """

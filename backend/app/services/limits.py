@@ -75,6 +75,13 @@ def check_point_cloud_extension(path: Path) -> None:
     _check_extension(path, ALLOWED_POINT_CLOUD_EXTENSIONS, "point-cloud")
 
 
+ALLOWED_DEM_EXTENSIONS = {".tif", ".tiff"}
+
+
+def check_dem_extension(path: Path) -> None:
+    _check_extension(path, ALLOWED_DEM_EXTENSIONS, "DEM")
+
+
 ALLOWED_POLE_MODEL_EXTENSIONS = {".pol"}
 
 

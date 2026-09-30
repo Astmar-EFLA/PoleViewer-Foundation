@@ -1,5 +1,16 @@
 import type { CoordinateReferenceSystem } from "./coordinates";
 
+/** What a terrain source file is: a LAS/LAZ point cloud, or a DEM elevation raster (GeoTIFF). */
+export type TerrainSourceKind = "point-cloud" | "dem";
+
+/** What a DEM's values are: height above sea level, or above the ellipsoid (e.g. ArcticDEM) -- which needs the geoid height N. */
+export type DemHeightReference = "orthometric" | "ellipsoidal";
+
+/** A DEM is recognised by its file extension; everything else is treated as a point cloud (the backend checks the extension either way). */
+export function terrainSourceKindForPath(filePath: string): TerrainSourceKind {
+  return /\.tiff?$/i.test(filePath) ? "dem" : "point-cloud";
+}
+
 /**
  * A registered point-cloud source file. `filePath` is workspace-relative,
  * matching the backend's workspace-root security model (never an absolute
@@ -16,6 +27,12 @@ export interface PointCloudSourceReference {
    * field existed, or before the backend has ever been reached).
    */
   readonly contentHash: string | null;
+  /** Absent in projects saved before DEM support: a point cloud. */
+  readonly kind?: TerrainSourceKind;
+  /** DEM only. Absent: orthometric. */
+  readonly heightReference?: DemHeightReference;
+  /** DEM only: geoid height N at the site, m, subtracted from ellipsoidal heights (H = h - N). */
+  readonly geoidHeightM?: number;
 }
 
 export interface RectangularClipBoundarySettings {

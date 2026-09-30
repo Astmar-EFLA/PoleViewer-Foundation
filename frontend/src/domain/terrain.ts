@@ -24,6 +24,8 @@ export interface TerrainSurface {
   /** ISO 8601 */
   readonly generatedAt: string;
   readonly terrainVersion: string;
+  /** Where the points came from. Absent in projects saved before DEM support (a point cloud). A DEM's vertices are cell values, not measured points. */
+  readonly source?: { readonly kind: "point-cloud" | "dem"; readonly filePath: string };
 }
 
 export type ElevationQuerySource = "point" | "interpolated" | "no-data";

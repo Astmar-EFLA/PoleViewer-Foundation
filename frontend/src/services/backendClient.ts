@@ -1,10 +1,12 @@
 import type { CoordinateReferenceSystem, ProjectCoordinate } from "../domain/coordinates";
 import type { PoleModel } from "../domain/poleModel";
-import type { ProcessingWarning, RectangularClipBoundarySettings } from "../domain/pointCloud";
+import type { DemHeightReference, ProcessingWarning, RectangularClipBoundarySettings } from "../domain/pointCloud";
 import {
   parseClipResult,
+  parseDemMetadata,
   parsePointCloudMetadata,
   type BackendClipResult,
+  type BackendDemMetadata,
   type BackendPointCloudMetadata,
 } from "../validation/backendPointCloudSchema";
 import {
@@ -121,7 +123,13 @@ async function postFormData(path: string, formData: FormData, baseUrl: string, s
   return json;
 }
 
-export type UploadKind = "pole-model" | "point-cloud" | "line-centreline" | "orthophoto-image" | "orthophoto-world-file";
+export type UploadKind =
+  | "pole-model"
+  | "point-cloud"
+  | "dem"
+  | "line-centreline"
+  | "orthophoto-image"
+  | "orthophoto-world-file";
 
 /**
  * Uploads a file picked via a native file-open dialog into the backend's
@@ -187,9 +195,37 @@ export async function requestClip(
   baseUrl: string = DEFAULT_BACKEND_BASE_URL,
   signal?: AbortSignal
 ): Promise<BackendClipResult> {
+  return postClip("/pointcloud/clip", request, baseUrl, signal);
+}
+
+/** A DEM clip request: the point-cloud one without classification/decimation, plus what the DEM's heights are. */
+export interface DemClipRequestBody {
+  readonly filePath: string;
+  readonly projectCrs: CoordinateReferenceSystem;
+  readonly localFrame: ClipRequestBody["localFrame"];
+  readonly boundary: ClipRequestBody["boundary"];
+  readonly heightReference: DemHeightReference;
+  readonly geoidHeightM: number | null;
+}
+
+/** /dem/clip returns the same ClipResult (and the same blocked-422 shape) as /pointcloud/clip. */
+export async function requestDemClip(
+  request: DemClipRequestBody,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL,
+  signal?: AbortSignal
+): Promise<BackendClipResult> {
+  return postClip("/dem/clip", request, baseUrl, signal);
+}
+
+async function postClip(
+  path: string,
+  request: ClipRequestBody | DemClipRequestBody,
+  baseUrl: string,
+  signal?: AbortSignal
+): Promise<BackendClipResult> {
   let json: unknown;
   try {
-    json = await postJson("/pointcloud/clip", request, baseUrl, signal);
+    json = await postJson(path, request, baseUrl, signal);
   } catch (error) {
     if (error instanceof BackendRequestError && error.status === 422) {
       const warnings = blockedWarningsFromResponseBody(error.body);
@@ -212,6 +248,18 @@ export async function requestInspect(
   const parsed = parsePointCloudMetadata(json);
   if (!parsed.success) {
     throw new BackendRequestError(`Backend inspect response failed validation: ${parsed.errors.join("; ")}`);
+  }
+  return parsed.data;
+}
+
+export async function requestDemInspect(
+  filePath: string,
+  baseUrl: string = DEFAULT_BACKEND_BASE_URL
+): Promise<BackendDemMetadata> {
+  const json = await postJson("/dem/inspect", { filePath }, baseUrl);
+  const parsed = parseDemMetadata(json);
+  if (!parsed.success) {
+    throw new BackendRequestError(`Backend DEM inspect response failed validation: ${parsed.errors.join("; ")}`);
   }
   return parsed.data;
 }

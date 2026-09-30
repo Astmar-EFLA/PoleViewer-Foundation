@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { useRef, useState } from "react";
+import type { DemHeightReference } from "../domain/pointCloud";
 import { useProjectStore } from "../state/projectStore";
 
 const SEVERITY_COLOUR: Record<string, string> = {
@@ -43,6 +44,7 @@ export function TerrainPanel() {
   const setClipBoundary = useProjectStore((s) => s.setClipBoundary);
   const regeneration = useProjectStore((s) => s.terrainRegeneration);
   const regenerate = useProjectStore((s) => s.regenerateTerrainFromPointCloud);
+  const setDemHeightReference = useProjectStore((s) => s.setDemHeightReference);
   const cancelRegeneration = useProjectStore((s) => s.cancelTerrainRegeneration);
   const orthophoto = useProjectStore((s) => s.project?.orthophoto);
   const orthophotoRegistration = useProjectStore((s) => s.orthophotoRegistration);
@@ -73,8 +75,43 @@ export function TerrainPanel() {
   return (
     <div>
       <div style={{ opacity: 0.75, marginBottom: 8, wordBreak: "break-all" }}>
-        Source: {pointCloudSource.filePath}
+        Source ({pointCloudSource.kind === "dem" ? "DEM" : "point cloud"}): {pointCloudSource.filePath}
       </div>
+
+      {pointCloudSource.kind === "dem" && (
+        <div style={clipFieldsStyle}>
+          <div style={{ opacity: 0.8, marginBottom: 4 }}>DEM heights</div>
+          <select
+            value={pointCloudSource.heightReference ?? "orthometric"}
+            onChange={(e) =>
+              setDemHeightReference(e.target.value as DemHeightReference, pointCloudSource.geoidHeightM ?? null)
+            }
+            style={{ width: "100%", fontSize: 11, marginBottom: 4 }}
+          >
+            <option value="orthometric">Height above sea level (e.g. ÍslandsDEM, Markhöjdmodell)</option>
+            <option value="ellipsoidal">Ellipsoidal height (e.g. ArcticDEM)</option>
+          </select>
+          {pointCloudSource.heightReference === "ellipsoidal" && (
+            <label style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ opacity: 0.8 }}>Geoid height N (m)</span>
+              <input
+                type="number"
+                step={0.01}
+                value={pointCloudSource.geoidHeightM ?? ""}
+                onChange={(e) =>
+                  setDemHeightReference("ellipsoidal", e.target.value === "" ? null : Number(e.target.value))
+                }
+                style={{ width: 80 }}
+              />
+            </label>
+          )}
+          <div style={{ opacity: 0.55, fontSize: 10 }}>
+            {pointCloudSource.heightReference === "ellipsoidal"
+              ? "Heights above sea level are taken as H = h - N. Look up N for the site in the national geoid model (Iceland: ISH2004, about 60-70 m; Sweden: SWEN17)."
+              : "Each DEM cell becomes one terrain point at its own value. A surface model (DSM) includes trees and buildings."}
+          </div>
+        </div>
+      )}
 
       <div style={clipFieldsStyle}>
         <div style={{ opacity: 0.8, marginBottom: 4 }}>
@@ -188,7 +225,11 @@ export function TerrainPanel() {
           disabled={regeneration.status === "loading"}
           style={{ flex: 1, padding: "6px 8px", cursor: "pointer" }}
         >
-          {regeneration.status === "loading" ? "Generating..." : "Regenerate from point cloud"}
+          {regeneration.status === "loading"
+            ? "Generating..."
+            : pointCloudSource.kind === "dem"
+              ? "Regenerate from DEM"
+              : "Regenerate from point cloud"}
         </button>
         {regeneration.status === "loading" && (
           <button type="button" onClick={cancelRegeneration} style={{ padding: "6px 8px", cursor: "pointer" }}>

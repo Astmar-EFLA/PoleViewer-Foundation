@@ -8,7 +8,7 @@ import type {
 import type { TerrainPoint, TerrainSurface } from "../domain/terrain";
 import { measureSync } from "../geometry/perf";
 import { generateTin } from "../geometry/terrain";
-import { DEFAULT_BACKEND_BASE_URL, requestClip } from "./backendClient";
+import { DEFAULT_BACKEND_BASE_URL, requestClip, requestDemClip } from "./backendClient";
 
 export interface TerrainGenerationResult {
   readonly terrainSurface: TerrainSurface;
@@ -33,6 +33,10 @@ export interface TerrainGenerationProjectContext {
  * (geometry/terrain.ts) on the returned, already-local-coordinate points.
  * The backend's own warnings (CRS issues, empty clip, etc.) are passed
  * through unmodified -- this function does not swallow or reinterpret them.
+ *
+ * A DEM source (source.kind "dem", a GeoTIFF) goes to /dem/clip instead,
+ * which returns its cells as the same clip result -- so everything after
+ * the request (TIN, excavation, sections, DXF) is identical for both.
  */
 export async function generateTerrainFromPointCloud(
   project: TerrainGenerationProjectContext,
@@ -42,21 +46,32 @@ export async function generateTerrainFromPointCloud(
   baseUrl: string = DEFAULT_BACKEND_BASE_URL,
   signal?: AbortSignal
 ): Promise<TerrainGenerationResult> {
-  const clipResult = await requestClip(
-    {
-      filePath: source.filePath,
-      projectCrs: project.crs,
-      localFrame: {
-        mastCentreProject: project.mastCentreProject,
-        lineBearingRadians: project.lineBearingRadians,
-      },
-      boundary: { shape: "rectangular", ...settings.clipBoundary },
-      classificationFilter: settings.classificationFilter as number[] | null,
-      decimationStep: settings.decimationStep,
+  const common = {
+    filePath: source.filePath,
+    projectCrs: project.crs,
+    localFrame: {
+      mastCentreProject: project.mastCentreProject,
+      lineBearingRadians: project.lineBearingRadians,
     },
-    baseUrl,
-    signal
-  );
+    boundary: { shape: "rectangular" as const, ...settings.clipBoundary },
+  };
+  const sourceKind = source.kind ?? "point-cloud";
+  const clipResult =
+    sourceKind === "dem"
+      ? await requestDemClip(
+          { ...common, heightReference: source.heightReference ?? "orthometric", geoidHeightM: source.geoidHeightM ?? null },
+          baseUrl,
+          signal
+        )
+      : await requestClip(
+          {
+            ...common,
+            classificationFilter: settings.classificationFilter as number[] | null,
+            decimationStep: settings.decimationStep,
+          },
+          baseUrl,
+          signal
+        );
 
   const groundPoints: TerrainPoint[] = clipResult.points.map((p) => ({ x: p.x, y: p.y, z: p.z }));
 
@@ -69,7 +84,7 @@ export async function generateTerrainFromPointCloud(
   );
 
   return {
-    terrainSurface,
+    terrainSurface: { ...terrainSurface, source: { kind: sourceKind, filePath: source.filePath } },
     warnings: clipResult.warnings,
     classificationCounts: clipResult.classificationCounts,
     sourcePointCount: clipResult.sourcePointCount,

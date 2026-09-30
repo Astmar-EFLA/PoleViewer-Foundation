@@ -40,3 +40,27 @@ describe("buildEngineeringSummary", () => {
     expect(labels).toContain("Line bearing");
   });
 });
+
+describe("buildEngineeringSummary: terrain source", () => {
+  it("names a DEM source with its heights and flags a DEM-built terrain surface as derived", () => {
+    const demo = buildSyntheticDemoProject();
+    const project = {
+      ...demo,
+      pointCloudSource: {
+        filePath: "DEM/arctic.tif",
+        crs: { kind: "epsg" as const, epsgCode: 3413 },
+        contentHash: null,
+        kind: "dem" as const,
+        heightReference: "ellipsoidal" as const,
+        geoidHeightM: 64.5,
+      },
+      terrainSurface: demo.terrainSurface ? { ...demo.terrainSurface, source: { kind: "dem" as const, filePath: "DEM/arctic.tif" } } : null,
+    };
+    const config = buildEngineeringSummary(project).projectConfiguration;
+    const source = config.find((e) => e.label === "Terrain source (DEM)");
+    expect(source?.value).toContain("ellipsoidal heights, geoid N = 64.50 m");
+    if (project.terrainSurface) {
+      expect(config.find((e) => e.label === "Terrain surface")?.value).toContain("not measured points");
+    }
+  });
+});

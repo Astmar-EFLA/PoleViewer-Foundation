@@ -31,6 +31,7 @@ from app.schemas.pointcloud import (
     ProcessingWarning,
 )
 from app.services.limits import max_returned_point_count
+from app.validation.coverage import mast_outside_extent_warning
 from app.validation.pointcloud_validation import crs_consistency_warnings
 
 
@@ -65,6 +66,15 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
     metadata = inspect_las(file_path)
     warnings: list[ProcessingWarning] = list(metadata.warnings)
     warnings.extend(crs_consistency_warnings(metadata.crs, request.project_crs))
+
+    bounds = metadata.bounds_project
+    mast = request.local_frame.mast_centre_project
+    outside = mast_outside_extent_warning(
+        "pointcloud", "point cloud", bounds.min_easting, bounds.max_easting, bounds.min_northing, bounds.max_northing,
+        mast.easting, mast.northing,
+    )
+    if outside:
+        warnings.append(outside)
 
     blocking = [w for w in warnings if w.severity == "blocking"]
     if blocking:

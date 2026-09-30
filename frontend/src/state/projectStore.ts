@@ -1,13 +1,26 @@
 import { create } from "zustand";
 import { localCoordinate } from "../domain/coordinates";
-import type { LocalCoordinate, LocalFrameDefinition, ProjectCoordinate } from "../domain/coordinates";
+import type {
+  CoordinateReferenceSystem,
+  ElevationReferenceType,
+  LocalCoordinate,
+  LocalFrameDefinition,
+  ProjectCoordinate,
+} from "../domain/coordinates";
 import { localToProject } from "../geometry/coordinateTransform";
 import type { SideSlope } from "../domain/excavation";
 import type { FoundationParameters } from "../domain/foundation";
 import { requireFoundationTypeById } from "../domain/foundationLibrary";
 import type { BoundaryDefinition, GeotechLayer } from "../domain/geotech";
 import type { Measurement, MeasurementKind, MeasurementPointRecord } from "../domain/measurement";
-import type { ClassificationCount, ProcessingWarning, RectangularClipBoundarySettings } from "../domain/pointCloud";
+import type {
+  ClassificationCount,
+  DemHeightReference,
+  PointCloudSourceReference,
+  ProcessingWarning,
+  RectangularClipBoundarySettings,
+} from "../domain/pointCloud";
+import { terrainSourceKindForPath } from "../domain/pointCloud";
 import type { Project, ProjectLayerStyles } from "../domain/project";
 import type { SectionDefinition, SectionMode, SectionPlane } from "../domain/section";
 import type { ElevationQuerySource } from "../domain/terrain";
@@ -27,6 +40,7 @@ import {
   DEFAULT_BACKEND_BASE_URL,
   requestCentreline,
   requestFileStatus,
+  requestDemInspect,
   requestInspect,
   requestOrthophotoRegister,
   requestPoleModelImport,
@@ -249,6 +263,11 @@ interface ProjectStoreState {
   setSectionsPanelOpen(open: boolean): void;
   setProjectNotes(notes: string): void;
   setMastCentreProject(mastCentreProject: ProjectCoordinate): void;
+  /** The project's horizontal CRS -- what the mast centre, line CSV and point-cloud/DEM coordinates are in. Relabels only: no coordinates are transformed. */
+  setProjectCrs(crs: CoordinateReferenceSystem): void;
+  /** DEM sources only: what the raster's heights are, and the site's geoid height N (m) for ellipsoidal heights. */
+  setDemHeightReference(heightReference: DemHeightReference, geoidHeightM: number | null): void;
+  setElevationReferenceType(elevationReferenceType: ElevationReferenceType): void;
   setLineBearingRadians(lineBearingRadians: number): void;
   setPoleModelHeightOffset(localOriginZ: number): void;
   checkPointCloudAssetStatus(baseUrl?: string): Promise<void>;
@@ -362,6 +381,37 @@ function applyOrthophotoResult(imagePath: string, result: BackendOrthophotoRegis
  * pipeline) happen in geometry/services functions called by these actions,
  * never inline in a component body beyond calling those functions.
  */
+/** A point cloud's or DEM's own CRS, by file extension (the backend inspects either). */
+async function inspectTerrainSourceCrs(filePath: string, baseUrl: string): Promise<CoordinateReferenceSystem> {
+  return terrainSourceKindForPath(filePath) === "dem"
+    ? (await requestDemInspect(filePath, baseUrl)).crs
+    : (await requestInspect(filePath, baseUrl)).crs;
+}
+
+/**
+ * The terrain source reference for a newly registered file. A DEM keeps the
+ * previous DEM's height reference / geoid height -- the next tile of the
+ * same dataset (e.g. per-mast pointCloudPath in a batch) has the same
+ * heights -- so a batch run doesn't silently fall back to orthometric.
+ */
+function terrainSourceReference(
+  filePath: string,
+  crs: CoordinateReferenceSystem,
+  previous: PointCloudSourceReference | null
+): PointCloudSourceReference {
+  const kind = terrainSourceKindForPath(filePath);
+  if (kind !== "dem") return { filePath, crs, contentHash: null, kind };
+  const carried = previous?.kind === "dem" ? previous : null;
+  return {
+    filePath,
+    crs,
+    contentHash: null,
+    kind,
+    heightReference: carried?.heightReference ?? "orthometric",
+    ...(carried?.geoidHeightM !== undefined ? { geoidHeightM: carried.geoidHeightM } : {}),
+  };
+}
+
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   project: null,
   hover: null,
@@ -452,19 +502,20 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     if (!get().project) return;
     set({ pointCloudRegistration: { status: "loading", errorMessage: null } });
     try {
-      const uploaded = await requestUpload(file, "point-cloud", baseUrl);
+      const kind = terrainSourceKindForPath(file.name);
+      const uploaded = await requestUpload(file, kind === "dem" ? "dem" : "point-cloud", baseUrl);
       // Read the file's own CRS from its header rather than assuming it
       // matches the project's -- if it doesn't, the existing clip-blocked
       // safety net (BackendClipBlockedError) is what catches that, not
       // anything decided here.
-      const metadata = await requestInspect(uploaded.filePath, baseUrl);
+      const crs = await inspectTerrainSourceCrs(uploaded.filePath, baseUrl);
       const nowIso = new Date().toISOString();
       set((state) => {
         if (!state.project) return {};
         return {
           project: {
             ...state.project,
-            pointCloudSource: { filePath: uploaded.filePath, crs: metadata.crs, contentHash: null },
+            pointCloudSource: terrainSourceReference(uploaded.filePath, crs, state.project.pointCloudSource),
             modifiedAt: nowIso,
           },
           pointCloudRegistration: { status: "success", errorMessage: null },
@@ -485,14 +536,14 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     if (!get().project) return;
     set({ pointCloudRegistration: { status: "loading", errorMessage: null } });
     try {
-      const metadata = await requestInspect(path, baseUrl);
+      const crs = await inspectTerrainSourceCrs(path, baseUrl);
       const nowIso = new Date().toISOString();
       set((state) => {
         if (!state.project) return {};
         return {
           project: {
             ...state.project,
-            pointCloudSource: { filePath: path, crs: metadata.crs, contentHash: null },
+            pointCloudSource: terrainSourceReference(path, crs, state.project.pointCloudSource),
             modifiedAt: nowIso,
           },
           pointCloudRegistration: { status: "success", errorMessage: null },
@@ -782,6 +833,40 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       return {
         project: { ...state.project, mastCentreProject, geometryVersion: state.project.geometryVersion + 1, modifiedAt: nowIso },
       };
+    }),
+  setProjectCrs: (crs) =>
+    set((state) => {
+      if (!state.project) return {};
+      // Changes what every project coordinate *means* (clip requests, CRS
+      // checks against the point cloud / DEM) without moving any of them --
+      // geometry-affecting, like setMastCentreProject. An existing terrain
+      // surface was clipped under the old CRS; TerrainPanel says to regenerate it.
+      return {
+        project: {
+          ...state.project,
+          crs,
+          geometryVersion: state.project.geometryVersion + 1,
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  setDemHeightReference: (heightReference, geoidHeightM) =>
+    set((state) => {
+      const source = state.project?.pointCloudSource;
+      if (!state.project || !source || source.kind !== "dem") return {};
+      const { geoidHeightM: _previous, ...rest } = source;
+      return {
+        project: {
+          ...state.project,
+          pointCloudSource: { ...rest, heightReference, ...(geoidHeightM !== null ? { geoidHeightM } : {}) },
+          modifiedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  setElevationReferenceType: (elevationReferenceType) =>
+    set((state) => {
+      if (!state.project) return {};
+      return { project: { ...state.project, elevationReferenceType, modifiedAt: new Date().toISOString() } };
     }),
   setLineBearingRadians: (lineBearingRadians) =>
     set((state) => {

@@ -216,3 +216,20 @@ def test_a_pdal_failure_becomes_a_clip_processing_error(workspace_with_fixtures,
     monkeypatch.setattr(las_clip_module.pdal.Reader, "las", lambda **kwargs: FailingPipeline())
     with pytest.raises(las_clip_module.ClipProcessingError, match="simulated PDAL failure"):
         clip_las(path, base_request())
+
+
+def test_a_mast_centre_outside_the_file_says_so(workspace_with_fixtures):
+    far = ProjectCoordinate(easting=554_144.3, northing=7_002_237.9, elevation=200.0)
+    path = workspace_with_fixtures / "pointcloud-mixed-classification.las"
+    result = clip_las(path, base_request(local_frame=frame(mast=far), classification_filter=[2]))
+
+    codes = [w.code for w in result.warnings]
+    assert "pointcloud.mast-outside-file-bounds" in codes
+    outside = next(w for w in result.warnings if w.code == "pointcloud.mast-outside-file-bounds")
+    assert "554144.3" in outside.message and "Project panel" in outside.message
+
+
+def test_a_mast_centre_inside_the_file_gives_no_extent_warning(workspace_with_fixtures):
+    path = workspace_with_fixtures / "pointcloud-mixed-classification.las"
+    result = clip_las(path, base_request(classification_filter=[2]))
+    assert all(w.code != "pointcloud.mast-outside-file-bounds" for w in result.warnings)

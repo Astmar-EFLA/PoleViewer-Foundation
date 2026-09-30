@@ -105,3 +105,54 @@ describe("generateTerrainFromPointCloud", () => {
     expect(result.terrainSurface.rejectedTriangleCount).toBeGreaterThan(0);
   });
 });
+
+describe("generateTerrainFromPointCloud: DEM sources", () => {
+  const CLIP_BODY = {
+    points: [
+      { x: 0, y: 0, z: 1.0, classification: 2 },
+      { x: 2, y: 0, z: 1.2, classification: 2 },
+      { x: 0, y: 2, z: 1.4, classification: 2 },
+      { x: 2, y: 2, z: 1.6, classification: 2 },
+    ],
+    sourcePointCount: 16,
+    clippedPointCount: 4,
+    returnedPointCount: 4,
+    classificationCounts: [{ classificationCode: 2, pointCount: 4 }],
+    warnings: [{ code: "dem.derived-surface", severity: "information", message: "DEM cells" }],
+    processingMetadata: {
+      filePath: "IslandsDEM.tif",
+      boundary: { shape: "rectangular", widthM: 40, lengthM: 40, centerOffsetLocal: { x: 0, y: 0 }, rotationRadians: 0 },
+      classificationFilter: null,
+      decimationStep: null,
+      durationMs: 3,
+    },
+  };
+
+  it("sends a DEM source to /dem/clip with its height reference and geoid height, and records the terrain source", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, CLIP_BODY));
+    vi.stubGlobal("fetch", fetchMock);
+    const demSource = { ...SOURCE, filePath: "IslandsDEM.tif", kind: "dem" as const, heightReference: "ellipsoidal" as const, geoidHeightM: 64.5 };
+
+    const result = await generateTerrainFromPointCloud(PROJECT_CONTEXT, demSource, DEFAULT_TERRAIN_GENERATION_SETTINGS, "2026-09-15T00:00:00.000Z");
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain("/dem/clip");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.heightReference).toBe("ellipsoidal");
+    expect(body.geoidHeightM).toBe(64.5);
+    expect(body).not.toHaveProperty("classificationFilter");
+    expect(result.terrainSurface.points).toHaveLength(4);
+    expect(result.terrainSurface.source).toEqual({ kind: "dem", filePath: "IslandsDEM.tif" });
+    expect(result.warnings.map((w) => w.code)).toContain("dem.derived-surface");
+  });
+
+  it("keeps sending a point cloud (and a legacy source with no kind) to /pointcloud/clip", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ...CLIP_BODY, warnings: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateTerrainFromPointCloud(PROJECT_CONTEXT, SOURCE, DEFAULT_TERRAIN_GENERATION_SETTINGS, "2026-09-15T00:00:00.000Z");
+
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/pointcloud/clip");
+    expect(result.terrainSurface.source).toEqual({ kind: "point-cloud", filePath: SOURCE.filePath });
+  });
+});

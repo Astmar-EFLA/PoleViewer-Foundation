@@ -550,10 +550,69 @@ describe("registerPointCloudFromPath", () => {
       filePath: "mast-a.las",
       crs: { kind: "epsg", epsgCode: 3057 },
       contentHash: null,
+      kind: "point-cloud",
     });
     // Only one call (the inspect) -- no upload request was made.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]![0])).toContain("/pointcloud/inspect");
+  });
+
+  const DEM_METADATA_BODY = {
+    filePath: "DEM/IslandsDEM_tile.tif",
+    widthPx: 500,
+    heightPx: 500,
+    pixelSizeXM: 2,
+    pixelSizeYM: 2,
+    extent: { minEasting: 512_000, maxEasting: 513_000, minNorthing: 487_000, maxNorthing: 488_000 },
+    crs: { kind: "epsg", epsgCode: 3057 },
+    nodataValue: -9999,
+    verticalCrsName: null,
+    warnings: [],
+  };
+
+  it("registers a .tif as a DEM through /dem/inspect, defaulting to heights above sea level", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, DEM_METADATA_BODY));
+    vi.stubGlobal("fetch", fetchMock);
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+
+    await useProjectStore.getState().registerPointCloudFromPath("DEM/IslandsDEM_tile.tif");
+
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/dem/inspect");
+    expect(useProjectStore.getState().project?.pointCloudSource).toEqual({
+      filePath: "DEM/IslandsDEM_tile.tif",
+      crs: { kind: "epsg", epsgCode: 3057 },
+      contentHash: null,
+      kind: "dem",
+      heightReference: "orthometric",
+    });
+  });
+
+  it("keeps the previous DEM's height settings for the next DEM tile (e.g. per-mast tiles in a batch)", async () => {
+    // A fresh Response per call -- a Response body can only be read once.
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => jsonResponse(200, DEM_METADATA_BODY)));
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    await useProjectStore.getState().registerPointCloudFromPath("DEM/tile-1.tif");
+    useProjectStore.getState().setDemHeightReference("ellipsoidal", 64.8);
+
+    await useProjectStore.getState().registerPointCloudFromPath("DEM/tile-2.tif");
+
+    const source = useProjectStore.getState().project?.pointCloudSource;
+    expect(source?.filePath).toBe("DEM/tile-2.tif");
+    expect(source?.heightReference).toBe("ellipsoidal");
+    expect(source?.geoidHeightM).toBe(64.8);
+  });
+
+  it("setDemHeightReference only applies to a DEM source, and clearing N removes it", async () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const before = useProjectStore.getState().project?.pointCloudSource;
+    useProjectStore.getState().setDemHeightReference("ellipsoidal", 60);
+    expect(useProjectStore.getState().project?.pointCloudSource).toEqual(before);
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, DEM_METADATA_BODY)));
+    await useProjectStore.getState().registerPointCloudFromPath("DEM/tile.tif");
+    useProjectStore.getState().setDemHeightReference("ellipsoidal", 60);
+    useProjectStore.getState().setDemHeightReference("ellipsoidal", null);
+    expect(useProjectStore.getState().project?.pointCloudSource).not.toHaveProperty("geoidHeightM");
   });
 
   it("surfaces a backend error without touching the existing point-cloud source", async () => {
@@ -688,5 +747,25 @@ describe("batch export", () => {
     useProjectStore.getState().resetBatchExport();
 
     expect(useProjectStore.getState().batchExport).toEqual({ status: "idle", results: [] });
+  });
+});
+
+describe("setProjectCrs", () => {
+  it("changes the project CRS without moving the mast centre, and bumps the geometry version", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    const before = useProjectStore.getState().project!;
+
+    useProjectStore.getState().setProjectCrs({ kind: "epsg", epsgCode: 3006 });
+
+    const after = useProjectStore.getState().project!;
+    expect(after.crs).toEqual({ kind: "epsg", epsgCode: 3006 });
+    expect(after.mastCentreProject).toEqual(before.mastCentreProject);
+    expect(after.geometryVersion).toBe(before.geometryVersion + 1);
+  });
+
+  it("sets the project's height reference", () => {
+    useProjectStore.getState().setProject(buildSyntheticDemoProject());
+    useProjectStore.getState().setElevationReferenceType("orthometric");
+    expect(useProjectStore.getState().project!.elevationReferenceType).toBe("orthometric");
   });
 });
