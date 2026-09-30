@@ -22,11 +22,20 @@ if not exist "%NODE_DIR%\npm.cmd" (
     exit /b 1
 )
 
-:: Optional: point the backend's file workspace at a real project folder
-:: (e.g. a whole line's .pol files on a network drive) instead of the
-:: default backend/workspace/. Put just the folder path, nothing else, in
-:: workspace-root.local.txt next to this script -- that file is gitignored
-:: (it names a real folder on this machine, never something to commit).
+:: Choose the backend's file workspace (the folder the line CSV's .pol /
+:: .las paths must be inside) in a small window listing recently used
+:: folders -- scripts\choose-workspace.ps1. It writes the choice to
+:: workspace-root.local.txt next to this script (gitignored: it names a
+:: real folder on this machine); "Default" removes it, so the backend uses
+:: backend\workspace. Run with /nopick to skip the window and reuse the
+:: last choice.
+if /i not "%~1"=="/nopick" (
+    powershell -NoProfile -STA -ExecutionPolicy Bypass -File "%REPO_ROOT%scripts\choose-workspace.ps1" -RepoRoot "%REPO_ROOT%." >nul
+    if errorlevel 1 (
+        echo Cancelled -- nothing started.
+        exit /b 1
+    )
+)
 set "WORKSPACE_ROOT_FILE=%REPO_ROOT%workspace-root.local.txt"
 if exist "%WORKSPACE_ROOT_FILE%" (
     :: cmd's own `set /p` reads through the console's ANSI code page and

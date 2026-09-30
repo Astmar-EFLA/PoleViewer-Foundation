@@ -36,3 +36,4 @@ npm-debug.log*
 # Local override for start-servers.bat's POLE_VIEWER_WORKSPACE_ROOT --
 # names a real project folder on this machine, never committed.
 workspace-root.local.txt
+workspace-roots-recent.local.txt

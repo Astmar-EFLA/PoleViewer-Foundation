@@ -9,6 +9,18 @@ The **Line** panel imports a whole line as a CSV: one row per mast, in line orde
 
 The coordinates are made-up examples; replace them. A test parses the template, so it always matches the app.
 
+## Workspace folder
+
+The backend only reads files inside **one workspace folder** (`POLE_VIEWER_WORKSPACE_ROOT`). Every `modelPath` and `pointCloudPath` in the CSV must be inside it, either relative to it or as an absolute path within it. If a path falls outside the folder, the backend rejects it: *"filePath resolves outside the approved workspace"*.
+
+Pick the folder when starting the app:
+
+- **`start-servers.bat`** (repo root) opens a small window before starting anything. It lists recently used folders, has **Browse...** to add another, and **Default** for `backend\workspace`. Choose one and click **Start**.
+- **`start-backend.bat`** restarts **only the backend** with a newly chosen folder. Use it to switch between projects (e.g. a line on the O: drive and a local copy on C:) while the frontend keeps running; reload the page afterwards.
+- Add `/nopick` to either script to skip the window and reuse the last choice.
+
+The choice is kept in `workspace-root.local.txt`, and the recent list in `workspace-roots-recent.local.txt`. Both are in the repo root and gitignored.
+
 ## Columns
 
 ### Required
