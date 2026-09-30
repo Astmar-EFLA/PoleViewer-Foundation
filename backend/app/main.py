@@ -16,6 +16,24 @@ logger = logging.getLogger("pole_viewer")
 
 app = FastAPI(title="Pole/Tower Viewer Backend", version="0.1.0")
 
+
+@app.middleware("http")
+async def catch_unhandled_exceptions(request: Request, call_next):
+    """
+    Turns an exception escaping a route into the same generic 500 as
+    unhandled_exception_handler below -- but *inside* the CORS middleware
+    (registered after this, so it wraps it). A 500 from the app-level
+    exception handler bypasses CORS, so the browser drops it for lacking an
+    Access-Control-Allow-Origin header and the frontend can only report
+    "could not reach the local backend", hiding that the backend answered
+    with an error.
+    """
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "An unexpected server error occurred."})
+
 # The frontend dev server (Vite, localhost:5173) is a different origin from
 # this backend (localhost:8100), so the browser preflights every POST with
 # an OPTIONS request; without CORS middleware that preflight gets a bare

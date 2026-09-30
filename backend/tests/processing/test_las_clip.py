@@ -179,3 +179,40 @@ def test_center_offset_moves_the_clip_area(workspace_with_fixtures):
     assert offset_result.clipped_point_count > 0
     for p in offset_result.points:
         assert 10.0 <= p.x <= 20.0
+
+
+def test_local_cs_file_is_clipped_in_its_raw_coordinates_with_a_warning(workspace_with_fixtures):
+    # pointcloud-local-cs.las's only CRS is a WKT LOCAL_CS -- PDAL's crop used to
+    # fail on it ("Geometry::transform() failed. NULL source SRS"), surfacing as
+    # an opaque 500. Its coordinates are now taken to be in the project CRS.
+    path = workspace_with_fixtures / "pointcloud-local-cs.las"
+    result = clip_las(path, base_request(file_path="pointcloud-local-cs.las", classification_filter=[2]))
+
+    assert result.clipped_point_count == 25
+    codes = [w.code for w in result.warnings]
+    assert "pointcloud.local-crs-assumed-project" in codes
+    # Every point is class 1, so the ground filter falls back to "assume ground" -- also said, not silent.
+    assert "pointcloud.assumed-ground-for-clip" in codes
+    local = next(w for w in result.warnings if w.code == "pointcloud.local-crs-assumed-project")
+    assert local.severity == "warning"
+    assert "EPSG:3057" in local.message
+
+
+def test_a_pdal_failure_becomes_a_clip_processing_error(workspace_with_fixtures, monkeypatch):
+    import app.processing.las_clip as las_clip_module
+
+    class FailingPipeline:
+        def __or__(self, other):
+            return self
+
+        def execute(self):
+            raise RuntimeError("simulated PDAL failure")
+
+    path = workspace_with_fixtures / "pointcloud-mixed-classification.las"
+    # inspect_las reads the file through the same pdal.Reader.las -- run it for real
+    # first, then make only the clip pipeline fail.
+    real_metadata = las_clip_module.inspect_las(path)
+    monkeypatch.setattr(las_clip_module, "inspect_las", lambda _path: real_metadata)
+    monkeypatch.setattr(las_clip_module.pdal.Reader, "las", lambda **kwargs: FailingPipeline())
+    with pytest.raises(las_clip_module.ClipProcessingError, match="simulated PDAL failure"):
+        clip_las(path, base_request())

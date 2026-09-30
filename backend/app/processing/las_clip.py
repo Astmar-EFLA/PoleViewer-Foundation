@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pdal
 
+from app.domain.coordinates import CoordinateReferenceSystem, CrsEpsg, CrsExplicit
 from app.geometry.clip_boundary import rectangular_clip_polygon_wkt
 from app.geometry.coordinate_transform import project_to_local_array
 from app.processing.las_inspect import GROUND_CLASSIFICATION_CODE, inspect_las
@@ -39,6 +40,23 @@ class ClipBlockedError(RuntimeError):
     def __init__(self, warnings: list[ProcessingWarning]):
         self.warnings = warnings
         super().__init__("Clip request blocked: " + "; ".join(w.message for w in warnings if w.severity == "blocking"))
+
+
+class ClipProcessingError(RuntimeError):
+    """PDAL failed while clipping -- surfaced to the client as a readable error instead of an opaque 500."""
+
+
+# WKT roots of a "local" / engineering CRS: coordinates in some unnamed
+# planar system, no datum -- nothing PDAL can transform to or from.
+_LOCAL_CRS_WKT_ROOTS = ("LOCAL_CS", "ENGCRS", "ENGINEERINGCRS")
+
+
+def is_local_crs(crs: CoordinateReferenceSystem) -> bool:
+    return isinstance(crs, CrsExplicit) and crs.definition.lstrip().upper().startswith(_LOCAL_CRS_WKT_ROOTS)
+
+
+def _project_crs_label(crs: CoordinateReferenceSystem) -> str:
+    return f"EPSG:{crs.epsg_code}" if isinstance(crs, CrsEpsg) else "the project CRS"
 
 
 def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
@@ -93,7 +111,27 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
             )
         )
 
-    pipeline = pdal.Reader.las(filename=str(file_path)) | pdal.Filter.crop(polygon=wkt)
+    # A file whose only CRS is a LOCAL_CS (e.g. a SWEREF 99 TM export that
+    # was never assigned its real CRS) makes filters.crop fail: PDAL tries to
+    # transform the (CRS-less) crop polygon into the file's CRS and cannot
+    # ("Geometry::transform() failed. NULL source SRS"). Read such a file
+    # with its SRS ignored so the crop runs in the file's raw coordinates --
+    # which are then taken to be in the project CRS, and said so.
+    local_crs = is_local_crs(metadata.crs)
+    if local_crs:
+        warnings.append(
+            ProcessingWarning(
+                code="pointcloud.local-crs-assumed-project",
+                severity="warning",
+                message=(
+                    "The point-cloud file's CRS is a local/undefined one (LOCAL_CS), so its "
+                    f"coordinates were assumed to be in {_project_crs_label(request.project_crs)}. "
+                    "Confirm the file really uses the project's coordinates before relying on the terrain."
+                ),
+            )
+        )
+    reader = pdal.Reader.las(filename=str(file_path), nosrs=True) if local_crs else pdal.Reader.las(filename=str(file_path))
+    pipeline = reader | pdal.Filter.crop(polygon=wkt)
     assumed_filter_excludes_everything = False
     if request.classification_filter and not assume_ground_for_filter:
         if has_classification_dimension:
@@ -108,7 +146,10 @@ def clip_las(file_path: Path, request: ClipRequest) -> ClipResult:
         clipped_count = 0
         arr = None
     else:
-        clipped_count = pipeline.execute()
+        try:
+            clipped_count = pipeline.execute()
+        except RuntimeError as exc:
+            raise ClipProcessingError(f"PDAL could not clip this point cloud: {exc}") from exc
         arr = pipeline.arrays[0] if clipped_count > 0 else None
 
     if clipped_count == 0:
