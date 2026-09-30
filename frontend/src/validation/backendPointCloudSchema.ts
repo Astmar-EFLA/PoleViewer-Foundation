@@ -89,3 +89,28 @@ export type BackendPointCloudMetadata = z.infer<typeof pointCloudMetadataSchema>
 export function parsePointCloudMetadata(input: unknown): ParseResult<BackendPointCloudMetadata> {
   return fromZodSafeParse(pointCloudMetadataSchema.safeParse(input)) as ParseResult<BackendPointCloudMetadata>;
 }
+
+/** /dem/inspect -- the DEM (GeoTIFF) counterpart of pointCloudMetadataSchema. Extent is in the DEM's own CRS. */
+export const demMetadataSchema = z.object({
+  filePath: z.string(),
+  widthPx: z.number().int().positive(),
+  heightPx: z.number().int().positive(),
+  pixelSizeXM: z.number().positive(),
+  pixelSizeYM: z.number().positive(),
+  extent: z.object({
+    minEasting: z.number().finite(),
+    maxEasting: z.number().finite(),
+    minNorthing: z.number().finite(),
+    maxNorthing: z.number().finite(),
+  }),
+  crs: crsSchema,
+  nodataValue: z.number().nullable(),
+  verticalCrsName: z.string().nullable(),
+  warnings: z.array(processingWarningSchema),
+});
+
+export type BackendDemMetadata = z.infer<typeof demMetadataSchema>;
+
+export function parseDemMetadata(input: unknown): ParseResult<BackendDemMetadata> {
+  return fromZodSafeParse(demMetadataSchema.safeParse(input)) as ParseResult<BackendDemMetadata>;
+}

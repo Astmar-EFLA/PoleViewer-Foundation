@@ -28,7 +28,7 @@ The choice is kept in `workspace-root.local.txt`, and the recent list in `worksp
 | Column | Meaning |
 |---|---|
 | `mastName` | Mast name. Batch-export files are named after it (`<mastName>.dxf`, `<mastName>-viewer.html`). |
-| `easting`, `northing` | Mast centre, in the project CRS (e.g. ISN93 / EPSG:3057), m |
+| `easting`, `northing` | Mast centre, in the project CRS, m. The project CRS is chosen in the **Project** panel (ISN93 / EPSG:3057, ISN2016, SWEREF 99 TM / EPSG:3006, or any EPSG code), and applies to every row. |
 | `elevation` | Mast centre elevation, m a.s.l. |
 | `modelPath` | The mast's `.pol` model, relative to the backend workspace folder (`POLE_VIEWER_WORKSPACE_ROOT`), e.g. `BS/10-BS-19_21.pol`. An absolute path inside that folder also works. |
 | `bearingLayerDepthM` | Depth below terrain to the bearing layer, m |
@@ -39,7 +39,7 @@ The choice is kept in `workspace-root.local.txt`, and the recent list in `worksp
 | Column | Meaning |
 |---|---|
 | `legAEasting`, `legANorthing`, `legBEasting`, `legBNorthing` | Surveyed leg coordinates, for the mast's exact orientation instead of estimating it from the centreline. **A = LP, B = RP**, the convention the pole models use. Reversing them gives an orientation exactly 180° wrong. Give all four or none. |
-| `pointCloudPath` | This mast's own `.las`/`.laz`, relative to the workspace folder. Without it, the point cloud currently open in the app is used. |
+| `pointCloudPath` | This mast's terrain source, relative to the workspace folder: a point cloud (`.las`/`.laz`) or a **DEM elevation raster (`.tif`/`.tiff`**, e.g. ÍslandsDEM, Lantmäteriet Markhöjdmodell, ArcticDEM). Without it, the source currently open in the app is used. A DEM keeps the height setting chosen in the Terrain panel (above sea level, or ellipsoidal with a geoid height N). |
 | `foundationTypeId` | Leg foundation type, an id from the foundation library, e.g. `B170-155x155` or `C120-160x160`. Without it, the default type is used. Guy-anchor foundations are not affected. |
 
 ## Format

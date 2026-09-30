@@ -21,6 +21,7 @@ export const terrainSurfaceSchema = z.object({
   duplicatePointCount: z.number().int().nonnegative(),
   generatedAt: z.string().datetime(),
   terrainVersion: z.string().min(1),
+  source: z.object({ kind: z.enum(["point-cloud", "dem"]), filePath: z.string().min(1) }).optional(),
 });
 
 export function parseTerrainSurface(input: unknown): ParseResult<TerrainSurface> {

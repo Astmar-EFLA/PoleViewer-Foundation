@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import { useRef } from "react";
-import type { CoordinateReferenceSystem } from "../domain/coordinates";
+import { useRef, useState } from "react";
+import type { CoordinateReferenceSystem, ElevationReferenceType } from "../domain/coordinates";
 import { downloadProjectJson } from "../services/projectFile";
 import type { AssetStatusState } from "../state/projectStore";
 import { useProjectStore } from "../state/projectStore";
@@ -27,6 +27,101 @@ function formatCrs(crs: CoordinateReferenceSystem): string {
   if (crs.kind === "epsg") return `EPSG:${crs.epsgCode}`;
   if (crs.kind === "explicit") return crs.definition;
   return "unknown";
+}
+
+/** The CRSs this tool is used with; anything else via "Other EPSG". */
+const COMMON_CRS: readonly { readonly epsgCode: number; readonly label: string }[] = [
+  { epsgCode: 3057, label: "ISN93 / Lambert 1993 (EPSG:3057)" },
+  { epsgCode: 8088, label: "ISN2016 / Lambert 2016 (EPSG:8088)" },
+  { epsgCode: 3006, label: "SWEREF 99 TM (EPSG:3006)" },
+];
+
+const ELEVATION_REFERENCE_LABELS: Record<ElevationReferenceType, string> = {
+  orthometric: "Height above sea level (orthometric)",
+  ellipsoidal: "Ellipsoidal height",
+  project: "Project-specific datum",
+  unknown: "Unknown",
+};
+
+function ProjectCrsFields({
+  crs,
+  elevationReferenceType,
+  hasTerrain,
+  onCrsChange,
+  onElevationReferenceChange,
+}: {
+  crs: CoordinateReferenceSystem;
+  elevationReferenceType: ElevationReferenceType;
+  hasTerrain: boolean;
+  onCrsChange: (crs: CoordinateReferenceSystem) => void;
+  onElevationReferenceChange: (value: ElevationReferenceType) => void;
+}) {
+  const epsg = crs.kind === "epsg" ? crs.epsgCode : null;
+  const isCommon = epsg !== null && COMMON_CRS.some((c) => c.epsgCode === epsg);
+  // "Other" is a UI state until a valid code is typed -- the project CRS itself only ever holds a real EPSG code.
+  const [otherMode, setOtherMode] = useState(false);
+  const selectValue = otherMode || !isCommon ? "other" : String(epsg);
+
+  return (
+    <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #ddd" }}>
+      <div style={{ opacity: 0.8, marginBottom: 4 }}>Coordinate system</div>
+      <select
+        value={selectValue}
+        onChange={(e) => {
+          if (e.target.value === "other") {
+            setOtherMode(true);
+          } else {
+            setOtherMode(false);
+            onCrsChange({ kind: "epsg", epsgCode: Number(e.target.value) });
+          }
+        }}
+        style={{ width: "100%", fontSize: 11, marginBottom: 4 }}
+      >
+        {COMMON_CRS.map((c) => (
+          <option key={c.epsgCode} value={c.epsgCode}>
+            {c.label}
+          </option>
+        ))}
+        <option value="other">Other EPSG...</option>
+      </select>
+      {selectValue === "other" && (
+        <label style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+          <span style={{ opacity: 0.8 }}>EPSG code</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={epsg ?? ""}
+            onChange={(e) => {
+              const code = Math.trunc(Number(e.target.value));
+              if (code > 0) onCrsChange({ kind: "epsg", epsgCode: code });
+            }}
+            style={{ width: 90 }}
+          />
+        </label>
+      )}
+      {crs.kind !== "epsg" && <div style={{ fontSize: 10, color: "#c98a12" }}>Current: {formatCrs(crs)}</div>}
+      <label style={{ display: "flex", justifyContent: "space-between", gap: 6, marginBottom: 4 }}>
+        <span style={{ opacity: 0.8 }}>Heights</span>
+        <select
+          value={elevationReferenceType}
+          onChange={(e) => onElevationReferenceChange(e.target.value as ElevationReferenceType)}
+          style={{ fontSize: 11 }}
+        >
+          {(Object.keys(ELEVATION_REFERENCE_LABELS) as ElevationReferenceType[]).map((k) => (
+            <option key={k} value={k}>
+              {ELEVATION_REFERENCE_LABELS[k]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div style={{ opacity: 0.55, fontSize: 10 }}>
+        The mast centre, line CSV and point-cloud / DEM coordinates are all read in this system. Changing it
+        relabels them -- it does not convert coordinates already entered.
+        {hasTerrain && " Regenerate the terrain after changing it."}
+      </div>
+    </div>
+  );
 }
 
 function CoordinateField({
@@ -62,6 +157,8 @@ export function ProjectPanel() {
   const dismissProjectFileLoadError = useProjectStore((s) => s.dismissProjectFileLoadError);
   const setProjectNotes = useProjectStore((s) => s.setProjectNotes);
   const setMastCentreProject = useProjectStore((s) => s.setMastCentreProject);
+  const setProjectCrs = useProjectStore((s) => s.setProjectCrs);
+  const setElevationReferenceType = useProjectStore((s) => s.setElevationReferenceType);
   const setLineBearingRadians = useProjectStore((s) => s.setLineBearingRadians);
   const setPoleModelHeightOffset = useProjectStore((s) => s.setPoleModelHeightOffset);
   const importPoleModelFromFile = useProjectStore((s) => s.importPoleModelFromFile);
@@ -128,6 +225,14 @@ export function ProjectPanel() {
         </div>
       )}
 
+      <ProjectCrsFields
+        crs={project.crs}
+        elevationReferenceType={project.elevationReferenceType}
+        hasTerrain={project.terrainSurface !== null}
+        onCrsChange={setProjectCrs}
+        onElevationReferenceChange={setElevationReferenceType}
+      />
+
       <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #ddd" }}>
         <div style={{ opacity: 0.8, marginBottom: 4 }}>
           Mast centre ({formatCrs(project.crs)})
@@ -172,7 +277,7 @@ export function ProjectPanel() {
       </div>
 
       <div style={{ marginBottom: 8 }}>
-        <div style={{ opacity: 0.8, marginBottom: 2 }}>Point cloud (.las, .laz)</div>
+        <div style={{ opacity: 0.8, marginBottom: 2 }}>Point cloud or DEM (.las, .laz, .tif)</div>
         {project.pointCloudSource && (
           <div style={{ marginBottom: 4 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -198,13 +303,13 @@ export function ProjectPanel() {
           {pointCloudRegistration.status === "loading"
             ? "Uploading..."
             : project.pointCloudSource
-              ? "Replace point cloud..."
-              : "Choose point cloud file..."}
+              ? "Replace point cloud / DEM..."
+              : "Choose point cloud or DEM file..."}
         </button>
         <input
           ref={pointCloudFileInputRef}
           type="file"
-          accept=".las,.laz"
+          accept=".las,.laz,.tif,.tiff"
           style={{ display: "none" }}
           onChange={(e) => void handlePointCloudFileChosen(e)}
         />

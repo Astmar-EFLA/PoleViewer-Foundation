@@ -125,9 +125,22 @@ export function buildEngineeringSummary(project: Project): EngineeringSummary {
     { label: "Elevation reference", value: project.elevationReferenceType },
   ];
   if (project.pointCloudSource) {
+    const source = project.pointCloudSource;
+    const isDem = source.kind === "dem";
+    const heights = isDem
+      ? source.heightReference === "ellipsoidal"
+        ? `, ellipsoidal heights, geoid N = ${source.geoidHeightM !== undefined ? `${source.geoidHeightM.toFixed(2)} m` : "not set"}`
+        : ", heights above sea level"
+      : "";
     projectConfiguration.push({
-      label: "Point-cloud source",
-      value: `${project.pointCloudSource.filePath}${project.pointCloudSource.contentHash ? ` (hash confirmed)` : " (hash not yet confirmed)"}`,
+      label: isDem ? "Terrain source (DEM)" : "Point-cloud source",
+      value: `${source.filePath}${heights}${source.contentHash ? ` (hash confirmed)` : " (hash not yet confirmed)"}`,
+    });
+  }
+  if (project.terrainSurface?.source?.kind === "dem") {
+    projectConfiguration.push({
+      label: "Terrain surface",
+      value: `Built from DEM cells (${project.terrainSurface.source.filePath}) -- derived values, not measured points`,
     });
   }
 
