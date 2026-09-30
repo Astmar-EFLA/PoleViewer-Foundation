@@ -150,7 +150,38 @@ def build_no_ground_classification_fixture() -> None:
     print(f"wrote {out_path}: {n} points, all classification 0 (no ground)")
 
 
+def build_local_cs_fixture() -> None:
+    """
+    A tiny LAS 1.4 file whose only CRS is a WKT LOCAL_CS (an engineering /
+    "local" CRS with no datum) -- what some survey exports write when the
+    real CRS (e.g. SWEREF 99 TM) was never assigned. PDAL cannot transform
+    a crop polygon into such a CRS, so this reproduces the clip failure
+    ("Geometry::transform() failed. NULL source SRS") that las_clip must
+    handle. All points classification 1 (unclassified), like the export
+    that surfaced the bug.
+    """
+    from laspy.vlrs.known import WktCoordinateSystemVlr
+
+    header = laspy.LasHeader(point_format=6, version="1.4")
+    header.scales = np.array([0.01, 0.01, 0.01])
+    header.offsets = np.array([MAST_EASTING, MAST_NORTHING, MAST_ELEVATION])
+    header.global_encoding.wkt = True
+    header.vlrs.append(WktCoordinateSystemVlr('LOCAL_CS["Local",UNIT["metre",1]]'))
+
+    las = laspy.LasData(header)
+    n = 25
+    las.x = MAST_EASTING + np.linspace(-5, 5, n)
+    las.y = MAST_NORTHING + np.linspace(-5, 5, n)
+    las.z = MAST_ELEVATION + np.zeros(n)
+    las.classification = np.ones(n, dtype=np.uint8)
+
+    out_path = f"{OUTPUT_DIR}/pointcloud-local-cs.las"
+    las.write(out_path)
+    print(f"wrote {out_path}: {n} points, LOCAL_CS only, all classification 1")
+
+
 if __name__ == "__main__":
     build_mixed_classification_fixture()
     build_no_crs_fixture()
     build_no_ground_classification_fixture()
+    build_local_cs_fixture()

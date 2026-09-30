@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.processing.las_clip import ClipBlockedError, clip_las
+from app.processing.las_clip import ClipBlockedError, ClipProcessingError, clip_las
 from app.processing.las_inspect import LasReadError, inspect_las
 from app.schemas.pointcloud import ClipRequest, ClipResult, InspectRequest, PointCloudMetadata
 from app.services.limits import ProcessingLimitError
@@ -43,5 +43,5 @@ def clip(request: ClipRequest) -> ClipResult:
                 "warnings": [w.model_dump(by_alias=True) for w in exc.warnings],
             },
         ) from exc
-    except (LasReadError, ProcessingLimitError) as exc:
+    except (LasReadError, ProcessingLimitError, ClipProcessingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

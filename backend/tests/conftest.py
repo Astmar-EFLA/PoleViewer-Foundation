@@ -8,6 +8,7 @@ FIXTURE_FILES = [
     "pointcloud-mixed-classification.las",
     "pointcloud-no-crs.las",
     "pointcloud-no-ground-classification.las",
+    "pointcloud-local-cs.las",
     "pole-model-2leg.pol",
     "line-centreline.zip",
     "orthophoto.jpg",
