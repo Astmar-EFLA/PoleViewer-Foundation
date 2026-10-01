@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_GRAVEL_PAD_THICKNESS_M } from "../domain/fill";
 import { buildSyntheticDemoProject } from "../services/buildSyntheticDemoProject";
 import { exportProjectAsStandaloneHtml } from "../services/exportProjectHtml";
+import { exportProjectAsGlb } from "../services/glbExport";
 import { exportSectionAsDxf } from "../services/sectionDxf";
 import { loadSyntheticFixtureJson } from "../tests/fixtures";
 import { useProjectStore } from "./projectStore";
@@ -19,6 +20,11 @@ vi.mock("../services/exportProjectHtml", () => ({
 // building is covered by sectionDxf.test.ts.
 vi.mock("../services/sectionDxf", () => ({
   exportSectionAsDxf: vi.fn(),
+}));
+// Same reason: the GLB export ends in a browser download. Building the GLB
+// is covered by glbExport.test.ts.
+vi.mock("../services/glbExport", () => ({
+  exportProjectAsGlb: vi.fn().mockResolvedValue(undefined),
 }));
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -47,6 +53,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(exportProjectAsStandaloneHtml).mockClear();
   vi.mocked(exportSectionAsDxf).mockClear();
+  vi.mocked(exportProjectAsGlb).mockClear();
 });
 
 describe("checkPointCloudAssetStatus cancellation", () => {
@@ -734,6 +741,8 @@ describe("batch export", () => {
     expect(dxfBaseName).toBe("mast-good");
     expect(dxfLabel).toBe("mast-good");
     expect(vi.mocked(exportProjectAsStandaloneHtml).mock.calls[0]![1]).toBe("mast-good-viewer");
+    expect(vi.mocked(exportProjectAsGlb)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(exportProjectAsGlb).mock.calls[0]![1]).toBe("mast-good");
   });
 
   it("resetBatchExport returns to idle with no results", async () => {

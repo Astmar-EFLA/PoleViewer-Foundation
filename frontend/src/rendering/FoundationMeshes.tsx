@@ -4,6 +4,7 @@ import type { ViewerFrameDefinition } from "../domain/coordinates";
 import type { FoundationInstance } from "../domain/foundation";
 import { localToViewer } from "../geometry/coordinateTransform";
 import { generateFoundationGeometry, type OrientedFrustum } from "../geometry/foundationGeometry";
+import { buildFrustum } from "./meshGeometry";
 import { domainZRotationToThreeYRotation, toThreeArrayXYZ } from "./threeAdapters";
 import { useAutoDispose } from "./useAutoDispose";
 
@@ -39,41 +40,9 @@ function FrustumPart({ frustum, position, rotationY, colour, opacity }: FrustumP
   const shearX = frustum.shear?.x ?? 0;
   const shearY = frustum.shear?.y ?? 0;
   const geometry = useAutoDispose(
-    useMemo(() => {
-      const { bottomHalfExtents, topHalfExtents, halfHeight } = frustum;
-      // An oblique frustum (leaning pedestal) shifts its faces by -/+ shear/2;
-      // local Y maps to Three's -Z (rendering/threeAdapters.ts toThreeArrayXYZ).
-      const sx = shearX / 2;
-      const sz = -shearY / 2;
-      const positions = new Float32Array(
-        [
-          [-bottomHalfExtents.x - sx, -halfHeight, -bottomHalfExtents.y - sz],
-          [bottomHalfExtents.x - sx, -halfHeight, -bottomHalfExtents.y - sz],
-          [bottomHalfExtents.x - sx, -halfHeight, bottomHalfExtents.y - sz],
-          [-bottomHalfExtents.x - sx, -halfHeight, bottomHalfExtents.y - sz],
-          [-topHalfExtents.x + sx, halfHeight, -topHalfExtents.y + sz],
-          [topHalfExtents.x + sx, halfHeight, -topHalfExtents.y + sz],
-          [topHalfExtents.x + sx, halfHeight, topHalfExtents.y + sz],
-          [-topHalfExtents.x + sx, halfHeight, topHalfExtents.y + sz],
-        ].flat()
-      );
-      // Bottom quad, top quad, then 4 side quads connecting corner i to i+1
-      // at both levels -- the same "ring of bottom corners to ring of top
-      // corners" pattern ExcavationMesh.tsx/FillMesh.tsx use for their
-      // skirts, just with a fixed 4-corner rectangle instead of a sampled
-      // terrain-following ring.
-      const indices: number[] = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7];
-      for (let i = 0; i < 4; i += 1) {
-        const next = (i + 1) % 4;
-        indices.push(i, next, 4 + next, i, 4 + next, 4 + i);
-      }
-
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      geom.setIndex(indices);
-      geom.computeVertexNormals();
-      return geom;
-    }, [
+    // Keyed on the frustum's values: `frustum` itself is regenerated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useMemo(() => buildFrustum(frustum), [
       frustum.bottomHalfExtents.x,
       frustum.bottomHalfExtents.y,
       frustum.topHalfExtents.x,
